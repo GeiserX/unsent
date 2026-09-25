@@ -1,0 +1,5 @@
+/unsent
+/dist/
+coverage.out
+*.test
+.omc/

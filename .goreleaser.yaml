@@ -1,0 +1,22 @@
+version: 2
+project_name: unsent
+
+builds:
+  - main: .
+    env: [CGO_ENABLED=0]
+    # Pseudo-terminals and file locks as used here exist on macOS and Linux
+    # (WSL included), not on native Windows.
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
