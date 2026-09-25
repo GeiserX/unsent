@@ -90,6 +90,22 @@ func (st *stitcher) update(v view) string {
 			b = min(st.b, len(st.text))
 		}
 	}
+	// An empty row at the top of the view is spacing the view itself
+	// carries. Where the last view showed spacing at that spot, the new
+	// view's replaces it rather than adding to it, or the line break would
+	// double. Only as much as the view carries: a blank line that scrolled
+	// out of sight above is real, and stays.
+	lead := len(cur) - len(strings.TrimLeft(cur, " \n"))
+	for ; lead > 0 && a > st.a && a > 0 && isSpace(st.text[a-1]); lead-- {
+		a--
+	}
+	// At the end, spacing that ran to the very end of the last view (an
+	// empty last row then) is now carried by this view, as trailing spacing
+	// or as the break before newly typed words. Spacing followed by more
+	// words the last view showed stays: those words scrolled away below.
+	if end := min(st.b, len(st.text)); b < end && strings.TrimLeft(st.text[b:end], " \n") == "" {
+		b = end
+	}
 	st.text = st.text[:a] + cur + st.text[b:]
 	st.a, st.b = a, a+len(cur)
 	return st.text
@@ -133,6 +149,10 @@ func lostChars(old, new string) int {
 		}
 	}
 	return lost
+}
+
+func isSpace(c byte) bool {
+	return c == ' ' || c == '\n'
 }
 
 // replace makes the view the whole draft.

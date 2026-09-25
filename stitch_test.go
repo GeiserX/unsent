@@ -79,7 +79,12 @@ func (b *boxSim) rows() ([]string, []int) {
 func (b *boxSim) view(t *testing.T) view {
 	rows, starts := b.rows()
 	if want := wrapText(b.text, b.width); !slices.Equal(rows, want) {
-		t.Fatalf("simulator rows differ from wrapText:\n%q\n%q", rows, want)
+		i := 0
+		for i < len(rows) && i < len(want) && rows[i] == want[i] {
+			i++
+		}
+		t.Fatalf("simulator rows differ from wrapText at row %d of %d/%d:\nsim  %q\nwrap %q\ntext %q",
+			i, len(rows), len(want), rows[i:min(len(rows), i+3)], want[i:min(len(want), i+3)], b.text[max(0, len(b.text)-80):])
 	}
 	cr := 0
 	for i, s := range starts {
@@ -296,7 +301,7 @@ func (r *stitchRun) save(v view, what string) string {
 		r.kept = append(r.kept, prev)
 	}
 	if r.log != nil {
-		r.log.spend(lostChars(prev, got))
+		r.log.spend(shrunk(prev, got))
 	}
 	r.last = got
 	r.trail = append(r.trail, fmt.Sprintf("step %d %s: deleted=%d lost=%d kept=%v", r.steps, what, v.deleted, lostChars(prev, got), history || version))
@@ -377,8 +382,22 @@ func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) (ex
 		case 2:
 			r.checkDeleted("delete a word", sim.deleteWord())
 		case 3:
-			sim.insert("\n" + word(n))
-			r.check("new line")
+			if rng.Intn(2) == 0 {
+				sim.insert("\n" + word(n))
+				r.check("new line")
+			} else {
+				// Enter at the end of a line, a pause long enough for a
+				// save, then the word.
+				if i := strings.IndexByte(sim.text[sim.cur:], '\n'); i >= 0 {
+					sim.cur += i
+				} else {
+					sim.cur = len(sim.text)
+				}
+				sim.insert("\n")
+				r.check("Enter, then a pause")
+				sim.insert(word(n))
+				r.check("type the new line")
+			}
 		case 4, 5:
 			sim.moveRows(-1 - rng.Intn(3))
 			r.check("move up")
@@ -688,5 +707,30 @@ func TestStitchSkipsAnUnchangedView(t *testing.T) {
 	st.text = "changed behind its back"
 	if got := st.update(v); got != "changed behind its back" {
 		t.Fatalf("an unchanged view was merged again: %q", got)
+	}
+}
+
+func TestStitchEnterThenPauseKeepsSpacingExact(t *testing.T) {
+	// Found in tmux, which sends Enter and the next letters separately: a
+	// save between them saw an empty last row, and the line break doubled.
+	sim := &boxSim{width: 60, cap: 6}
+	r := &stitchRun{t: t, sim: sim, strict: true, mustBeExact: true}
+	for i := 1; i <= 20; i++ {
+		if i > 1 {
+			sim.insert("\n")
+			r.check("Enter")
+		}
+		sim.insert(fmt.Sprintf("typed line %d", i))
+		r.check("type")
+	}
+	if got := r.st.text; got != sim.text {
+		t.Fatalf("spacing drifted:\ngot  %q\nwant %q", got, sim.text)
+	}
+	// Enter at the end of a line whose next line is out of sight adds a
+	// real blank line: it must survive.
+	sim.cur = strings.Index(sim.text, "typed line 3") + len("typed line 3")
+	for i := 0; i < 10; i++ {
+		sim.moveRows(0)
+		r.check("move")
 	}
 }

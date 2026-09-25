@@ -25,6 +25,9 @@
 - Some redraws are wrapped in synchronized-output marks (`ESC[?2026h` … `ESC[?2026l`); one measured session had 6 matched pairs, not one per keystroke. The screen is never read inside a pair.
 - A paste shows as `[Pasted text #N +M lines]`, or `[Pasted text #N]` with no line break (a 12,000-character one-line paste measured). A 3-line paste shows inline; 6 lines and more become the placeholder.
 - Right after it starts, Claude Code takes several seconds before Esc+Enter makes a new line; keys typed earlier run lines together. Scripted real-app tests wait about 9 s after the box appears.
+- Claude Code runs on the terminal's alternate screen (`ESC[?1049h` at startup), so anything printed before it, such as unsent's recovery notice, is hidden until it exits.
+- Ground truth for a real-app test: Ctrl+G hands the draft to `$EDITOR`. Point `EDITOR` at a script that copies its file argument and exits, and the copy is exactly what Claude Code holds; compare the saved draft to it byte for byte.
+- In tmux, `send-keys Escape Enter` and `send-keys -l '\\'` then `Enter` both make a new line, and `paste-buffer -p` sends a bracketed paste. tmux delivers Enter and the next letters separately, so saves see an empty last row between them (the same as a person pausing after Shift+Enter).
 
 Re-measure these when a Claude Code release changes the prompt. A reader that stops matching fails safe (keeps the last draft) but saves nothing new.
 
