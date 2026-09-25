@@ -3,14 +3,18 @@ package main
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // view is what an extractor sees of the input box on one screen.
 type view struct {
 	// rows are the box's visible rows, prefix stripped, trailing spaces trimmed.
 	rows []string
-	// cursor is the row index of the cursor inside rows, or -1.
-	cursor int
+	// cursor is the row index of the cursor inside rows, or -1, and
+	// cursorEnd whether it sits after the last character of its row.
+	cursor    int
+	cursorEnd bool
 	// width is the column at which the agent wraps a row.
 	width int
 	// capped is true when the box is at its maximum height, so it may be
@@ -18,6 +22,13 @@ type view struct {
 	capped bool
 	// empty is true when the box holds no draft (only a dim hint, or nothing).
 	empty bool
+	// deleted is how many characters the delete keys pressed since the
+	// last view can have removed (unlimited after Ctrl+W, Ctrl+U, Ctrl+K
+	// or undo), and deletedAhead whether one removes text after the cursor
+	// (Delete, Ctrl+K, undo). The screen alone cannot tell text deleted at
+	// the edge of the box from text moved out of sight.
+	deleted      int
+	deletedAhead bool
 }
 
 // An extractor finds the agent's input box on the screen. ok is false when
@@ -73,11 +84,12 @@ func claudeBox(s *screen) (view, bool) {
 		for z := y; z < end; z++ {
 			v.rows = append(v.rows, s.rows[z].textFrom(2))
 		}
-		if shell {
-			v.rows[0] = "!" + v.rows[0]
-		}
 		if s.curY >= y && s.curY < end {
 			v.cursor = s.curY - y
+			v.cursorEnd = s.curX >= 2+runewidth.StringWidth(v.rows[v.cursor])
+		}
+		if shell {
+			v.rows[0] = "!" + v.rows[0]
 		}
 		return v, true
 	}

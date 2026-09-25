@@ -11,7 +11,8 @@ import (
 var (
 	pasteStart = []byte("\x1b[200~")
 	pasteEnd   = []byte("\x1b[201~")
-	// Claude Code shows a long paste as "[Pasted text #2 +39 lines]".
+	// Claude Code shows a long paste as "[Pasted text #2 +39 lines]", or
+	// "[Pasted text #2]" when it has no line break.
 	pastePlaceholder = regexp.MustCompile(`\[Pasted text #\d+(?: \+(\d+) lines?)?\]`)
 )
 
@@ -26,7 +27,9 @@ type pasteTracker struct {
 	pending []byte // a marker split across two reads
 }
 
-func (p *pasteTracker) feed(b []byte) {
+// feed takes keystrokes as they arrive, and returns the bytes that were
+// typed rather than pasted.
+func (p *pasteTracker) feed(b []byte) (typed []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	data := append(p.pending, b...)
@@ -42,18 +45,23 @@ func (p *pasteTracker) feed(b []byte) {
 			keep := partialSuffix(data, marker)
 			if p.in {
 				p.cur = append(p.cur, data[:len(data)-keep]...)
+			} else {
+				typed = append(typed, data[:len(data)-keep]...)
 			}
 			p.pending = append(p.pending, data[len(data)-keep:]...)
-			return
+			return typed
 		}
 		if p.in {
 			p.cur = append(p.cur, data[:i]...)
 			p.pastes = append(p.pastes, normalizeNewlines(string(p.cur)))
 			p.cur = nil
+		} else {
+			typed = append(typed, data[:i]...)
 		}
 		p.in = !p.in
 		data = data[i+len(marker):]
 	}
+	return typed
 }
 
 // partialSuffix returns how many bytes at the end of data are a proper
@@ -99,7 +107,7 @@ func (p *pasteTracker) expand(draft string) string {
 	used := make([]bool, len(pastes))
 	return pastePlaceholder.ReplaceAllStringFunc(draft, func(ph string) string {
 		m := pastePlaceholder.FindStringSubmatch(ph)
-		want := -1
+		want := 0
 		if m[1] != "" {
 			want, _ = strconv.Atoi(m[1])
 		}
@@ -109,7 +117,7 @@ func (p *pasteTracker) expand(draft string) string {
 				continue
 			}
 			nl := strings.Count(strings.TrimRight(text, "\n"), "\n")
-			if want < 0 || nl == want || strings.Count(text, "\n") == want {
+			if nl == want || strings.Count(text, "\n") == want {
 				used[i] = true
 				return text
 			}

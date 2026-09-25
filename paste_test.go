@@ -40,3 +40,11 @@ func TestPasteExpand(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestPasteFeedReturnsOnlyTypedBytes(t *testing.T) {
+	var p pasteTracker
+	typed := p.feed([]byte("ab\x1b[200~x\x0by\x1b[201~\x7f"))
+	if string(typed) != "ab\x7f" {
+		t.Fatalf("typed %q", typed)
+	}
+}
