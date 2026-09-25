@@ -151,3 +151,68 @@ func TestFormatting(t *testing.T) {
 		t.Fatal("samePath")
 	}
 }
+
+func TestCLIRestorePrefersThisFolder(t *testing.T) {
+	st := testStore(t)
+	here, _ := os.Getwd()
+	for i, c := range []struct{ cwd, draft string }{{"/elsewhere", "newest, other folder"}, {here, "this folder's draft"}} {
+		r := newRecord([]string{"claude"}, c.cwd)
+		r.ID, r.Draft, r.Ended = "r"+string(rune('a'+i)), c.draft, time.Now()
+		r.Updated = time.Now().Add(-time.Duration(i) * time.Minute)
+		st.write(r)
+	}
+	if _, out, _ := runCLI("show"); out != "this folder's draft\n" {
+		t.Fatalf("show %q", out)
+	}
+	if _, out, _ := runCLI("show", "1"); out != "newest, other folder\n" {
+		t.Fatalf("show 1 %q", out)
+	}
+}
+
+func TestCLIRestoreKeepsTheDraftIfHistoryFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores the read-only folder this test relies on")
+	}
+	st := seed(t, "precious")
+	bin := t.TempDir()
+	os.WriteFile(filepath.Join(bin, "pbcopy"), []byte("#!/bin/sh\n/bin/cat >/dev/null\n"), 0o755)
+	os.WriteFile(filepath.Join(bin, "wl-copy"), []byte("#!/bin/sh\n/bin/cat >/dev/null\n"), 0o755)
+	t.Setenv("PATH", bin)
+	hist := filepath.Join(st.dir, "history")
+	os.Chmod(hist, 0o500) // the history copy cannot be written
+	defer os.Chmod(hist, 0o700)
+	if code, _, _ := runCLI("restore"); code != 0 {
+		t.Fatal("restore failed")
+	}
+	if len(st.orphans()) != 1 {
+		t.Fatal("the only copy of the draft was removed")
+	}
+}
+
+func TestCLIShowPrintsUnplacedPastes(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/w")
+	r.ID, r.Draft, r.Ended = "p", "see [Pasted text #1 +3 lines]", time.Now()
+	r.Pastes = []string{"a\nb\nc\nd\ne"}
+	st.write(r)
+	_, out, _ := runCLI("show")
+	if !strings.Contains(out, "could not be placed") || !strings.Contains(out, "a\nb\nc\nd\ne") {
+		t.Fatalf("show %q", out)
+	}
+}
+
+func TestCLIListMarksEarlierVersions(t *testing.T) {
+	st := seed(t, "the live draft")
+	r := newRecord([]string{"claude"}, "/work")
+	r.ID, r.Draft = "sess", "an earlier version of it"
+	if err := st.keepVersion(r); err != nil {
+		t.Fatal(err)
+	}
+	_, out, _ := runCLI("list", "--all")
+	if !strings.Contains(out, "(earlier version) an earlier version") {
+		t.Fatalf("list --all:\n%s", out)
+	}
+	if _, out, _ := runCLI("list"); strings.Contains(out, "earlier version") {
+		t.Fatalf("plain list shows versions:\n%s", out)
+	}
+}

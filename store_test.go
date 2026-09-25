@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -120,5 +121,86 @@ func TestStoreWarnOnce(t *testing.T) {
 func TestWriteDurableFailsOnMissingDir(t *testing.T) {
 	if err := writeDurable(filepath.Join(t.TempDir(), "nope", "x.json"), &record{}); err == nil {
 		t.Fatal("no error")
+	}
+}
+
+func TestStoreLocksDownAnExistingFolder(t *testing.T) {
+	dir := t.TempDir()
+	os.Chmod(dir, 0o755)
+	t.Setenv("UNSENT_HOME", dir)
+	if _, err := openStore(); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Stat(dir); fi.Mode().Perm() != 0o700 {
+		t.Fatalf("mode %v", fi.Mode().Perm())
+	}
+}
+
+func TestStoreSweepsOldTempFiles(t *testing.T) {
+	st := testStore(t)
+	old := filepath.Join(st.dir, "drafts", ".tmp-old")
+	fresh := filepath.Join(st.dir, "history", ".tmp-fresh")
+	os.WriteFile(old, nil, 0o600)
+	os.WriteFile(fresh, nil, 0o600)
+	os.Chtimes(old, time.Now().Add(-2*time.Hour), time.Now().Add(-2*time.Hour))
+	st.orphans()
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatal("old temp file kept")
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Fatal("a write in progress was swept")
+	}
+}
+
+func TestStoreTrustsTheFileNameNotTheContent(t *testing.T) {
+	st := testStore(t)
+	victim := newRecord([]string{"claude"}, "/w")
+	victim.ID, victim.Draft = "victim", "keep me"
+	st.write(victim)
+	os.WriteFile(st.lockPath("victim"), nil, 0o600)
+	// A record whose content names another session's ID.
+	liar := newRecord([]string{"claude"}, "/w")
+	liar.ID = "victim"
+	writeDurable(filepath.Join(st.dir, "drafts", "liar.json"), liar)
+	st.orphans() // cleans up the empty "liar" session
+	if _, err := os.Stat(st.draftPath("victim")); err != nil {
+		t.Fatal("cleaning one record removed another's file")
+	}
+	if _, err := os.Stat(st.draftPath("liar")); !os.IsNotExist(err) {
+		t.Fatal("the empty dead session was not cleaned")
+	}
+}
+
+func TestStoreArchiveReportsFailure(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/w")
+	r.Draft = "text"
+	os.RemoveAll(filepath.Join(st.dir, "history"))
+	if err := st.archive(r); err == nil {
+		t.Fatal("archive into a missing folder reported success")
+	}
+}
+
+func TestStoreVersionsAreCappedAndDropped(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/w")
+	r.ID = "sess"
+	for i := 0; i < versionsPerSession+5; i++ {
+		r.Draft = fmt.Sprintf("version %d", i)
+		if err := st.keepVersion(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	other := newRecord([]string{"claude"}, "/w")
+	other.ID, other.Draft = "other", "someone else's"
+	st.keepVersion(other)
+	st.archive(other) // real history, never trimmed by versions
+	count := func(p string) int { n, _ := filepath.Glob(filepath.Join(st.dir, "history", p)); return len(n) }
+	if n := count("v-sess-*.json"); n != versionsPerSession {
+		t.Fatalf("%d versions kept, want %d", n, versionsPerSession)
+	}
+	st.dropVersions(r)
+	if count("v-sess-*.json") != 0 || count("v-other-*.json") != 1 || count("2*.json") != 1 {
+		t.Fatal("dropVersions touched the wrong files")
 	}
 }

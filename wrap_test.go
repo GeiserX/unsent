@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/x/vt"
+	"github.com/creack/pty"
 	"golang.org/x/term"
 )
 
@@ -117,18 +120,45 @@ func runWrapped(t *testing.T, script func(type_ func(string))) (int, *store) {
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	r, w, err := os.Pipe()
+	// A real terminal pair: the wrapper steps aside for pipes.
+	user, term, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
-	devnull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	defer func() { w.Close(); devnull.Close() }()
+	pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
+	ready := make(chan struct{})
+	go func() {
+		// Drain the screen, and start typing once the box is drawn, as a
+		// person would: keys sent earlier reach a terminal not yet in raw
+		// mode, which echoes them and turns Enter into a line feed.
+		var seen []byte
+		waiting := true
+		buf := make([]byte, 4096)
+		for {
+			n, err := user.Read(buf)
+			if waiting {
+				seen = append(seen, buf[:n]...)
+				if strings.Contains(string(seen), "❯") {
+					close(ready)
+					waiting, seen = false, nil
+				}
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	defer func() { user.Close(); term.Close() }()
 
 	code := make(chan int, 1)
-	go func() { code <- wrap([]string{"claude"}, r, devnull) }()
-	time.Sleep(300 * time.Millisecond)
+	go func() { code <- wrap([]string{"claude"}, term, term) }()
+	select {
+	case <-ready:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the fake agent never drew its box")
+	}
 	script(func(s string) {
-		w.WriteString(s)
+		user.WriteString(s)
 		time.Sleep(3 * saveInterval)
 	})
 	select {
@@ -203,7 +233,7 @@ func TestWrapEmptyBoxLeavesNothing(t *testing.T) {
 		type_("\x04")
 	})
 	if rs := st.orphans(); len(rs) != 0 {
-		t.Fatalf("orphans %+v", rs)
+		t.Fatalf("orphans %+v", *rs[0])
 	}
 	names, _ := filepath.Glob(filepath.Join(st.dir, "drafts", "*.json"))
 	if len(names) != 0 {
@@ -214,11 +244,117 @@ func TestWrapEmptyBoxLeavesNothing(t *testing.T) {
 
 func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 	t.Setenv("UNSENT_HOME", t.TempDir())
-	if code := wrap([]string{"sh", "-c", "exit 7"}, os.Stdin, os.Stdout); code != 7 {
+	user, term, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go io.Copy(io.Discard, user)
+	defer func() { user.Close(); term.Close() }()
+	if code := wrap([]string{"sh", "-c", "exit 7"}, term, term); code != 7 {
 		t.Fatalf("exit %d", code)
 	}
-	if code := wrap([]string{"no-such-agent-unsent-test"}, os.Stdin, os.Stdout); code != 127 {
+	if code := wrap([]string{"no-such-agent-unsent-test"}, term, term); code != 127 {
 		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestWrapStepsAsideForPipes(t *testing.T) {
+	t.Setenv("UNSENT_HOME", t.TempDir())
+	var ran []string
+	old := execAgent
+	execAgent = func(bin string, args []string) error { ran = append([]string{bin}, args...); return nil }
+	defer func() { execAgent = old }()
+	r, w, _ := os.Pipe()
+	defer r.Close()
+	defer w.Close()
+	if code := wrap([]string{"sh", "-c", "true"}, r, w); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if len(ran) != 4 || !strings.HasSuffix(ran[0], "/sh") || ran[3] != "true" {
+		t.Fatalf("ran %q", ran)
+	}
+	execAgent = func(string, []string) error { return os.ErrPermission }
+	if code := wrap([]string{"sh"}, r, w); code != 126 {
+		t.Fatalf("exit %d on exec failure", code)
+	}
+}
+
+func TestSessionWaitsForTheFrameToEnd(t *testing.T) {
+	st := testStore(t)
+	reads := 0
+	s := &session{
+		screen: vt.NewEmulator(40, 10),
+		rec:    newRecord([]string{"claude"}, "/w"),
+		store:  st,
+		pastes: &pasteTracker{},
+		read: func(*screen) (view, bool) {
+			reads++
+			return view{}, false
+		},
+	}
+	go io.Copy(io.Discard, s.screen)
+	s.write([]byte("\x1b[?2026hhalf a fra"))
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		s.write([]byte("me\x1b[?2026"))
+		s.write([]byte("l")) // the end mark split across two writes
+	}()
+	s.save()
+	if reads != 1 || s.inFrame {
+		t.Fatalf("reads %d, in frame %v: the save did not wait for the frame to close", reads, s.inFrame)
+	}
+	// A frame that stays open does not hold a save back for long.
+	s.write([]byte("\x1b[?2026hstill drawing"))
+	start := time.Now()
+	s.save()
+	if reads != 2 || time.Since(start) > 5*maxFrameWait {
+		t.Fatalf("reads %d after %v with a frame left open", reads, time.Since(start))
+	}
+}
+
+func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
+	s := &session{read: func(*screen) (view, bool) { t.Fatal("read a broken screen"); return view{}, false }}
+	s.write([]byte("x")) // s.screen is nil: the emulator write panics
+	if !s.broken {
+		t.Fatal("panic not caught")
+	}
+	s.write([]byte("more output keeps flowing"))
+	s.dirty = true
+	s.save()
+}
+
+func TestDeleteKeys(t *testing.T) {
+	cases := []struct {
+		keys  string
+		chars int64
+		ahead bool
+	}{
+		{"\x7f", 1, false},
+		{"\x7f\x7f\x08", 3, false},
+		{"x\x1b[3~", 1, true},
+		{"\x17", unlimited, false},
+		{"\x15", unlimited, false},
+		{"\x0b", unlimited, true},
+		{"\x1f", unlimited, true},
+		{"hello \x1b[A\r", 0, false},
+	}
+	for _, c := range cases {
+		if chars, ahead := deleteKeys([]byte(c.keys)); chars != c.chars || ahead != c.ahead {
+			t.Errorf("%q: %d %v, want %d %v", c.keys, chars, ahead, c.chars, c.ahead)
+		}
+	}
+}
+
+func TestSimilar(t *testing.T) {
+	a := "please refactor the auth module and keep every test green"
+	if !similar(a, a+" today") || !similar(a, strings.Replace(a, "auth", "login", 1)) {
+		t.Fatal("an edit read as a different text")
+	}
+	if similar(a, "an entirely different prompt recalled from history, nothing shared") {
+		t.Fatal("a different text read as an edit")
+	}
+	if !similar("short", "other") {
+		t.Fatal("short drafts are always edits")
 	}
 }
 
@@ -239,5 +375,51 @@ func TestWrapCtrlZSuspendsTheWrapper(t *testing.T) {
 	rs := st.orphans()
 	if len(rs) != 1 || rs[0].Draft != "before after" {
 		t.Fatalf("orphans %+v", rs)
+	}
+}
+
+func TestKeepOld(t *testing.T) {
+	old := "please refactor the auth module and keep every test green before the release"
+	cases := []struct {
+		draft            string
+		stitched         bool
+		history, version bool
+		why              string
+	}{
+		{"", false, true, false, "the box emptied"},
+		{"an unrelated prompt recalled from history with nothing in common", false, true, false, "replaced wholesale"},
+		{strings.Replace(old, " module", "", 1), true, false, true, "text lost from a stitched draft keeps a copy"},
+		{strings.Replace(old, " module", "", 1), false, false, false, "the whole draft is on screen: a real deletion"},
+		{old + " today", true, false, false, "typing"},
+		{strings.Replace(old, "release", "rel", 1), true, false, true, "a word shrank"},
+		{strings.Replace(old, "green", "greenish", 1), true, false, false, "typing into a word"},
+		{strings.Replace(old, "green", "gren", 1), true, false, true, "a letter deleted"},
+	}
+	for _, c := range cases {
+		if h, v := keepOld(old, c.draft, c.stitched); h != c.history || v != c.version {
+			t.Errorf("%s: keepOld = %v %v, want %v %v", c.why, h, v, c.history, c.version)
+		}
+	}
+	if h, v := keepOld("", "anything", true); h || v {
+		t.Error("an empty old draft has nothing to keep")
+	}
+}
+
+func TestLostChars(t *testing.T) {
+	if n := lostChars("a hel", "a hello"); n != 0 {
+		t.Fatalf("a half-typed word counted as lost: %d", n)
+	}
+	if n := lostChars("x the y", "x then there y"); n != 0 {
+		t.Fatalf("growth in place counted as lost: %d", n)
+	}
+	if n := lostChars("a helo b", "a hello b"); n != 0 {
+		t.Fatalf("a letter typed into a word counted as lost: %d", n)
+	}
+	if n := lostChars("前文字後", "前後"); n != 2 {
+		t.Fatalf("wide characters: lost %d, want 2 (characters, not bytes)", n)
+	}
+	// "the" lost at one end, "then" typed at the other: not growth.
+	if n := lostChars("the a b c d", "a b c d then"); n != 3 {
+		t.Fatalf("lost %d, want 3", n)
 	}
 }

@@ -73,16 +73,19 @@ Anything else runs through `unsent` unchanged; it just isn't saved yet.
 3. When the text changes, it writes it to disk: a temporary file, flushed with `fsync`, then renamed into place. A power cut leaves the previous save or the new one, never half a file.
 4. When the box empties because you sent or cleared it, the draft moves to history. When the agent exits with text still in the box, the draft stays for `unsent restore`.
 
+**One promise.** `unsent` never throws away text you didn't delete. Text in view is read exactly. Text out of sight above or below the box is inferred, and an inference can be wrong, so while a draft is taller than the box every save that loses text first keeps the previous version. Whatever `unsent` gets wrong, a correct copy is in `unsent list --all`, marked "(earlier version)". Those copies are capped at 30 per session and deleted once the prompt is sent.
+
 A few things make that more than a screenshot:
 
-- **Long drafts.** Claude Code's box stops growing at half the window height and scrolls inside itself, so the screen only shows part of a long prompt. `unsent` lines each view up against what it has already seen and stitches the full draft together, including edits you make after scrolling back up.
+- **Long drafts.** Claude Code's box stops growing at half the window height and scrolls inside itself, so the screen only shows part of a long prompt. `unsent` lines each view up, word by word, against what it has already seen, and keeps the parts above and below it. Edits you make after scrolling back up, and resizing the window, both work. The screen can't tell text you deleted from text that only moved out of sight. The delete keys you pressed in the last second can, so `unsent` counts them.
 - **Big pastes.** Claude Code shows a long paste as `[Pasted text #1 +39 lines]`. Terminals mark pasted text with special codes, so `unsent` records the paste as it goes in and puts the real text back in place of the placeholder.
 - **Ctrl+Z.** Suspending works as usual: your shell shows the job as stopped, and `fg` brings the agent back.
+- **Pipes.** When input or output isn't a terminal (`git diff | claude -p "review"`, `claude -p x > out.md`), `unsent` hands over to the agent directly. There's no input box to save, so the alias is safe to keep.
 - **Knowing what's dead.** Each session holds a file lock, and the operating system releases it when the process dies, whether it exits, crashes or the machine reboots. A process ID can't be trusted for this because a reboot reuses them. The lock can.
 
 ## Where your drafts live
 
-Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session and `history/` keeps the last 500 drafts you cleared, sent or restored. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
+Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, sent or restored, plus the capped earlier versions. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
 
 ## Limits
 
@@ -90,6 +93,8 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - Pasted images show as `[Image #1]` and come back as that placeholder.
 - A screen can't tell a wrapped line from a line you ended by hand exactly where the row was full. In that one case the line break comes back as a space. Lines that start a list item, heading, quote or code block are kept on their own line.
 - If a whole long draft lands in the box between two saves, only the part on screen is recovered. Typing never goes that fast.
+- In a draft taller than the box, a few edits can't be read off the screen for certain: for example, typing a word identical to the next word hidden below the box, or typing, deleting and scrolling at the edge of the box within one 0.4-second save. Then the live draft can come out slightly wrong. In simulation that's about 1 save in 100 with ordinary text, a little more with heavily repeated words or with Ctrl+W. Thanks to the promise above, the correct text is still in history.
+- A draft that changes wholesale, like a prompt recalled with the Up arrow, is saved from what's on screen, and the old draft goes to history.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.
 
 ## Development

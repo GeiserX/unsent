@@ -47,8 +47,12 @@ func TestClaudeBoxTypedText(t *testing.T) {
 	if strings.Join(v.rows, "|") != "hello from unsent|second line" {
 		t.Fatalf("rows %q", v.rows)
 	}
-	if v.cursor != 1 || v.width != 96 || v.capped {
-		t.Fatalf("cursor=%d width=%d capped=%v", v.cursor, v.width, v.capped)
+	if v.cursor != 1 || !v.cursorEnd || v.width != 96 || v.capped {
+		t.Fatalf("cursor=%d end=%v width=%d capped=%v", v.cursor, v.cursorEnd, v.width, v.capped)
+	}
+	s = screenFromText(claudeScreen("❯\u00a0hello▮ world"), 100)
+	if v, _ := claudeBox(s); v.cursor != 0 || v.cursorEnd {
+		t.Fatalf("cursor mid-row read as at the end: %+v", v)
 	}
 }
 

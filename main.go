@@ -22,8 +22,9 @@ const usage = `unsent: AutoRecover for AI agent prompts.
 
 Usage:
   unsent <agent> [args...]   run the agent with its input box saved as you type
-  unsent list [--all]        list drafts left behind (--all adds cleared ones)
-  unsent show [N]            print draft N (default: the newest)
+  unsent list [--all]        list drafts left behind (--all adds cleared ones
+                             and earlier versions)
+  unsent show [N]            print draft N (default: this folder's newest)
   unsent restore [N]         copy draft N to the clipboard and mark it restored
   unsent version
 
@@ -116,7 +117,11 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	for i, r := range rs {
-		fmt.Fprintf(stdout, "%3d  %s  %-24s  %s\n", i+1, when(r.Updated), shortPath(r.Cwd, 24), preview(r.Draft, 60))
+		mark := ""
+		if r.Version {
+			mark = "(earlier version) "
+		}
+		fmt.Fprintf(stdout, "%3d  %s  %-24s  %s%s\n", i+1, when(r.Updated), shortPath(r.Cwd, 24), mark, preview(r.Draft, 60-len(mark)))
 	}
 	return 0
 }
@@ -140,9 +145,24 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 			return 2
 		}
 	}
+	if len(args) == 0 {
+		// The recovery notice promised this folder's draft: prefer it.
+		cwd, _ := os.Getwd()
+		for i, r := range rs {
+			if isDraftFile(st, r) && samePath(r.Cwd, cwd) {
+				n = i + 1
+				break
+			}
+		}
+	}
 	r := rs[n-1]
 	if !restore {
 		fmt.Fprintln(stdout, r.Draft)
+		for _, p := range r.Pastes {
+			if !strings.Contains(r.Draft, p) {
+				fmt.Fprintf(stdout, "\n--- a paste that could not be placed in the draft ---\n%s\n", p)
+			}
+		}
 		return 0
 	}
 	if err := copyToClipboard(r.Draft); err != nil {
@@ -151,13 +171,28 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 		fmt.Fprintf(stderr, "unsent: no clipboard (%v); printed the draft instead\n", err)
 		return 0
 	}
-	if isDraftFile(st, r) {
-		st.archive(r)
+	// Leave the draft in place unless its copy in history is safely written.
+	if isDraftFile(st, r) && st.archive(r) == nil {
 		st.remove(r)
 	}
 	fmt.Fprintf(stderr, "Copied %s from %s to the clipboard. Paste it into the agent.\n",
 		lines(r.Draft), when(r.Updated))
+	if n := unplaced(r); n > 0 {
+		// Restoring moved the draft to history, so its number changed.
+		fmt.Fprintf(stderr, "%d paste(s) could not be put back in place: find the draft in `unsent list --all`, and `unsent show <number>` prints them.\n", n)
+	}
 	return 0
+}
+
+// unplaced counts a record's pastes that are not in its draft.
+func unplaced(r *record) int {
+	n := 0
+	for _, p := range r.Pastes {
+		if !strings.Contains(r.Draft, p) {
+			n++
+		}
+	}
+	return n
 }
 
 // noticeOrphans tells the user, before the agent starts, that a draft from

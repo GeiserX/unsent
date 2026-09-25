@@ -23,6 +23,10 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test -race -count=1 -coverprofile=coverage.out ./...
+      # The race detector runs a shortened fuzz; run the full one without it.
+      - run: go test -count=1 -run Fuzz ./...
+        env:
+          UNSENT_FUZZ_SEEDS: "50"
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v7
