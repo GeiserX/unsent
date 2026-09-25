@@ -415,8 +415,8 @@ func TestLostChars(t *testing.T) {
 	if n := lostChars("a helo b", "a hello b"); n != 0 {
 		t.Fatalf("a letter typed into a word counted as lost: %d", n)
 	}
-	if n := lostChars("前文字後", "前後"); n != len("文字") {
-		t.Fatalf("wide characters: lost %d, want %d", n, len("文字"))
+	if n := lostChars("前文字後", "前後"); n != 2 {
+		t.Fatalf("wide characters: lost %d, want 2 (characters, not bytes)", n)
 	}
 	// "the" lost at one end, "then" typed at the other: not growth.
 	if n := lostChars("the a b c d", "a b c d then"); n != 3 {

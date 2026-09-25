@@ -95,7 +95,8 @@ func (st *stitcher) update(v view) string {
 	return st.text
 }
 
-// lostChars counts the characters of the words in old that are not in
+// lostChars counts the characters (not bytes: a delete key removes one
+// character) of the words in old that are not in
 // new, ignoring spacing. It compares only the stretch where the two differ
 // (trimming the words they share at the start and the end), so a word is
 // judged against its own surroundings. There, a word that was typed into
@@ -128,7 +129,7 @@ func lostChars(old, new string) int {
 		case k < len(n) && grewFrom(n[k], w):
 			// Typed into, in place.
 		default:
-			lost += len(w)
+			lost += utf8.RuneCountInString(w)
 		}
 	}
 	return lost
@@ -214,7 +215,7 @@ func align(old, seen []word, shownA, shownB, width, deleted int) (p, q, shared i
 		return abs(old[f].start - shownA)
 	}
 	drop := func(w string) int {
-		if len(w) <= deleted {
+		if utf8.RuneCountInString(w) <= deleted {
 			return 1
 		}
 		return impossible
@@ -223,7 +224,7 @@ func align(old, seen []word, shownA, shownB, width, deleted int) (p, q, shared i
 		switch {
 		case grewFrom(s, old) || cutAtEdge(s, old, first, last, width):
 			return 1
-		case deleted > 0 && len(old)-len(s) <= deleted && removed(s, old) <= deleted:
+		case deleted > 0 && utf8.RuneCountInString(old)-utf8.RuneCountInString(s) <= deleted && removed(s, old) <= deleted:
 			// (removed is at least the length difference: check that first,
 			// it is free.)
 			return 2
@@ -312,10 +313,11 @@ func grewFrom(s, old string) bool {
 	return i == len(old)
 }
 
-// removed is how many of old's characters must have been deleted to turn
+// removed is how many of word's characters must have been deleted to turn
 // it into s by deleting and typing: those not in their longest common
 // subsequence.
-func removed(s, old string) int {
+func removed(str, word string) int {
+	s, old := []rune(str), []rune(word)
 	if len(s)*len(old) > 1<<16 {
 		return len(old) // too long to compare cheaply; words rarely are
 	}

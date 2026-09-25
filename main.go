@@ -178,7 +178,8 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 	fmt.Fprintf(stderr, "Copied %s from %s to the clipboard. Paste it into the agent.\n",
 		lines(r.Draft), when(r.Updated))
 	if n := unplaced(r); n > 0 {
-		fmt.Fprintf(stderr, "%d paste(s) could not be put back in place; `unsent show %s` prints them.\n", n, n0(args))
+		// Restoring moved the draft to history, so its number changed.
+		fmt.Fprintf(stderr, "%d paste(s) could not be put back in place: find the draft in `unsent list --all`, and `unsent show <number>` prints them.\n", n)
 	}
 	return 0
 }
@@ -192,14 +193,6 @@ func unplaced(r *record) int {
 		}
 	}
 	return n
-}
-
-// n0 is the draft number the user asked for, for messages.
-func n0(args []string) string {
-	if len(args) > 0 {
-		return args[0]
-	}
-	return ""
 }
 
 // noticeOrphans tells the user, before the agent starts, that a draft from

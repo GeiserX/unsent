@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -418,8 +420,12 @@ func (b *boxSim) rows0() []string {
 	return rows
 }
 
-// fuzzSeeds is how many random runs each fuzz test makes.
+// fuzzSeeds is how many random runs each fuzz test makes
+// (UNSENT_FUZZ_SEEDS overrides it).
 func fuzzSeeds() int64 {
+	if n, err := strconv.ParseInt(os.Getenv("UNSENT_FUZZ_SEEDS"), 10, 64); err == nil && n > 0 {
+		return n
+	}
 	if raceEnabled || testing.Short() {
 		// The race detector looks for concurrency bugs, and the stitcher
 		// has none; CI runs the full fuzz without it.
