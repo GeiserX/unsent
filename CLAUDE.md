@@ -13,6 +13,7 @@
 | `stitch.go` | Rebuilds drafts taller than the box: word-level edit-distance alignment of each view against the known text; un-wraps rows back into lines |
 | `paste.go` | Captures bracketed pastes and expands `[Pasted text #N +M lines]` |
 | `store.go` | Durable writes, history, per-session lock files |
+| `testdata/claude/<version>/` | Real Claude Code captures (raw bytes, screens, editor copies) that `replay_test.go` replays through the reader and stitcher |
 
 ## Facts about Claude Code's box (measured on 2.1.282)
 
