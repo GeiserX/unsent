@@ -129,7 +129,7 @@ unset _unsent_a
   - curl: no quarantine [measured (lane)].
   - Browser download of a release tarball: quarantined, so Gatekeeper blocks the first run [docs: Apple; not executed, to avoid a dialog].
   - Casks: quarantined [measured, re-checked on copilot-cli].
-- **How, if wanted:** goreleaser OSS `notarize.macos` (anchore/quill) runs on Linux and needs a Developer ID `.p12` plus password and an App Store Connect `.p8` key with issuer ID and key ID [docs: https://goreleaser.com/customization/notarize/, not re-checked]. A bare Mach-O cannot have a ticket stapled, so Gatekeeper checks notarization online on first run [docs: Apple, not re-checked]. `personal/CLAUDE.md` lists an "Apple Developer" entry in the `secrets.md` index, so an account exists [source, re-checked in the index table].
+- **How, if wanted:** goreleaser OSS `notarize.macos` (anchore/quill) runs on Linux and needs a Developer ID `.p12` plus password and an App Store Connect `.p8` key with issuer ID and key ID [docs: https://goreleaser.com/customization/notarize/, not re-checked]. A bare Mach-O cannot have a ticket stapled, so Gatekeeper checks notarization online on first run [docs: Apple, not re-checked]. The maintainer has an Apple Developer account.
 - **Recommendation:** leave it off until there is a cask or a real browser-download audience. It fixes only that path.
 
 ---

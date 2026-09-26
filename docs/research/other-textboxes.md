@@ -65,7 +65,7 @@ Notes:
 | Write method | Lane's number | Skeptic re-run | Tag |
 |---|---|---|---|
 | fork+exec of `/usr/bin/true` | ~176 ms | 148 ms (20 runs) | measured |
-| `print -rn >| file` | 4.5 ms | 2.7 ms (200 runs) | measured |
+| `print -rn >\| file` | 4.5 ms | 2.7 ms (200 runs) | measured |
 | sysopen + write + close + `mv` (builtin, `zsh/files`) | 13 ms | **0.38 ms** (200 runs) | measured |
 | same with `O_SYNC` | 18.5 ms | **0.38 ms** | measured |
 | `syswrite` append to an fd opened once | 0.014 ms | 0.0075 ms (2000 runs) | measured |
