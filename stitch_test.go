@@ -515,17 +515,19 @@ func fuzzSeeds() int64 {
 // the user deleted it. Measured: how often the live draft is exactly
 // right, which must stay above a floor. Views are partial, so a few rare
 // edits (typing, deleting and scrolling at the box edge within one 0.4 s
-// save) are misread; the guarantee makes that safe. Exact has two floors:
-// the same words in the same order, and the same bytes (byteExact), which
-// catches lost and doubled line breaks. The floors sit at the rates
-// measured with blank-line edits, so they can only go up.
+// save) are misread; the guarantee makes that safe. Exact has three
+// floors: the same words in the same order; the same bytes (byteExact),
+// which catches lost and doubled line breaks; and identical, with no
+// allowance, which catches a line break at a full row the stitcher kept
+// before and now turns into a space. The floors sit at the rates measured
+// with blank-line edits, so they can only go up.
 
 func TestStitchFuzzUniqueWords(t *testing.T) {
 	for _, m := range []struct {
-		mode             string
-		floor, byteFloor float64
-	}{{"exact", 0.995, 0.88}, {"window", 0.99, 0.88}, {"unlimited", 0.95, 0.86}} {
-		t.Run(m.mode, func(t *testing.T) { fuzzRate(t, 0, m.mode, m.floor, m.byteFloor) })
+		mode                       string
+		floor, byteFloor, rawFloor float64
+	}{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.95, 0.86, 0.55}} {
+		t.Run(m.mode, func(t *testing.T) { fuzzRate(t, 0, m.mode, m.floor, m.byteFloor, m.rawFloor) })
 	}
 }
 
@@ -534,24 +536,27 @@ func TestStitchFuzzUniqueWords(t *testing.T) {
 // word identical to the next hidden word looks like that word having been
 // there all along.
 func TestStitchFuzzRepeatedWords(t *testing.T) {
-	fuzzRate(t, 40, "window", 0.95, 0.84)
+	fuzzRate(t, 40, "window", 0.95, 0.84, 0.56)
 }
 
-func fuzzRate(t *testing.T, vocab int, mode string, floor, byteFloor float64) {
+func fuzzRate(t *testing.T, vocab int, mode string, floor, byteFloor, rawFloor float64) {
 	t.Helper()
 	exact, bytes, raw, saves := 0, 0, 0, 0
 	for seed := int64(1); seed <= fuzzSeeds(); seed++ {
 		r := fuzzStitch(t, seed, vocab, seed%2 == 0, mode)
 		exact, bytes, raw, saves = exact+r.exact, bytes+r.bytes, raw+r.raw, saves+r.exact+r.near
 	}
-	rate, byteRate := float64(exact)/float64(saves), float64(bytes)/float64(saves)
+	rate, byteRate, rawRate := float64(exact)/float64(saves), float64(bytes)/float64(saves), float64(raw)/float64(saves)
 	t.Logf("%d of %d saves exact (%.2f%%), %d byte-exact (%.2f%%), %d identical (%.2f%%)",
-		exact, saves, 100*rate, bytes, 100*byteRate, raw, 100*float64(raw)/float64(saves))
+		exact, saves, 100*rate, bytes, 100*byteRate, raw, 100*rawRate)
 	if rate < floor {
 		t.Fatalf("exact rate %.4f below %.4f", rate, floor)
 	}
 	if byteRate < byteFloor {
 		t.Fatalf("byte-exact rate %.4f below %.4f", byteRate, byteFloor)
+	}
+	if rawRate < rawFloor {
+		t.Fatalf("identical rate %.4f below %.4f", rawRate, rawFloor)
 	}
 }
 
@@ -665,11 +670,40 @@ func TestUnwrap(t *testing.T) {
 		{"code fence starts a new line", []string{"aaaa bbbb", "```go"}, 10, "aaaa bbbb\n```go"},
 		{"blank row is kept", []string{"aaaa bbbb", "", "cc"}, 10, "aaaa bbbb\n\ncc"},
 		{"full row then hand newline joins (known limit)", []string{"aaaa bbbb", "cccc"}, 10, "aaaa bbbb cccc"},
+		{"next word fits exactly: a hand newline", []string{"aaaa", "bbbbb"}, 10, "aaaa\nbbbbb"},
+		{"next word one column too wide: a wrap", []string{"aaaa", "bbbbbb"}, 10, "aaaa bbbbbb"},
 		{"no rows", nil, 10, ""},
 	}
 	for _, c := range cases {
 		if got := unwrap(c.rows, c.width); got != c.want {
 			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// byteExact is the fuzz's only check on unwrap's full-row boundary, so it
+// is pinned here: a checker with the same off-by-one as unwrap would
+// excuse it.
+func TestByteExact(t *testing.T) {
+	cases := []struct {
+		name       string
+		got, truth string
+		want       bool
+	}{
+		{"identical", "aa\nbb", "aa\nbb", true},
+		{"break joined at a full row", "aaaa bbbb cccc", "aaaa bbbb\ncccc", true},
+		{"break joined where the next word fits exactly", "aaaa bbbbb", "aaaa\nbbbbb", false},
+		{"break joined one column past the fit", "aaaa bbbbbb", "aaaa\nbbbbbb", true},
+		{"a line of several rows is judged by its last row", "aaaa bbbb cccc dddd", "aaaa bbbb cccc\ndddd", false},
+		{"blank line lost", "aaaa bbbb\ncccc", "aaaa bbbb\n\ncccc", false},
+		{"line break doubled", "aa\n\nbb", "aa\nbb", false},
+		{"break before a blank line never joins", "aaaa bbbbb \ncccc", "aaaa bbbbb\n\ncccc", false},
+		{"break ending an empty line never joins", "aa\n cccccccccc", "aa\n\ncccccccccc", false},
+		{"a changed word", "aa\nbc", "aa\nbb", false},
+	}
+	for _, c := range cases {
+		if got := byteExact(c.got, c.truth, 10); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}
 }
