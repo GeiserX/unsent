@@ -204,3 +204,60 @@ func TestStoreVersionsAreCappedAndDropped(t *testing.T) {
 		t.Fatal("dropVersions touched the wrong files")
 	}
 }
+
+func TestStoreVersionsGlobalCap(t *testing.T) {
+	st := testStore(t)
+	for i := 0; i < versionsLimit+3; i++ {
+		r := newRecord([]string{"claude"}, "/w")
+		r.ID, r.Draft = fmt.Sprintf("s%03d", i), "draft"
+		if err := st.keepVersion(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names, _ := filepath.Glob(filepath.Join(st.dir, "history", "v-*.json"))
+	if len(names) != versionsLimit {
+		t.Fatalf("%d versions kept, want %d", len(names), versionsLimit)
+	}
+}
+
+func TestStoreWriteFailures(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores the read-only folders this test relies on")
+	}
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/w")
+	r.Draft = "text"
+	hist := filepath.Join(st.dir, "history")
+	os.Chmod(hist, 0o500)
+	defer os.Chmod(hist, 0o700)
+	if err := st.keepVersion(r); err == nil {
+		t.Fatal("a version written into a read-only folder")
+	}
+	if err := st.keepVersion(&record{ID: "empty"}); err != nil {
+		t.Fatal("an empty draft needs no version")
+	}
+	// A state folder that cannot be created.
+	file := filepath.Join(t.TempDir(), "a-file")
+	os.WriteFile(file, nil, 0o600)
+	t.Setenv("UNSENT_HOME", filepath.Join(file, "state"))
+	if _, err := openStore(); err == nil {
+		t.Fatal("opened a store under a file")
+	}
+}
+
+func TestStoreHoldTwice(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/w")
+	if err := st.hold(r); err != nil {
+		t.Fatal(err)
+	}
+	other := &store{dir: st.dir}
+	if err := other.hold(r); err == nil {
+		t.Fatal("a second holder took a lock that is held")
+	}
+	st.release()
+	if err := other.hold(r); err != nil {
+		t.Fatalf("lock not free after release: %v", err)
+	}
+	other.release()
+}

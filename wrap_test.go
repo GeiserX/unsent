@@ -423,3 +423,16 @@ func TestLostChars(t *testing.T) {
 		t.Fatalf("lost %d, want 3", n)
 	}
 }
+
+func TestLogView(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "views.jsonl")
+	before := stitcher{text: "old", a: 0, b: 3}
+	after := stitcher{text: "old new"}
+	logView(path, before, view{rows: []string{"old new"}, width: 80}, after)
+	logView(path, after, view{rows: []string{"old new more"}, width: 80}, after)
+	b, err := os.ReadFile(path)
+	if err != nil || strings.Count(string(b), "\n") != 2 || !strings.Contains(string(b), `"after":"old new"`) {
+		t.Fatalf("log %q, err %v", b, err)
+	}
+	logView(filepath.Join(path, "not-a-dir", "x"), before, view{}, after) // must not panic
+}

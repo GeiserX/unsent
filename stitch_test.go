@@ -734,3 +734,14 @@ func TestStitchEnterThenPauseKeepsSpacingExact(t *testing.T) {
 		r.check("move")
 	}
 }
+
+func TestStitchEmptyTopRowReplacesTheSameBreak(t *testing.T) {
+	// The last view began with a blank row; this one too, with a word typed
+	// below it. The blank row's line break is the one already in the text,
+	// not a new one.
+	st := stitcher{text: "one two\n\nthree four", a: len("one two\n"), b: len("one two\n\nthree four")}
+	got := st.update(view{rows: []string{"", "three four five"}, width: 40, capped: true, cursor: 1, cursorEnd: true})
+	if want := "one two\n\nthree four five"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}

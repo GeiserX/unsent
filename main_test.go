@@ -216,3 +216,32 @@ func TestCLIListMarksEarlierVersions(t *testing.T) {
 		t.Fatalf("plain list shows versions:\n%s", out)
 	}
 }
+
+func TestBuildVersion(t *testing.T) {
+	old := version
+	defer func() { version = old }()
+	version = "9.9.9"
+	if buildVersion() != "9.9.9" {
+		t.Fatal(buildVersion())
+	}
+	version = "dev"
+	if v := buildVersion(); v == "" {
+		t.Fatal("empty version")
+	}
+}
+
+func TestRestoreMentionsUnplacedPastes(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/work")
+	r.ID, r.Draft, r.Ended = "p", "see [Pasted text #1 +3 lines]", time.Now()
+	r.Pastes = []string{"a\nb\nc\nd"}
+	st.write(r)
+	bin := t.TempDir()
+	os.WriteFile(filepath.Join(bin, "pbcopy"), []byte("#!/bin/sh\n/bin/cat >/dev/null\n"), 0o755)
+	os.WriteFile(filepath.Join(bin, "wl-copy"), []byte("#!/bin/sh\n/bin/cat >/dev/null\n"), 0o755)
+	t.Setenv("PATH", bin)
+	_, _, errOut := runCLI("restore")
+	if !strings.Contains(errOut, "1 paste(s) could not be put back") {
+		t.Fatalf("stderr %q", errOut)
+	}
+}
