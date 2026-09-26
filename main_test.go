@@ -224,9 +224,10 @@ func TestBuildVersion(t *testing.T) {
 	if buildVersion() != "9.9.9" {
 		t.Fatal(buildVersion())
 	}
+	// Under go test the module version is "(devel)", so it stays "dev".
 	version = "dev"
-	if v := buildVersion(); v == "" {
-		t.Fatal("empty version")
+	if v := buildVersion(); v != "dev" {
+		t.Fatalf("fallback version %q", v)
 	}
 }
 

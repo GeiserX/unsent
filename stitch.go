@@ -96,7 +96,9 @@ func (st *stitcher) update(v view) string {
 	// double. Only as much as the view carries: a blank line that scrolled
 	// out of sight above is real, and stays.
 	lead := len(cur) - len(strings.TrimLeft(cur, " \n"))
-	for ; lead > 0 && a > st.a && a > 0 && isSpace(st.text[a-1]); lead-- {
+	// (Only the same character: a space typed at the start of a row is not
+	// the line break above it.)
+	for ; lead > 0 && a > st.a && a > 0 && st.text[a-1] == cur[lead-1]; lead-- {
 		a--
 	}
 	// At the end, spacing that ran to the very end of the last view (an
@@ -149,10 +151,6 @@ func lostChars(old, new string) int {
 		}
 	}
 	return lost
-}
-
-func isSpace(c byte) bool {
-	return c == ' ' || c == '\n'
 }
 
 // replace makes the view the whole draft.
