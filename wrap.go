@@ -14,6 +14,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/x/vt"
 	"github.com/creack/pty"
@@ -364,7 +365,7 @@ func (s *session) save() {
 		s.store.dropVersions(s.rec)
 		s.stitched = false
 	}
-	s.deletes.spend(lostChars(s.rec.Draft, draft))
+	s.deletes.spend(shrunk(s.rec.Draft, draft))
 	s.rec.Draft = draft
 	s.rec.Pastes = s.pastes.all()
 	s.rec.Updated = time.Now()
@@ -490,6 +491,13 @@ func (d *deleteLog) spend(n int) {
 			n -= int(used)
 		}
 	}
+}
+
+// shrunk is how many characters shorter draft is than old: what the
+// delete keys at least removed. (Counting lost words instead overcharges:
+// "typed li" backspaced to "type" removes 4 characters, not 7.)
+func shrunk(old, draft string) int {
+	return max(0, utf8.RuneCountInString(old)-utf8.RuneCountInString(draft))
 }
 
 // Keys that remove text in Claude Code's input box. Backspace, Ctrl+H and
