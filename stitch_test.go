@@ -157,7 +157,9 @@ func (b *boxSim) deleteWord() int {
 	return n
 }
 
-// moveRows puts the cursor on a word end about d rows away.
+// moveRows puts the cursor on a word end about d rows away. A row with no
+// word end (a blank line) is stepped over, further the same way; with
+// none left that way the cursor stays.
 func (b *boxSim) moveRows(d int) {
 	rows, starts := b.rows()
 	cr := 0
@@ -166,16 +168,22 @@ func (b *boxSim) moveRows(d int) {
 			cr = i
 		}
 	}
-	target := clamp(cr+d, 0, len(rows)-1)
+	step := 1
+	if d < 0 {
+		step = -1
+	}
 	ends := b.wordEnds()
-	best := b.cur
-	for _, e := range ends {
-		if e >= starts[target] && e <= starts[target]+len(rows[target]) {
-			best = e
-			break
+	for target := clamp(cr+d, 0, len(rows)-1); target >= 0 && target < len(rows); target += step {
+		for _, e := range ends {
+			if e >= starts[target] && e <= starts[target]+len(rows[target]) {
+				b.cur = e
+				return
+			}
+		}
+		if d == 0 {
+			return
 		}
 	}
-	b.cur = best
 }
 
 type stitchRun struct {
@@ -202,6 +210,9 @@ type stitchRun struct {
 	last        string
 	kept        []string
 	exact, near int
+	// bytes counts saves that are the draft byte for byte (byteExact),
+	// raw those with no allowance at all.
+	bytes, raw int
 	// trail describes recent saves, for failure messages.
 	trail []string
 }
@@ -276,6 +287,12 @@ func (r *stitchRun) checkKeys(what string, deleted int) {
 	if r.sweeping {
 		return
 	}
+	if byteExact(got, r.sim.text, r.sim.width) {
+		r.bytes++
+	}
+	if got == r.sim.text {
+		r.raw++
+	}
 	if slices.Equal(strings.Fields(got), strings.Fields(r.sim.text)) {
 		r.exact++
 		return
@@ -284,6 +301,41 @@ func (r *stitchRun) checkKeys(what string, deleted int) {
 	if r.mustBeExact {
 		r.t.Fatalf("step %d (%s): got %q\nwant %q", r.steps, what, got, r.sim.text)
 	}
+}
+
+// byteExact reports whether got is the draft byte for byte, allowing only
+// the limit unwrap documents: a line break typed where the row before it
+// is full comes back as a space. Full means the next line's first word
+// would not have fitted after that row, so the screen shows a wrap. (The
+// fuzz never types a list item or a code fence, which unwrap keeps apart.)
+// It wraps with wrapText, not unwrap, so a broken unwrap cannot excuse
+// itself.
+func byteExact(got, truth string, width int) bool {
+	if len(got) != len(truth) {
+		return false
+	}
+	lineStart := 0
+	for i := 0; i < len(truth); i++ {
+		if got[i] != truth[i] && (truth[i] != '\n' || got[i] != ' ' || !fullRowAt(truth, lineStart, i, width)) {
+			return false
+		}
+		if truth[i] == '\n' {
+			lineStart = i + 1
+		}
+	}
+	return true
+}
+
+// fullRowAt reports whether the line break at text[i], ending the line
+// that starts at lineStart, looks like a wrap on screen.
+func fullRowAt(text string, lineStart, i, width int) bool {
+	next, _, _ := strings.Cut(text[i+1:], "\n")
+	first, _, _ := strings.Cut(next, " ")
+	if i == lineStart || next == "" {
+		return false
+	}
+	rows := wrapText(text[lineStart:i], width)
+	return runewidth.StringWidth(rows[len(rows)-1])+1+runewidth.StringWidth(first) > width
 }
 
 // save runs one save the way the session does: stitch the view, and keep
@@ -351,7 +403,7 @@ func (r *stitchRun) lostEverywhere(prev, got string) []string {
 
 // fuzzStitch types a draft past the cap, then makes random edits all over
 // it, and checks after every save that not a word was lost or doubled.
-func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) (exact, near int) {
+func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) *stitchRun {
 	rng := rand.New(rand.NewSource(seed))
 	word := func(n int) string {
 		if vocab > 0 {
@@ -382,10 +434,14 @@ func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) (ex
 		case 2:
 			r.checkDeleted("delete a word", sim.deleteWord())
 		case 3:
-			if rng.Intn(2) == 0 {
+			switch rng.Intn(3) {
+			case 0:
 				sim.insert("\n" + word(n))
 				r.check("new line")
-			} else {
+			case 1:
+				sim.insert("\n\n" + word(n))
+				r.check("blank line")
+			default:
 				// Enter at the end of a line, a pause long enough for a
 				// save, then the word.
 				if i := strings.IndexByte(sim.text[sim.cur:], '\n'); i >= 0 {
@@ -431,7 +487,7 @@ func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) (ex
 			}
 		}
 	}
-	return r.exact, r.near
+	return r
 }
 
 func (b *boxSim) rows0() []string {
@@ -459,14 +515,17 @@ func fuzzSeeds() int64 {
 // the user deleted it. Measured: how often the live draft is exactly
 // right, which must stay above a floor. Views are partial, so a few rare
 // edits (typing, deleting and scrolling at the box edge within one 0.4 s
-// save) are misread; the guarantee makes that safe.
+// save) are misread; the guarantee makes that safe. Exact has two floors:
+// the same words in the same order, and the same bytes (byteExact), which
+// catches lost and doubled line breaks. The floors sit at the rates
+// measured with blank-line edits, so they can only go up.
 
 func TestStitchFuzzUniqueWords(t *testing.T) {
 	for _, m := range []struct {
-		mode  string
-		floor float64
-	}{{"exact", 0.995}, {"window", 0.99}, {"unlimited", 0.95}} {
-		t.Run(m.mode, func(t *testing.T) { fuzzRate(t, 0, m.mode, m.floor) })
+		mode             string
+		floor, byteFloor float64
+	}{{"exact", 0.995, 0.88}, {"window", 0.99, 0.88}, {"unlimited", 0.95, 0.86}} {
+		t.Run(m.mode, func(t *testing.T) { fuzzRate(t, 0, m.mode, m.floor, m.byteFloor) })
 	}
 }
 
@@ -475,20 +534,24 @@ func TestStitchFuzzUniqueWords(t *testing.T) {
 // word identical to the next hidden word looks like that word having been
 // there all along.
 func TestStitchFuzzRepeatedWords(t *testing.T) {
-	fuzzRate(t, 40, "window", 0.97)
+	fuzzRate(t, 40, "window", 0.95, 0.84)
 }
 
-func fuzzRate(t *testing.T, vocab int, mode string, floor float64) {
+func fuzzRate(t *testing.T, vocab int, mode string, floor, byteFloor float64) {
 	t.Helper()
-	exact, near := 0, 0
+	exact, bytes, raw, saves := 0, 0, 0, 0
 	for seed := int64(1); seed <= fuzzSeeds(); seed++ {
-		e, n := fuzzStitch(t, seed, vocab, seed%2 == 0, mode)
-		exact, near = exact+e, near+n
+		r := fuzzStitch(t, seed, vocab, seed%2 == 0, mode)
+		exact, bytes, raw, saves = exact+r.exact, bytes+r.bytes, raw+r.raw, saves+r.exact+r.near
 	}
-	rate := float64(exact) / float64(exact+near)
-	t.Logf("%d of %d saves exact (%.2f%%)", exact, exact+near, 100*rate)
+	rate, byteRate := float64(exact)/float64(saves), float64(bytes)/float64(saves)
+	t.Logf("%d of %d saves exact (%.2f%%), %d byte-exact (%.2f%%), %d identical (%.2f%%)",
+		exact, saves, 100*rate, bytes, 100*byteRate, raw, 100*float64(raw)/float64(saves))
 	if rate < floor {
 		t.Fatalf("exact rate %.4f below %.4f", rate, floor)
+	}
+	if byteRate < byteFloor {
+		t.Fatalf("byte-exact rate %.4f below %.4f", byteRate, byteFloor)
 	}
 }
 
