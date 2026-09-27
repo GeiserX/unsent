@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/x/vt"
+	"github.com/creack/pty"
 )
 
 // readRaw reads a raw log back with the replay tests' own reader: the
@@ -56,6 +58,7 @@ func private(t *testing.T, paths ...string) {
 
 func TestRawLog(t *testing.T) {
 	base := filepath.Join(t.TempDir(), "x")
+	before := time.Now().Truncate(time.Microsecond)
 	r, err := openRaw(base, "claude", "2.1.282")
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +69,17 @@ func TestRawLog(t *testing.T) {
 	r.record('o', []byte("\x1b[2Ja"))
 	r.resize(80, 24)
 	r.close()
+	after := time.Now()
 	r.record('o', []byte("after the end")) // must not panic
+	// The replay drives its save tick from these times.
+	data, _ := os.ReadFile(base + ".rec")
+	last := before
+	eachChunk(t, data, func(at time.Time, dir byte, _ []byte) {
+		if at.Before(last) || at.After(after) {
+			t.Errorf("chunk %c at %v, want from %v to %v", dir, at, last, after)
+		}
+		last = at
+	})
 	dirs, keys, output, meta := readRaw(t, base)
 	if dirs != "sioe" || string(keys) != "a" || string(output) != "\x1b[2Ja" {
 		t.Fatalf("chunks %q, keys %q, output %q", dirs, keys, output)
@@ -107,7 +120,14 @@ func TestWrapLogsRawBytesOnlyWhenAsked(t *testing.T) {
 
 	debug := t.TempDir()
 	t.Setenv("UNSENT_DEBUG_DIR", debug)
-	runWrapped(t, typed)
+	runWrapped(t, func(type_ func(string)) {
+		type_("hello")
+		// The window grows: os.Stdin is the wrapper's terminal here.
+		pty.Setsize(os.Stdin, &pty.Winsize{Cols: 120, Rows: 40})
+		syscall.Kill(os.Getpid(), syscall.SIGWINCH)
+		type_("\x1b\rworld")
+		type_("\x04")
+	})
 	recs, _ := filepath.Glob(filepath.Join(debug, "raw-*.rec"))
 	if len(recs) != 1 {
 		t.Fatalf("raw logs %q", recs)
@@ -117,7 +137,7 @@ func TestWrapLogsRawBytesOnlyWhenAsked(t *testing.T) {
 	if string(keys) != "hello\x1b\rworld\x04" || !strings.HasPrefix(dirs, "s") || !strings.HasSuffix(dirs, "e") {
 		t.Fatalf("keys %q, chunks %q", keys, dirs)
 	}
-	if len(meta.Sizes) != 1 || meta.Sizes[0].Cols != 100 || meta.Sizes[0].Rows != 30 || meta.Agent != "claude" {
+	if len(meta.Sizes) != 2 || meta.Sizes[0].Cols != 100 || meta.Sizes[0].Rows != 30 || meta.Sizes[1].Cols != 120 || meta.Sizes[1].Rows != 40 || meta.Agent != "claude" {
 		t.Fatalf("meta %+v", meta)
 	}
 	private(t, base+".rec", base+".json")
@@ -188,6 +208,27 @@ func TestCapture(t *testing.T) {
 	// The session saved drafts as it always does.
 	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello there" {
 		t.Fatalf("orphans %+v", rs)
+	}
+}
+
+// A capture asks the command its version only when the command is the agent:
+// a launcher UNSENT_AGENT names for another agent would answer with its own.
+func TestCaptureAsksOnlyTheAgentItsVersion(t *testing.T) {
+	for _, c := range []struct{ agentEnv, want string }{
+		{"", "testdata/launcher/9.9.9"},
+		{"gemini", "testdata/gemini/unknown"},
+	} {
+		t.Run(c.want, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			for _, k := range []string{"EDITOR", "VISUAL", "UNSENT_CAPTURE_TO"} {
+				t.Setenv(k, "")
+			}
+			t.Setenv("UNSENT_AGENT", c.agentEnv)
+			_, _, _, said := runWrappedOut(t, "launcher", []string{"capture", "launcher"}, func(type_ func(string)) { type_("\x04") })
+			if recs, _ := filepath.Glob(filepath.Join(c.want, "capture-*.rec")); len(recs) != 1 {
+				t.Fatalf("captures in %s: %q, stderr %q", c.want, recs, said)
+			}
+		})
 	}
 }
 

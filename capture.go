@@ -151,13 +151,17 @@ func cmdCapture(args []string, stderr io.Writer) int {
 		return 127
 	}
 	agent := agentFor("", args[0])
-	ask := []string{"--version"}
-	if p := profileFor(args[0]); p != nil {
-		ask = p.version
-	}
-	version := agentVersion(bin, ask)
-	if version == "" {
-		version = "unknown"
+	// Only the agent itself is asked its version: a command UNSENT_AGENT
+	// names, such as npx or node, would answer with its own.
+	version := "unknown"
+	if p := profileFor(args[0]); p != nil || agent == filepath.Base(args[0]) {
+		ask := []string{"--version"}
+		if p != nil {
+			ask = p.version
+		}
+		if v := agentVersion(bin, ask); v != "" {
+			version = v
+		}
 	}
 	dir := filepath.Join("testdata", agent, version)
 	tmp, err := os.MkdirTemp("", "unsent-capture-")

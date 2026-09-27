@@ -121,6 +121,9 @@ func editDraft(draft string) {
 	defer os.Remove(f.Name())
 	f.WriteString(draft)
 	f.Close()
+	// Readable by all, as a file written under the usual umask is: an
+	// editor copy is private only because the capture editor makes it so.
+	os.Chmod(f.Name(), 0o644)
 	editor := os.Getenv("VISUAL")
 	if editor == "" {
 		editor = os.Getenv("EDITOR")
@@ -814,6 +817,8 @@ func TestWrapCtrlZSuspendsTheWrapper(t *testing.T) {
 	old := stopSelf
 	stopSelf = func() { stops++ }
 	defer func() { stopSelf = old }()
+	debug := t.TempDir()
+	t.Setenv("UNSENT_DEBUG_DIR", debug)
 	_, st := runWrapped(t, func(type_ func(string)) {
 		type_("before")
 		type_("\x1a")
@@ -826,6 +831,15 @@ func TestWrapCtrlZSuspendsTheWrapper(t *testing.T) {
 	rs := st.orphans()
 	if len(rs) != 1 || rs[0].Draft != "before after" {
 		t.Fatalf("orphans %+v", rs)
+	}
+	// The raw log notes the size again after the resume, as the agent
+	// repaints at it.
+	recs, _ := filepath.Glob(filepath.Join(debug, "raw-*.rec"))
+	if len(recs) != 1 {
+		t.Fatalf("raw logs %q", recs)
+	}
+	if _, _, _, meta := readRaw(t, strings.TrimSuffix(recs[0], ".rec")); len(meta.Sizes) != 2 || meta.Sizes[1].Cols != 100 || meta.Sizes[1].Rows != 30 {
+		t.Fatalf("sizes %+v", meta.Sizes)
 	}
 }
 
