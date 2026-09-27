@@ -26,6 +26,14 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 
 ## Install
 
+With Homebrew on macOS or Linux, available once the tap is live with v0.3:
+
+```sh
+brew tap geiserx/unsent && brew install unsent
+```
+
+With Go:
+
 ```sh
 go install github.com/GeiserX/unsent@latest
 ```
@@ -40,15 +48,15 @@ Start Claude Code through it:
 unsent claude
 ```
 
-Everything else stays the same. Same terminal, same keys, same arguments, so `unsent claude --resume` works too. To stop thinking about it, run this once:
+Everything else stays the same. Same terminal, same keys, same arguments, so `unsent claude --resume` works too. To stop typing `unsent`, run setup once:
 
 ```sh
-unsent setup
+unsent setup          # from the next shell, `claude` runs through unsent
+unsent status         # am I protected? one line per fact
+unsent setup --undo   # remove the block again
 ```
 
-It adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or name the shell: `unsent setup bash`). From the next shell, every agent `unsent` can read that is on your `PATH`, today `claude`, is a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, before or after the block. Setup leaves alone a function you already have under the agent's name, and it warns about anything that skips the wrapper: an alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path. It never edits them; make them call `unsent claude` instead. Run setup again after an upgrade that adds agents. `unsent setup --undo` removes the block and nothing else, and leaves your drafts where they are.
-
-To check what a shell does, run `unsent status` (or `unsent status bash`). It asks that shell, reading your rc files the way a new terminal would, and prints one line per fact: whether the block is there and current, whether each agent name runs through `unsent` or what skips it, the profile each agent gets and the agent version its reader was last checked against, every alias or launcher that bypasses the wrapper, whether `UNSENT_OFF` has saving off, and the on-send setting with the variable that set it. It never starts an agent and never edits a file.
+Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude`, into a shell function that runs it through `unsent`. Your aliases keep working and a function of the same name is left alone. Launchers that start the agent through `env`, `command`, `exec` or a full path skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
 
 To run the agent without `unsent` for a while, for example when an agent update confuses it, set `UNSENT_OFF=1`: `unsent` then hands over to the agent directly. `command claude` also skips the wrapper, for one run.
 
