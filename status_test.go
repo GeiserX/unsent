@@ -3,10 +3,15 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/creack/pty"
 )
 
 // runStatus runs `unsent status` for one real shell binary, asking it with
@@ -42,6 +47,34 @@ func statusLine(t *testing.T, out, label string) string {
 	return found[0]
 }
 
+// loginReadsRC gives bash's login shell, which status asks, a
+// ~/.bash_profile that reads ~/.bashrc, as setup tells bash users to.
+func (h setupHome) loginReadsRC(t *testing.T, kind string) {
+	t.Helper()
+	if kind == "bash" {
+		os.WriteFile(filepath.Join(h.home, ".bash_profile"), []byte(". ~/.bashrc\n"), 0o644)
+	}
+}
+
+// skipIfSystemAgents skips a test that needs a PATH with no claude and no
+// unsent when the system's own login files (path_helper on macOS) put one
+// there, so no expected line depends on what the machine has installed.
+func (h setupHome) skipIfSystemAgents(t *testing.T, sh string) {
+	t.Helper()
+	orig := statusEnv
+	defer func() { statusEnv = orig }()
+	statusEnv = func() []string {
+		return []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=/usr/bin:/bin", "TERM=dumb"}
+	}
+	p, err := runProbe(sh, shellKind(sh), []string{"claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := p.agents["claude"].path; c != "" || p.unsent != "" {
+		t.Skipf("the system login files put claude (%q) or unsent (%q) on PATH", c, p.unsent)
+	}
+}
+
 // TestStatusInRealShells asks each real shell, through the scratch rc file,
 // what claude runs: nothing wraps it before setup, the block's function
 // after, and each way it can still skip unsent is named.
@@ -49,10 +82,17 @@ func TestStatusInRealShells(t *testing.T) {
 	for _, sh := range testShells(t) {
 		t.Run(sh, func(t *testing.T) {
 			h := newSetupHome(t)
+			h.skipIfSystemAgents(t, sh)
 			kind := shellKind(sh)
 			rc := h.rc(t, kind)
+			h.loginReadsRC(t, kind)
 			path := h.agentBin + ":" + h.unsentBin + ":/usr/bin:/bin"
+			noAgent := h.unsentBin + ":/usr/bin:/bin"
 
+			// Nothing named claude at all: zsh says "none", bash nothing.
+			if got := statusLine(t, h.runStatus(t, sh, noAgent), "claude"); got != "not on PATH" {
+				t.Errorf("claude with no agent and no block: %q", got)
+			}
 			out := h.runStatus(t, sh, path)
 			if got := statusLine(t, out, "shell"); got != kind+" ("+sh+")" {
 				t.Errorf("shell: %q", got)
@@ -67,7 +107,15 @@ func TestStatusInRealShells(t *testing.T) {
 				t.Errorf("profile: %q", got)
 			}
 
+			// An alias of its own name and no block yet.
 			os.WriteFile(rc, []byte("alias claude='claude --flag'\n"), 0o644)
+			out = h.runStatus(t, sh, path)
+			if got := statusLine(t, out, "claude"); got != "runs directly: alias claude='claude --flag', and no wrapper function; run unsent setup" {
+				t.Errorf("claude under an alias of its own name, before setup: %q", got)
+			}
+			if got := statusLine(t, h.runStatus(t, sh, noAgent), "claude"); got != "not on PATH" {
+				t.Errorf("claude under an alias of its own name, no agent: %q", got)
+			}
 			mustSetup(t, kind)
 			out = h.runStatus(t, sh, path)
 			if got := statusLine(t, out, "setup block"); got != "in "+tilde(rc)+", up to date" {
@@ -83,9 +131,15 @@ func TestStatusInRealShells(t *testing.T) {
 				t.Errorf("claude without unsent on PATH: %q", got)
 			}
 			// The agent not installed.
-			out = h.runStatus(t, sh, h.unsentBin+":/usr/bin:/bin")
+			out = h.runStatus(t, sh, noAgent)
 			if got := statusLine(t, out, "claude"); got != "not on PATH; the wrapper covers it once it is" {
 				t.Errorf("claude not installed: %q", got)
+			}
+			// An rc file that ends in output with no line break.
+			appendLine(t, rc, "printf 'welcome'")
+			out = h.runStatus(t, sh, path)
+			if got := statusLine(t, out, "claude"); got != "goes through unsent (the claude function), runs ~/agent-bin/claude" {
+				t.Errorf("claude after an rc file that prints with no line break: %q", got)
 			}
 
 			// An alias after the block that points at a path wins over the
@@ -120,7 +174,130 @@ func TestStatusInRealShells(t *testing.T) {
 			if got := statusLine(t, out, "claude"); got != "goes through unsent (alias claude='unsent claude')" {
 				t.Errorf("claude as an alias to unsent: %q", got)
 			}
+			// The same alias with unsent missing runs nothing at all.
+			out = h.runStatus(t, sh, h.agentBin+":/usr/bin:/bin")
+			if got := statusLine(t, out, "claude"); got != "fails: alias claude='unsent claude' calls unsent, which is not on this shell's PATH" {
+				t.Errorf("claude as an alias to unsent, with no unsent on PATH: %q", got)
+			}
 		})
+	}
+}
+
+// TestStatusReadsLoginFiles checks status asks the shell a new terminal
+// starts, a login shell: a function in ~/.zlogin replaces the block's, and a
+// ~/.bash_profile that never reads ~/.bashrc leaves the block unread.
+func TestStatusReadsLoginFiles(t *testing.T) {
+	for _, sh := range testShells(t) {
+		t.Run(sh, func(t *testing.T) {
+			h := newSetupHome(t)
+			kind := shellKind(sh)
+			path := h.agentBin + ":" + h.unsentBin + ":/usr/bin:/bin"
+			mustSetup(t, kind)
+			if kind == "zsh" {
+				os.WriteFile(filepath.Join(h.zdotdir, ".zlogin"), []byte("function claude { command claude \"$@\"; }\n"), 0o644)
+				out := h.runStatus(t, sh, path)
+				if got := statusLine(t, out, "claude"); got != "runs directly: your own claude function does not call `unsent claude`" {
+					t.Errorf("claude under a function in .zlogin: %q", got)
+				}
+				return
+			}
+			os.WriteFile(filepath.Join(h.home, ".bash_profile"), nil, 0o644)
+			out := h.runStatus(t, sh, path)
+			if got := statusLine(t, out, "claude"); strings.HasPrefix(got, "goes through unsent") {
+				t.Errorf("claude with a .bash_profile that never reads .bashrc: %q", got)
+			}
+			if !strings.Contains(out, "bypass: ~/.bash_profile: bash login shells read this file, and it never sources ~/.bashrc") {
+				t.Errorf("no bypass line for .bash_profile:\n%s", out)
+			}
+			h.loginReadsRC(t, kind)
+			if got := statusLine(t, h.runStatus(t, sh, path), "claude"); !strings.HasPrefix(got, "goes through unsent") {
+				t.Errorf("claude with a .bash_profile that reads .bashrc: %q", got)
+			}
+		})
+	}
+}
+
+// TestStatusProbeIsBounded checks status returns soon after its timeout
+// even when the startup files leave a job running with stdout open, and
+// that an answer the shell printed in full counts though the shell then
+// hangs or leaves such a job behind.
+func TestStatusProbeIsBounded(t *testing.T) {
+	sh := testShells(t)[0]
+	noRC := "-f"
+	if shellKind(sh) == "bash" {
+		noRC = "--norc --noprofile"
+	}
+	// Each fake runs the probe script, its last argument, in the real
+	// shell with no rc file.
+	answer := `for a; do s=$a; done; ` + sh + ` ` + noRC + ` -c "$s"`
+	for _, c := range []struct {
+		name, script, want string
+	}{
+		{"hangs, a job holds stdout", "sleep 30 & sleep 30", "unknown, could not ask the shell: {fake} did not answer within 1s"},
+		{"answers, then a job holds stdout", "sleep 30 & " + answer, "runs directly: no wrapper function in this shell; run unsent setup"},
+		{"answers, then hangs", answer + "; sleep 30", "runs directly: no wrapper function in this shell; run unsent setup"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newSetupHome(t)
+			orig := statusProbeTimeout
+			t.Cleanup(func() { statusProbeTimeout = orig })
+			statusProbeTimeout = time.Second
+			fake := filepath.Join(h.home, "fake-shell", filepath.Base(sh))
+			writeScript(t, fake, c.script)
+			start := time.Now()
+			out := h.runStatus(t, fake, h.agentBin+":"+h.unsentBin+":/usr/bin:/bin")
+			if d := time.Since(start); d > 5*time.Second {
+				t.Errorf("status took %v", d)
+			}
+			if got, want := statusLine(t, out, "claude"), strings.ReplaceAll(c.want, "{fake}", fake); got != want {
+				t.Errorf("claude: %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// TestStatusProbeTakesNoTerminal runs status in a terminal of its own and
+// checks the shell it asks cannot open that terminal, so it cannot take it
+// from whatever status runs beside (`unsent status | less`). A plain child
+// of the same terminal can, which shows the check can fail.
+func TestStatusProbeTakesNoTerminal(t *testing.T) {
+	sh := testShells(t)[0]
+	h := newSetupHome(t)
+	kind := shellKind(sh)
+	h.loginReadsRC(t, kind)
+	tryTTY := func(file string) string {
+		return "if { : </dev/tty; } 2>/dev/null; then echo has >" + file + "; else echo none >" + file + "; fi\n"
+	}
+	inTerminal := func(cmd *exec.Cmd) {
+		t.Helper()
+		ptmx, err := pty.Start(cmd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ptmx.Close()
+		go io.Copy(io.Discard, ptmx)
+		if err := cmd.Wait(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	control := filepath.Join(h.home, "control-tty")
+	inTerminal(exec.Command("/bin/sh", "-c", tryTTY(control)))
+	if got := strings.TrimSpace(readFile(t, control)); got != "has" {
+		t.Fatalf("a plain child of the terminal: %q", got)
+	}
+
+	probed := filepath.Join(h.home, "probe-tty")
+	os.WriteFile(h.rc(t, kind), []byte(tryTTY(probed)), 0o644)
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(self, "status", kind)
+	cmd.Env = []string{"UNSENT_TEST_RUN=1", "HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "UNSENT_HOME=" + filepath.Join(h.home, "state"),
+		"PATH=" + h.agentBin + ":" + h.unsentBin + ":/usr/bin:/bin", "TERM=dumb", "SHELL=" + sh}
+	inTerminal(cmd)
+	if got := strings.TrimSpace(readFile(t, probed)); got != "none" {
+		t.Fatalf("the shell status asks opened its terminal: %q", got)
 	}
 }
 
@@ -133,6 +310,7 @@ func TestStatusChecksCanFail(t *testing.T) {
 			h := newSetupHome(t)
 			kind := shellKind(sh)
 			rc := h.rc(t, kind)
+			h.loginReadsRC(t, kind)
 			block := setupBlock(kind)
 			broken := strings.Replace(block, `then unsent $_unsent_a`, `then command $_unsent_a`, 1)
 			if broken == block {
@@ -188,9 +366,7 @@ func TestStatusNamesLaunchers(t *testing.T) {
 	kind := shellKind(sh)
 	path := h.agentBin + ":" + h.unsentBin + ":/usr/bin:/bin"
 	mustSetup(t, kind)
-	if kind == "bash" {
-		os.WriteFile(filepath.Join(h.home, ".bash_profile"), []byte(". ~/.bashrc\n"), 0o644)
-	}
+	h.loginReadsRC(t, kind)
 	if out := h.runStatus(t, sh, path); statusLine(t, out, "bypass") != "none found in the startup files" {
 		t.Errorf("bypass with no launcher:\n%s", out)
 	}
@@ -254,6 +430,14 @@ func TestParseProbeSkipsRcOutput(t *testing.T) {
 	r := p.agents["claude"]
 	if !ok || r.kind != "function" || r.path != "/x/claude" || !callsUnsent(r.body, "claude") || p.unsent != "/u/unsent" {
 		t.Fatalf("parseProbe: %+v %v", p, ok)
+	}
+	// An answer cut off before its last line does not count.
+	if _, ok := parseProbe(out[:strings.Index(out, "@@unsent ")]); ok {
+		t.Fatal("parsed an answer with no @@unsent line")
+	}
+	// Lines a logout file prints after the answer are not read.
+	if p, ok := parseProbe(out + "@@kind claude file\n"); !ok || p.agents["claude"].kind != "function" {
+		t.Fatalf("read past the answer: %+v %v", p, ok)
 	}
 	if _, ok := parseProbe("no mark here\n"); ok {
 		t.Fatal("parsed output with no mark")

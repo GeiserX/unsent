@@ -398,7 +398,7 @@ func lineBypass(line string, agents []string) string {
 	if m := funcHeader.FindStringSubmatch(line); m != nil {
 		name := m[1] + m[2]
 		if slices.Contains(agents, name) {
-			return fmt.Sprintf("defines its own %s function, which the block leaves alone, so it goes through unsent only if it calls `unsent %s`", name, name)
+			return fmt.Sprintf("defines its own %s function, so %s goes through unsent only if that function calls `unsent %s`", name, name, name)
 		}
 	}
 	for _, words := range shellCommands(line) {

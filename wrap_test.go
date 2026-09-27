@@ -26,6 +26,11 @@ func TestMain(m *testing.M) {
 		fakeAgent()
 		return
 	}
+	// The test binary as unsent itself, for tests that need it in a
+	// terminal of its own.
+	if os.Getenv("UNSENT_TEST_RUN") == "1" {
+		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+	}
 	os.Exit(m.Run())
 }
 

@@ -16,7 +16,7 @@
 | `store.go` | Durable writes, history, per-session lock files |
 | `capture.go` | The raw log (`rawLog`: keys and output in `script -r` format, window sizes beside it, files `0600`), written only under `UNSENT_DEBUG_DIR` or by `unsent capture`, which records a fixture bundle into `testdata/<agent>/<version>/` with an editor copy per Ctrl+G |
 | `setup.go` | `unsent setup [zsh\|bash]` and `--undo`: one marked block in the rc file (`$ZDOTDIR/.zshrc` when set) that wraps each profile's commands in a `function name { }` (never `name() { }`, which an existing alias breaks) that looks the agent up on PATH when called, leaves a user's function of that name alone; undo takes out exactly what setup added; warns, never edits, about aliases to a path and launchers that start an agent through `env`, `command`, `exec` or a full path |
-| `status.go` | `unsent status [zsh\|bash]`: one fact per line; asks the shell itself (`-i -c`, this environment) what each agent name resolves to, since a child cannot see its parent's functions; block present and current, profile and verified version, setup's bypass scan, `UNSENT_OFF`, the on-send setting and the variable that set it (`onSendFrom`) |
+| `status.go` | `unsent status [zsh\|bash]`: one fact per line; asks the shell itself (`-l -i -c` as a new terminal starts it, this environment, a session of its own with no terminal, bounded by a timeout) what each agent name resolves to, since a child cannot see its parent's functions; block present and current, profile and verified version, setup's bypass scan, `UNSENT_OFF`, the on-send setting and the variable that set it (`onSendFrom`) |
 | `sent.go` | Send detection (submit and clear keys in order, each submit and the first keys after it with the screen they were typed into), `UNSENT_ON_SEND`, the per-session sent logs in `sent/` and their limits |
 | `testdata/claude/<version>/` | Real Claude Code captures (raw bytes, keys with output, screens, editor copies) that `replay_test.go` replays through the reader and stitcher |
 
@@ -47,7 +47,7 @@ Re-measure these when a Claude Code release changes the prompt, and set the prof
 
 - Tests: `go test -race ./...`. Coverage target 90% (`codecov.yml`).
 - `wrap_test.go` re-runs the test binary as a fake agent; keep it drawing the box the way the real one does.
-- `setup_test.go` and `status_test.go` run the block in every real zsh and bash they find (`-i -c`, an empty environment, `HOME` and `ZDOTDIR` in a scratch folder, a fake `claude` and `unsent` on `PATH`; status swaps `statusEnv` for that environment). Never let a setup or status test reach a real rc file or a real agent.
+- `setup_test.go` and `status_test.go` run the block in every real zsh and bash they find (`-i -c`, `-l -i -c` for status, an empty environment, `HOME` and `ZDOTDIR` in a scratch folder, a fake `claude` and `unsent` on `PATH`; status swaps `statusEnv` for that environment). Never let a setup or status test reach a real rc file or a real agent.
 - Never add network access. Drafts stay on the machine.
 - Adding an agent means one profile file (`agent_<name>.go`, listed in `profiles`) plus tests built from real screen captures.
 - The promise: no text the user did not delete is ever lost. Text in view is exact; text out of sight is inferred. So once a draft has been stitched, `keepOld` keeps a safety copy (`store.keepVersion`, capped per session) before any save that loses text (`lostChars`). The delete-key count (`deleteLog`, each key spent once) only guides the stitcher; it never permits a loss. Any change must keep that true.

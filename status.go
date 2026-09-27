@@ -10,13 +10,15 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 )
 
 // unsent status answers "am I protected?" for one shell, one fact per line.
 // A process cannot see its parent shell's functions, so status asks the
-// shell itself: it starts that shell interactively with this environment,
-// so it reads the same rc files a new terminal would, and has it say what
+// shell itself: it starts that shell as a login, interactive shell with this
+// environment, so it reads the same startup files a new terminal would
+// (terminals on macOS and tmux start login shells), and has it say what
 // each agent name resolves to. It never starts an agent. Aliases and
 // launchers that skip the wrapper come from the same text scan setup warns
 // with; status only reports them.
@@ -40,7 +42,7 @@ func probeScript(shell string, agents []string) string {
 	if shell == "zsh" {
 		kind, path, fn = `whence -w "$_unsent_a"`, `whence -p "$_unsent_a"`, `typeset -f "$_unsent_a"`
 	}
-	return "printf '%s\\n' '" + probeMark + "'\n" +
+	return "printf '\\n%s\\n' '" + probeMark + "'\n" +
 		"for _unsent_a in " + strings.Join(agents, " ") + "; do\n" +
 		"  _unsent_k=$(" + kind + " 2>/dev/null); _unsent_k=${_unsent_k##*: }\n" +
 		`  printf '@@kind %s %s\n' "$_unsent_a" "$_unsent_k"` + "\n" +
@@ -65,27 +67,35 @@ type probe struct {
 	unsent string
 }
 
-// runProbe starts the shell interactively and reads its answer.
+// runProbe starts the shell as a new terminal would and reads its answer.
+// The shell gets a session of its own: with no controlling terminal it
+// cannot take the terminal from the job status runs in (`unsent status |
+// less`), and on timeout one kill reaches everything the startup files
+// started. WaitDelay stops the wait soon after the shell is gone, though a
+// background job it started still holds stdout open.
 func runProbe(shellPath, shell string, agents []string) (probe, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), statusProbeTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, shellPath, "-i", "-c", probeScript(shell, agents))
+	cmd := exec.CommandContext(ctx, shellPath, "-l", "-i", "-c", probeScript(shell, agents))
 	cmd.Env = statusEnv()
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
+	if p, ok := parseProbe(string(out)); ok {
+		return p, nil
+	}
 	if ctx.Err() != nil {
 		return probe{}, fmt.Errorf("%s did not answer within %v", shellPath, statusProbeTimeout)
 	}
-	p, ok := parseProbe(string(out))
-	if !ok {
-		if err == nil {
-			err = fmt.Errorf("no answer")
-		}
-		return probe{}, fmt.Errorf("%s: %v", shellPath, err)
+	if err == nil {
+		err = fmt.Errorf("no answer")
 	}
-	return p, nil
+	return probe{}, fmt.Errorf("%s: %v", shellPath, err)
 }
 
-// parseProbe reads the lines after probeMark.
+// parseProbe reads the lines after probeMark, up to the @@unsent line that
+// ends a whole answer. Without that line the answer does not count.
 func parseProbe(out string) (probe, bool) {
 	i := strings.Index("\n"+out, "\n"+probeMark+"\n")
 	if i < 0 {
@@ -97,7 +107,7 @@ func parseProbe(out string) (probe, bool) {
 		tag, rest, _ := strings.Cut(lines[j], " ")
 		if tag == "@@unsent" {
 			p.unsent = rest
-			continue
+			return p, true
 		}
 		name, value, _ := strings.Cut(rest, " ")
 		r := p.agents[name]
@@ -119,7 +129,7 @@ func parseProbe(out string) (probe, bool) {
 		}
 		p.agents[name] = r
 	}
-	return p, true
+	return probe{}, false
 }
 
 // aliasValue is the text an alias stands for, from `alias name` as bash
@@ -173,6 +183,8 @@ func route(a string, r resolved, unsentOnPath bool) (through bool, why string) {
 		switch {
 		case callsUnsent(v, a) && unsentOnPath:
 			return true, fmt.Sprintf("goes through unsent (alias %s='%s')", a, v)
+		case callsUnsent(v, a):
+			return false, fmt.Sprintf("fails: alias %s='%s' calls unsent, which is not on this shell's PATH", a, v)
 		case first == a && r.body != "":
 			return viaFunction()
 		case first == a && r.path == "":
