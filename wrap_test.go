@@ -287,10 +287,10 @@ func TestSessionWaitsForTheFrameToEnd(t *testing.T) {
 		rec:    newRecord([]string{"claude"}, "/w"),
 		store:  st,
 		pastes: &pasteTracker{},
-		read: func(*screen) (view, bool) {
+		prof: &profile{read: func(*screen) (view, bool) {
 			reads++
 			return view{}, false
-		},
+		}},
 	}
 	go io.Copy(io.Discard, s.screen)
 	s.write([]byte("\x1b[?2026hhalf a fra"))
@@ -313,7 +313,7 @@ func TestSessionWaitsForTheFrameToEnd(t *testing.T) {
 }
 
 func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
-	s := &session{read: func(*screen) (view, bool) { t.Fatal("read a broken screen"); return view{}, false }}
+	s := &session{prof: &profile{read: func(*screen) (view, bool) { t.Fatal("read a broken screen"); return view{}, false }}}
 	s.write([]byte("x")) // s.screen is nil: the emulator write panics
 	if !s.broken {
 		t.Fatal("panic not caught")
@@ -339,7 +339,7 @@ func TestDeleteKeys(t *testing.T) {
 		{"hello \x1b[A\r", 0, false},
 	}
 	for _, c := range cases {
-		if chars, ahead := deleteKeys([]byte(c.keys)); chars != c.chars || ahead != c.ahead {
+		if chars, ahead := claude.keys.deletes([]byte(c.keys)); chars != c.chars || ahead != c.ahead {
 			t.Errorf("%q: %d %v, want %d %v", c.keys, chars, ahead, c.chars, c.ahead)
 		}
 	}

@@ -34,7 +34,7 @@ func TestPasteExpand(t *testing.T) {
 	p.feed([]byte("\x1b[200~" + strings.Repeat("x", 2000) + "\x1b[201~"))
 
 	draft := "before short [Pasted text #1 +39 lines] mid [Pasted text #2] after [Pasted text #3 +5 lines]"
-	got := p.expand(draft)
+	got := p.expand(draft, claude.placeholder)
 	want := "before short " + big + " mid " + strings.Repeat("x", 2000) + " after [Pasted text #3 +5 lines]"
 	if got != want {
 		t.Fatalf("got %q", got)

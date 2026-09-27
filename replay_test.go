@@ -30,7 +30,7 @@ func replayBytes(t *testing.T, cols, rows int, data []byte) []string {
 		rec:    newRecord([]string{"claude"}, "/w"),
 		store:  testStore(t),
 		pastes: &pasteTracker{},
-		read:   claudeBox,
+		prof:   &claude,
 	}
 	// Claude Code queries the terminal; the emulator's answers must drain.
 	go io.Copy(io.Discard, s.screen)
@@ -66,7 +66,7 @@ func replayRecord(t *testing.T, name string) {
 		rec:    newRecord([]string{"claude"}, "/w"),
 		store:  testStore(t),
 		pastes: &pasteTracker{},
-		read:   claudeBox,
+		prof:   &claude,
 	}
 	go io.Copy(io.Discard, s.screen)
 	var now time.Time

@@ -11,9 +11,6 @@ import (
 var (
 	pasteStart = []byte("\x1b[200~")
 	pasteEnd   = []byte("\x1b[201~")
-	// Claude Code shows a long paste as "[Pasted text #2 +39 lines]", or
-	// "[Pasted text #2]" when it has no line break.
-	pastePlaceholder = regexp.MustCompile(`\[Pasted text #\d+(?: \+(\d+) lines?)?\]`)
 )
 
 // pasteTracker keeps the text of every paste since the box was last empty.
@@ -99,14 +96,14 @@ func (p *pasteTracker) all() []string {
 	return append([]string(nil), p.pastes...)
 }
 
-// expand puts the pasted text back where the agent shows a placeholder.
-// Placeholders are matched to pastes in order, by line count. One that
-// matches no paste stays as it is.
-func (p *pasteTracker) expand(draft string) string {
+// expand puts the pasted text back where the agent shows a placeholder
+// (see profile.placeholder). Placeholders are matched to pastes in order,
+// by line count. One that matches no paste stays as it is.
+func (p *pasteTracker) expand(draft string, placeholder *regexp.Regexp) string {
 	pastes := p.all()
 	used := make([]bool, len(pastes))
-	return pastePlaceholder.ReplaceAllStringFunc(draft, func(ph string) string {
-		m := pastePlaceholder.FindStringSubmatch(ph)
+	return placeholder.ReplaceAllStringFunc(draft, func(ph string) string {
+		m := placeholder.FindStringSubmatch(ph)
 		want := 0
 		if m[1] != "" {
 			want, _ = strconv.Atoi(m[1])

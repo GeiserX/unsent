@@ -2,9 +2,9 @@ package main
 
 import (
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
-
-	"github.com/mattn/go-runewidth"
 )
 
 // view is what an extractor sees of the input box on one screen.
@@ -35,65 +35,30 @@ type view struct {
 // the box is not visible (a menu, a permission prompt, a full-screen editor).
 type extractor func(s *screen) (v view, ok bool)
 
-func extractorFor(command string) extractor {
-	switch filepath.Base(command) {
-	case "claude":
-		return claudeBox
-	default:
-		return nil
-	}
+// A profile is everything unsent knows about one agent: the commands that
+// start it, how to read its box, and which of its keys the save loop must
+// know about. Adding an agent means adding a profile, in a file of its own.
+type profile struct {
+	// names are the command base names that start the agent.
+	names []string
+	read  extractor
+	// placeholder matches what the agent shows in place of a long paste;
+	// its first group, when it matches, is the paste's line count.
+	placeholder *regexp.Regexp
+	keys        keyset
 }
 
-// claudeBox reads Claude Code's input box. It is drawn as:
-//
-//	────────────────────
-//	❯ first row of the draft
-//	  following rows, indented two columns
-//	────────────────────
-//
-// The marker is followed by a no-break space (U+00A0). An empty box shows a
-// dim hint after it. In shell mode the marker is "!".
-// The box grows up to half the window height minus five rows, then scrolls
-// inside itself. Rows wrap at the window width minus four columns.
-func claudeBox(s *screen) (view, bool) {
-	for y := len(s.rows) - 2; y >= 1; y-- {
-		first := s.rows[y].text()
-		shell := hasMarker(first, "!")
-		if !shell && !hasMarker(first, "❯") {
-			continue
+// profiles are the agents unsent can read.
+var profiles = []*profile{&claude}
+
+// profileFor returns the profile of the agent a command starts, or nil.
+func profileFor(command string) *profile {
+	for _, p := range profiles {
+		if slices.Contains(p.names, filepath.Base(command)) {
+			return p
 		}
-		if !isRule(s.rows[y-1].text(), s.cols) {
-			continue
-		}
-		end := -1
-		for z := y + 1; z < len(s.rows); z++ {
-			if isRule(s.rows[z].text(), s.cols) {
-				end = z
-				break
-			}
-		}
-		if end < 0 {
-			continue
-		}
-		v := view{cursor: -1, width: s.cols - 4}
-		v.capped = end-y >= s.rows2cap()
-		if (s.rows[y].textFrom(2) == "" || s.rows[y].faintFrom(2)) && end == y+1 {
-			v.empty = true
-			return v, true
-		}
-		for z := y; z < end; z++ {
-			v.rows = append(v.rows, s.rows[z].textFrom(2))
-		}
-		if s.curY >= y && s.curY < end {
-			v.cursor = s.curY - y
-			v.cursorEnd = s.curX >= 2+runewidth.StringWidth(v.rows[v.cursor])
-		}
-		if shell {
-			v.rows[0] = "!" + v.rows[0]
-		}
-		return v, true
 	}
-	return view{}, false
+	return nil
 }
 
 // hasMarker reports whether a row starts with marker and a space, or is
@@ -101,18 +66,6 @@ func claudeBox(s *screen) (view, bool) {
 func hasMarker(row, marker string) bool {
 	rest, ok := strings.CutPrefix(row, marker)
 	return ok && (rest == "" || strings.HasPrefix(rest, " ") || strings.HasPrefix(rest, "\u00a0"))
-}
-
-// rows2cap is the height at which Claude Code's box stops growing. It is one
-// row lower than the measured cap (rows/2 - 5): treating a box that is not
-// scrolled as scrolled only costs a little precision, while the opposite
-// would drop the rows scrolled out of sight.
-func (s *screen) rows2cap() int {
-	c := len(s.rows)/2 - 6
-	if c < 1 {
-		c = 1
-	}
-	return c
 }
 
 // isRule reports whether a row is a horizontal line across most of the window.

@@ -70,17 +70,17 @@ func wrap(args []string, in, out *os.File) int {
 		store:  st,
 		screen: vt.NewEmulator(cols, rows),
 		pastes: &pasteTracker{},
-		read:   extractorFor(args[0]),
+		prof:   profileFor(args[0]),
 	}
-	if s.read == nil {
+	if s.prof == nil {
 		fmt.Fprintf(os.Stderr, "unsent: no reader for %q yet, running it without saving drafts\n", args[0])
 	}
-	if s.read != nil {
+	if s.prof != nil {
 		if err := st.hold(s.rec); err != nil {
 			// Without the lock another unsent would take this live session
 			// for a dead one and could clean up its files.
 			fmt.Fprintf(os.Stderr, "unsent: %v; running without saving drafts\n", err)
-			s.read = nil
+			s.prof = nil
 		}
 	}
 	defer st.release()
@@ -239,14 +239,18 @@ type session struct {
 	store  *store
 	pastes *pasteTracker
 	stitch stitcher
-	read   extractor
+	// prof is the agent's profile, or nil when nothing is saved.
+	prof *profile
 }
 
 // input notes one chunk of keys on its way to the agent: the pastes in it,
 // and the delete keys. Pasted text can hold control bytes (Word pastes
 // \x0b for line breaks); only keys typed outside a paste count.
 func (s *session) input(keys []byte) {
-	s.deletes.add(s.pastes.feed(keys))
+	typed := s.pastes.feed(keys)
+	if s.prof != nil {
+		s.deletes.push(s.prof.keys.deletes(typed))
+	}
 }
 
 func (s *session) feedScreen(output <-chan []byte) {
@@ -304,7 +308,7 @@ const resizeQuiet = 150 * time.Millisecond
 // save reads the input box off the shadow screen and writes the draft to
 // disk when it changed. A box that empties archives the draft it held.
 func (s *session) save() {
-	if s.read == nil {
+	if s.prof == nil {
 		return
 	}
 	// If the agent is halfway through drawing, give it a moment to finish.
@@ -336,7 +340,7 @@ func (s *session) save() {
 			s.store.warn(fmt.Errorf("stopped saving after an internal error: %v", r))
 		}
 	}()
-	v, ok := s.read(scr)
+	v, ok := s.prof.read(scr)
 	if !ok {
 		// The box is not on screen (a menu, a permission prompt, an editor):
 		// keep the last draft we saw.
@@ -344,7 +348,7 @@ func (s *session) save() {
 	}
 	v.deleted, v.deletedAhead = s.deletes.recent()
 	before := s.stitch
-	draft := s.pastes.expand(s.stitch.update(v))
+	draft := s.pastes.expand(s.stitch.update(v), s.prof.placeholder)
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
 	}
@@ -438,11 +442,6 @@ func (d *deleteLog) clock() time.Time {
 	return time.Now()
 }
 
-func (d *deleteLog) add(b []byte) {
-	chars, ahead := deleteKeys(b)
-	d.push(chars, ahead)
-}
-
 func (d *deleteLog) push(chars int64, ahead bool) {
 	if chars == 0 && !ahead {
 		return
@@ -505,27 +504,25 @@ func shrunk(old, draft string) int {
 	return max(0, utf8.RuneCountInString(old)-utf8.RuneCountInString(draft))
 }
 
-// Keys that remove text in Claude Code's input box. Backspace, Ctrl+H and
-// Delete remove one character; Ctrl+W, Ctrl+U, Ctrl+K and undo (Ctrl+_)
-// any amount. Delete, Ctrl+K and undo can remove text after the cursor.
-var (
-	oneCharKeys = [][]byte{{0x7f}, {0x08}, []byte("\x1b[3~")}
-	manyKeys    = [][]byte{{0x17}, {0x15}, {0x0b}, {0x1f}}
-	aheadKeys   = [][]byte{[]byte("\x1b[3~"), {0x0b}, {0x1f}}
-)
+// keyset is the keys that remove text in an agent's input box: one
+// character each, any amount, and (a subset of both) those that can remove
+// text after the cursor.
+type keyset struct {
+	one, many, ahead [][]byte
+}
 
-// deleteKeys returns how many characters the keys in b can delete, and
+// deletes returns how many characters the keys in b can delete, and
 // whether any can delete after the cursor.
-func deleteKeys(b []byte) (chars int64, ahead bool) {
-	for _, k := range oneCharKeys {
+func (ks keyset) deletes(b []byte) (chars int64, ahead bool) {
+	for _, k := range ks.one {
 		chars += int64(bytes.Count(b, k))
 	}
-	for _, k := range manyKeys {
+	for _, k := range ks.many {
 		if bytes.Contains(b, k) {
 			chars = unlimited
 		}
 	}
-	for _, k := range aheadKeys {
+	for _, k := range ks.ahead {
 		if bytes.Contains(b, k) {
 			ahead = true
 		}

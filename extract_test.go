@@ -115,12 +115,12 @@ func TestClaudeBoxNotOnScreen(t *testing.T) {
 	}
 }
 
-func TestExtractorFor(t *testing.T) {
-	if extractorFor("/usr/local/bin/claude") == nil {
-		t.Fatal("no extractor for claude")
+func TestProfileFor(t *testing.T) {
+	if profileFor("/usr/local/bin/claude") != &claude {
+		t.Fatal("no profile for claude")
 	}
-	if extractorFor("vim") != nil {
-		t.Fatal("extractor for vim")
+	if profileFor("vim") != nil {
+		t.Fatal("profile for vim")
 	}
 }
 
