@@ -11,8 +11,13 @@ import (
 	"time"
 )
 
-// historyLimit caps how many archived drafts are kept.
-const historyLimit = 500
+// historyLimit caps how many archived agent drafts are kept, and
+// shellHistoryLimit how many shell lines. Shell lines are short and many,
+// so they count against their own cap and never push agent drafts out.
+const (
+	historyLimit      = 500
+	shellHistoryLimit = 500
+)
 
 // Safety copies (see keepVersion) are capped separately, so they never push
 // real history out: this many per session, and this many in all.
@@ -113,7 +118,10 @@ func openStore() (*store, error) {
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return nil, err
 	}
-	return &store{dir: dir}, nil
+	s := &store{dir: dir}
+	// Every command that reads the store sees the shells' lines too.
+	s.importShells()
+	return s, nil
 }
 
 func (s *store) draftPath(id string) string {
@@ -180,14 +188,27 @@ func (s *store) archive(r *record) error {
 	if strings.TrimSpace(r.Draft) == "" {
 		return nil
 	}
-	a := *r
-	a.ID = fmt.Sprintf("%s-%d", time.Now().Format("20060102-150405.000000"), r.PID)
-	if err := writeDurable(filepath.Join(s.dir, "history", a.ID+".json"), &a); err != nil {
+	id := fmt.Sprintf("%s-%d", time.Now().Format("20060102-150405.000000"), r.PID)
+	if isShell(r.agent()) {
+		id = shellHistoryPrefix + id
+	}
+	if err := s.archiveAs(r, id); err != nil {
 		s.warn(err)
 		return err
 	}
 	s.prune()
 	return nil
+}
+
+// archiveAs writes the record's draft into history/ under id. Shell lines
+// take ids that start with shellHistoryPrefix, and names sort by time.
+func (s *store) archiveAs(r *record, id string) error {
+	if strings.TrimSpace(r.Draft) == "" {
+		return nil
+	}
+	a := *r
+	a.ID = id
+	return writeDurable(filepath.Join(s.dir, "history", a.ID+".json"), &a)
 }
 
 // keepVersion saves the record's current draft as a safety copy, named
@@ -217,18 +238,30 @@ func (s *store) dropVersions(r *record) {
 	}
 }
 
+// prune keeps the newest historyLimit agent drafts and, apart from them,
+// the newest shellHistoryLimit shell lines. Safety copies have caps of
+// their own (keepVersion).
 func (s *store) prune() {
 	names, _ := filepath.Glob(filepath.Join(s.dir, "history", "*.json"))
-	var real []string
+	var agents, shells []string
 	for _, n := range names {
-		if !strings.HasPrefix(filepath.Base(n), "v-") {
-			real = append(real, n)
+		switch b := filepath.Base(n); {
+		case strings.HasPrefix(b, "v-"):
+		case strings.HasPrefix(b, shellHistoryPrefix):
+			shells = append(shells, n)
+		default:
+			agents = append(agents, n)
 		}
 	}
-	sort.Strings(real)
-	for len(real) > historyLimit {
-		os.Remove(real[0])
-		real = real[1:]
+	for _, c := range []struct {
+		names []string
+		limit int
+	}{{agents, historyLimit}, {shells, shellHistoryLimit}} {
+		sort.Strings(c.names)
+		for len(c.names) > c.limit {
+			os.Remove(c.names[0])
+			c.names = c.names[1:]
+		}
 	}
 }
 

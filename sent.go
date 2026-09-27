@@ -197,7 +197,9 @@ func (l *keyLog) settle(scr func() *screen) {
 // onSend is the on-send setting for an agent: "log" appends a sent draft to
 // the session's sent log, "delete" keeps nothing. UNSENT_ON_SEND_<NAME>
 // (UNSENT_ON_SEND_CLAUDE) wins over UNSENT_ON_SEND. An unset or unknown
-// value falls through to the next; the default is log.
+// value falls through to the next; the default is log for agents and
+// delete for shells, because a shell's own history already keeps the lines
+// it ran.
 func onSend(agent string) string {
 	v, _ := onSendFrom(agent)
 	return v
@@ -219,6 +221,9 @@ func onSendFrom(agent string) (value, from string) {
 		if v := strings.ToLower(os.Getenv(k)); v == "log" || v == "delete" {
 			return v, k
 		}
+	}
+	if isShell(agent) {
+		return "delete", "the default"
 	}
 	return "log", "the default"
 }
@@ -267,7 +272,13 @@ func (s *store) sentPath(id string) string {
 // logSent appends the record's draft to its session's sent log, flushed to
 // disk. The first message writes the header and prunes old logs.
 func (s *store) logSent(r *record) error {
-	m := sentMessage{Time: time.Now(), Text: r.Draft}
+	return s.logSentAt(r, time.Now())
+}
+
+// logSentAt is logSent for a message sent at a known time, such as a shell
+// line read back from its log.
+func (s *store) logSentAt(r *record, when time.Time) error {
+	m := sentMessage{Time: when, Text: r.Draft}
 	for _, p := range r.Pastes {
 		if !strings.Contains(r.Draft, p) {
 			m.Pastes = append(m.Pastes, p)

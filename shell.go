@@ -17,17 +17,18 @@ import (
 // runs do not inherit it.
 //
 // Each shell writes its own log, created on the first prompt with mode 0600
-// in a 0700 folder: <state>/shell/zsh-<host>-<pid>-<microseconds>.log,
-// where <state> is the folder stateDir names and <host> is $HOST with
-// anything but letters, digits, dots and dashes turned into _. Past 256 KB
+// in a 0700 folder: <state>/shell/zsh-<host>-<pid>-<stamp>.log, where
+// <state> is the folder stateDir names, <host> is $HOST with anything but
+// letters, digits, dots and dashes turned into _, and <stamp> is
+// $EPOCHREALTIME with the dot taken out. Past 256 KB
 // the hook renames the log to the same name ending in .done at the next
 // prompt and starts a new one. A write that fails does the same at once,
 // so a torn record is only ever the tail of a log nothing writes to any
-// more, and the next prompt opens a fresh log. So the importer deletes a
-// .done log, or the log of a shell on its own host whose pid is gone, and
-// reads a live shell's log only up to where it got. A log named for
-// another host, such as a second machine sharing the home folder, is not
-// its to judge by pid.
+// more, and the next prompt opens a fresh log. So the importer
+// (shellimport.go) deletes a .done log, or the log of a shell on its own
+// host whose pid is gone, and reads a live shell's log only up to where it
+// got. A log named for another host, such as a second machine sharing the
+// home folder, is not its to judge by pid.
 //
 // A record is a header line, "<kind> <unix seconds> <bytes>", then that
 // many bytes of text, then a line break. The kinds:
@@ -39,10 +40,15 @@ import (
 //	b  the line before a redraw, $PREBUFFER$BUFFER
 //	s  Enter ended the line; its text
 //	h  the window closed; the line at that moment
-//	f  the line gained a leading space: drop this line's earlier records
+//	f  the line gained a leading space, or came to match HISTORY_IGNORE:
+//	   drop this line's earlier records
 //
 // Only the shell's own prompt and its continuation lines are saved, never
-// vared or select, and nothing while the line starts with a space. A
+// vared or select, and nothing while the line starts with a space or
+// matches the user's HISTORY_IGNORE. zsh matches that pattern itself, as
+// it does for its history file, with the user's extended_glob; a pattern
+// zsh cannot parse matches nothing. The importer (shellimport.go) drops
+// the line's earlier records at the forget mark. A
 // password read by sudo, ssh or read -s never passes through the line
 // editor. zsh skips a redraw when more input is pending, so a shell killed
 // in that gap loses its last keys. The hooks write only into a folder the
@@ -99,10 +105,16 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     _unsent_fd=$1
   }
   function _unsent_line {
+    local -i xg=0 ig=0
+    [[ -o extended_glob ]] && xg=1
     emulate -L zsh
+    (( xg )) && setopt extended_glob
     [[ $CONTEXT == start || $CONTEXT == cont ]] || return 0
     local t=$PREBUFFER$BUFFER
-    if [[ $t == ' '* ]]; then
+    if [[ -n $t && -n $HISTORY_IGNORE ]]; then
+      { { [[ $t == ${~HISTORY_IGNORE} ]] && ig=1 } 2>/dev/null } always { TRY_BLOCK_ERROR=0 }
+    fi
+    if [[ $t == ' '* ]] || (( ig )); then
       (( _unsent_n )) && _unsent_put f ''
       _unsent_n=0 _unsent_last=' '
       return 0

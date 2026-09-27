@@ -64,7 +64,10 @@ Usage:
 
 A message you send goes to its session's sent log, not to history.
 UNSENT_ON_SEND=delete keeps nothing of it; UNSENT_ON_SEND_CLAUDE=delete does
-that for one agent, and wins over UNSENT_ON_SEND.
+that for one agent, and wins over UNSENT_ON_SEND. A shell line you run keeps
+nothing, since the shell's own history has it; UNSENT_ON_SEND_ZSH=log logs
+it. A shell line you clear goes to history, and the last line of a closed
+shell waits in unsent list.
 
 UNSENT_OFF=1 runs the agent directly, as if unsent were not there.
 UNSENT_DEBUG_DIR=<folder> logs every key, all output and each save's view
@@ -482,14 +485,19 @@ func cmdForget(args []string, stdout, stderr io.Writer) int {
 // orphanNotice is the line that tells the user a draft this agent left in
 // this folder is waiting, the way a word processor offers recovered files,
 // or "" when there is none. A draft is only offered back to the agent it
-// came from, and one left in a subfolder is counted, not offered.
+// came from, and one left in a subfolder is counted, not offered. A shell
+// line typed in this folder and never run, by a shell that is gone, gets a
+// line of its own.
 func orphanNotice(st *store, cwd, agent string) string {
-	var here []*record
-	var first *record // this folder's newest, of any agent: what a plain restore picks
+	var here, left []*record // this agent's drafts here; shell lines left here
+	var first *record        // this folder's newest, of any agent: what a plain restore picks
 	sub := 0
 	for _, r := range st.orphans() {
 		if samePath(r.Cwd, cwd) && first == nil {
 			first = r
+		}
+		if isShell(r.agent()) && r.agent() != agent && samePath(r.Cwd, cwd) {
+			left = append(left, r)
 		}
 		switch {
 		case r.agent() != agent:
@@ -506,11 +514,18 @@ func orphanNotice(st *store, cwd, agent string) string {
 	case sub > 1:
 		subs = fmt.Sprintf("%d drafts wait in subfolders", sub)
 	}
+	shell := ""
+	switch {
+	case len(left) == 1:
+		shell = fmt.Sprintf("unsent: a %s line you typed here and did not run is saved: `unsent restore --agent %s` copies it.\n", left[0].agent(), left[0].agent())
+	case len(left) > 1:
+		shell = fmt.Sprintf("unsent: %d shell lines you typed here and did not run are saved: `unsent list --here`.\n", len(left))
+	}
 	if len(here) == 0 {
 		if subs != "" {
-			return fmt.Sprintf("unsent: %s of this folder: `unsent list`.\n", subs)
+			return fmt.Sprintf("unsent: %s of this folder: `unsent list`.\n", subs) + shell
 		}
-		return ""
+		return shell
 	}
 	r := here[0]
 	more := ""
@@ -526,7 +541,7 @@ func orphanNotice(st *store, cwd, agent string) string {
 		subs = " " + subs + ": `unsent list`."
 	}
 	return fmt.Sprintf("unsent: recovered a draft from %s, %s%s. Run `%s` to copy it.%s\n",
-		when(r.Updated), lines(r.Draft), more, restore, subs)
+		when(r.Updated), lines(r.Draft), more, restore, subs) + shell
 }
 
 // realPath is a folder's resolved real path, so /tmp and /private/tmp on

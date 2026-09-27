@@ -1,0 +1,570 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+)
+
+// fixtureTime is the time every fixture record carries.
+var fixtureTime = time.Date(2026, 9, 27, 10, 0, 0, 0, time.Local)
+
+// shellLogBytes writes records in the hooks' format.
+func shellLogBytes(recs ...zrec) []byte {
+	var b []byte
+	for _, r := range recs {
+		b = fmt.Appendf(b, "%s %d %d\n%s\n", r.kind, fixtureTime.Unix(), len(r.text), r.text)
+	}
+	return b
+}
+
+// shellLogName is the name the hooks give a log of this host.
+func shellLogName(pid int, micro int64, ext string) string {
+	return fmt.Sprintf("zsh-%s-%d-%d%s", shellHost(), pid, micro, ext)
+}
+
+// writeShellLog writes a fixture log into the store's shell folder.
+func writeShellLog(t *testing.T, st *store, name string, recs ...zrec) string {
+	t.Helper()
+	dir := filepath.Join(st.dir, "shell")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, shellLogBytes(recs...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func appendShellLog(t *testing.T, path string, recs ...zrec) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.Write(shellLogBytes(recs...)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// deadPid is the pid of a process that has exited.
+func deadPid(t *testing.T) int {
+	t.Helper()
+	cmd := exec.Command("/bin/sh", "-c", "exit 0")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	pid := cmd.Process.Pid
+	if pidAlive(pid) {
+		t.Skipf("pid %d was taken again at once", pid)
+	}
+	return pid
+}
+
+// shellHistory is the text of every shell line in history, sorted.
+func shellHistory(st *store) []string {
+	var out []string
+	for _, r := range st.load(true) {
+		if r.agent() == "zsh" && !isDraftFile(st, r) {
+			out = append(out, r.Draft)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func shellOrphans(st *store) []*record {
+	var out []*record
+	for _, r := range st.orphans() {
+		if r.agent() == "zsh" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func sentTexts(st *store) []string {
+	var out []string
+	for _, l := range st.sentLogs() {
+		for _, m := range l.messages {
+			out = append(out, l.Agent+": "+m.Text)
+		}
+	}
+	return out
+}
+
+// scenarioImport writes the log of a shell that is gone: a line run with
+// Enter, one cleared at its prompt, one that starts with a space, one
+// dropped by a forget mark (a leading space added later, or a match of
+// HISTORY_IGNORE), and one left at the prompt. Then imp imports it, and the
+// store must hold the cleared line in history, the last one as an orphan
+// in the folder the prompt ran in, and nothing of the rest.
+func scenarioImport(st *store, folder string, pid int, imp func(*store)) error {
+	dir := filepath.Join(st.dir, "shell")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	log := filepath.Join(dir, shellLogName(pid, 1, ".log"))
+	data := shellLogBytes(
+		zrec{"v", "1"},
+		zrec{"i", folder},
+		zrec{"b", "echo sent"}, zrec{"s", "echo sent"},
+		zrec{"i", folder},
+		zrec{"b", "cleared line"},
+		zrec{"i", folder},
+		zrec{"b", " spaced secret"},
+		zrec{"i", folder},
+		zrec{"b", "l"}, zrec{"f", ""},
+		zrec{"i", folder},
+		zrec{"b", "left at the prompt"},
+	)
+	if err := os.WriteFile(log, data, 0o600); err != nil {
+		return err
+	}
+	imp(st)
+	var errs []error
+	if h := shellHistory(st); !slices.Equal(h, []string{"cleared line"}) {
+		errs = append(errs, fmt.Errorf("history holds %q, want the cleared line", h))
+	}
+	o := shellOrphans(st)
+	if len(o) != 1 || o[0].Draft != "left at the prompt" || o[0].Cwd != realPath(folder) || o[0].PID != pid {
+		errs = append(errs, fmt.Errorf("orphans %v, want the line left at the prompt in %s", o, folder))
+	} else if o[0].Updated.Unix() != fixtureTime.Unix() || o[0].Started.Unix() != fixtureTime.Unix() {
+		errs = append(errs, fmt.Errorf("orphan times %v %v, want the record's", o[0].Started, o[0].Updated))
+	}
+	if s := sentTexts(st); len(s) > 0 {
+		errs = append(errs, fmt.Errorf("sent logs hold %q under the shells' default", s))
+	}
+	if exists(log) {
+		errs = append(errs, errors.New("the dead shell's log is still there"))
+	}
+	return errors.Join(errs...)
+}
+
+// TestImportShellLines imports a dead shell's log, and checks the check
+// goes red when the import imports nothing.
+func TestImportShellLines(t *testing.T) {
+	folder := t.TempDir()
+	pid := deadPid(t)
+	if err := scenarioImport(testStore(t), folder, pid, (*store).importShells); err != nil {
+		t.Fatal(err)
+	}
+	if err := scenarioImport(testStore(t), folder, pid, func(*store) {}); err == nil {
+		t.Fatal("the check passed with an import that imports nothing")
+	}
+}
+
+// Every command that opens the store imports first: unsent list shows the
+// dead shell's line, and the notice in that folder names it.
+func TestImportOnEveryCommand(t *testing.T) {
+	st := testStore(t)
+	folder := t.TempDir()
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", folder}, zrec{"b", "make release"})
+	code, out, _ := runCLI("list")
+	if code != 0 || !strings.Contains(out, "zsh") || !strings.Contains(out, "make release") {
+		t.Fatalf("unsent list: %d %q", code, out)
+	}
+	code, out, _ = runCLI("show", "--agent", "zsh")
+	if code != 0 || out != "make release\n" {
+		t.Fatalf("unsent show --agent zsh: %d %q", code, out)
+	}
+	n := orphanNotice(st, folder, "claude")
+	if !strings.Contains(n, "a zsh line you typed here and did not run") || !strings.Contains(n, "unsent restore --agent zsh") {
+		t.Fatalf("notice %q", n)
+	}
+	if n := orphanNotice(st, t.TempDir(), "claude"); n != "" {
+		t.Fatalf("notice in another folder %q", n)
+	}
+	writeShellLog(t, st, shellLogName(deadPid(t), 2, ".log"),
+		zrec{"v", "1"}, zrec{"i", folder}, zrec{"b", "git push"})
+	st.importShells()
+	if n := orphanNotice(st, folder, "claude"); !strings.Contains(n, "2 shell lines") {
+		t.Fatalf("notice with two lines %q", n)
+	}
+}
+
+// A line run with Enter follows the on-send setting: nothing by default,
+// the sent log under log, with the per-shell variable winning.
+func TestImportSentLine(t *testing.T) {
+	for _, c := range []struct {
+		global, zsh string
+		want        []string
+	}{
+		{"", "", nil},
+		{"", "log", []string{"zsh: echo one", "zsh: exit"}},
+		{"log", "", []string{"zsh: echo one", "zsh: exit"}},
+		{"log", "delete", nil},
+	} {
+		t.Run(c.global+"/"+c.zsh, func(t *testing.T) {
+			t.Setenv("UNSENT_ON_SEND", c.global)
+			t.Setenv("UNSENT_ON_SEND_ZSH", c.zsh)
+			st := testStore(t)
+			folder := t.TempDir()
+			writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+				zrec{"v", "1"}, zrec{"i", folder},
+				zrec{"b", "echo one"}, zrec{"s", "echo one"},
+				zrec{"i", folder},
+				zrec{"s", "exit"}) // the shell exits with no prompt after
+			st.importShells()
+			if got := sentTexts(st); !slices.Equal(got, c.want) {
+				t.Fatalf("sent %q, want %q", got, c.want)
+			}
+			if h, o := shellHistory(st), shellOrphans(st); len(h) > 0 || len(o) > 0 {
+				t.Fatalf("a sent line reached history %q or the drafts %v", h, o)
+			}
+			if c.want == nil {
+				return
+			}
+			l := st.sentLogs()[0]
+			if l.Cwd != realPath(folder) || l.messages[0].Time.Unix() != fixtureTime.Unix() {
+				t.Fatalf("sent log folder %q, time %v", l.Cwd, l.messages[0].Time)
+			}
+			if fi, err := os.Stat(l.path); err != nil || fi.Mode().Perm() != 0o600 {
+				t.Fatalf("sent log mode %v %v", fi.Mode(), err)
+			}
+		})
+	}
+}
+
+func TestOnSendShellDefault(t *testing.T) {
+	t.Setenv("UNSENT_ON_SEND", "")
+	t.Setenv("UNSENT_ON_SEND_ZSH", "")
+	if v, from := onSendFrom("zsh"); v != "delete" || from != "the default" {
+		t.Fatalf("zsh: %s (%s)", v, from)
+	}
+	if v, _ := onSendFrom("claude"); v != "log" {
+		t.Fatalf("claude: %s", v)
+	}
+}
+
+// Enter at an open quote only opens a continuation prompt; Ctrl+C there
+// clears both lines, which go to history together.
+func TestImportContinuationIsNotASend(t *testing.T) {
+	t.Setenv("UNSENT_ON_SEND_ZSH", "log")
+	st := testStore(t)
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"},
+		zrec{"b", `echo "a`}, zrec{"s", `echo "a`}, zrec{"c", ""},
+		zrec{"b", "echo \"a\nb"},
+		zrec{"i", "/"})
+	st.importShells()
+	if h := shellHistory(st); !slices.Equal(h, []string{"echo \"a\nb"}) {
+		t.Fatalf("history %q", h)
+	}
+	if s := sentTexts(st); len(s) > 0 {
+		t.Fatalf("sent %q", s)
+	}
+}
+
+// A line replaced wholesale, as Up or Ctrl+R does, goes to history; one
+// edited in place does not; one emptied by hand does.
+func TestImportReplacedLine(t *testing.T) {
+	st := testStore(t)
+	typed := "curl -X POST https://example.invalid/hook -d @body.json"
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"},
+		zrec{"b", typed},
+		zrec{"b", typed + " -v"},
+		zrec{"b", "git log --oneline --graph --decorate --all"},
+		zrec{"i", "/"},
+		zrec{"b", "echo emptied by hand"}, zrec{"b", ""},
+		zrec{"i", "/"})
+	st.importShells()
+	want := []string{typed + " -v", "git log --oneline --graph --decorate --all", "echo emptied by hand"}
+	slices.Sort(want)
+	if h := shellHistory(st); !slices.Equal(h, want) {
+		t.Fatalf("history %q, want %q", h, want)
+	}
+}
+
+// A forget mark drops the line, and whatever of it already went to history.
+func TestImportForgetDropsTheLine(t *testing.T) {
+	st := testStore(t)
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"},
+		zrec{"b", "export TOKEN=pw1 and a long enough tail"},
+		zrec{"b", "recalled from the history, long enough"},
+		zrec{"f", ""},
+		zrec{"b", "typed after the space came off"},
+		zrec{"i", "/"},
+		zrec{"b", "kept at the next prompt"},
+		zrec{"i", "/"})
+	st.importShells()
+	want := []string{"kept at the next prompt", "typed after the space came off"}
+	if h := shellHistory(st); !slices.Equal(h, want) {
+		t.Fatalf("history %q, want %q", h, want)
+	}
+}
+
+// A live shell's log stays, and each import takes only the records added
+// since the last one, across the log being moved aside and the next one.
+// The shell is one session throughout.
+func TestImportLiveShellKeepsItsPlace(t *testing.T) {
+	t.Setenv("UNSENT_ON_SEND_ZSH", "log")
+	st := testStore(t)
+	pid := os.Getpid() // alive for the whole test
+	log := writeShellLog(t, st, shellLogName(pid, 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "first cleared"}, zrec{"i", "/"},
+		zrec{"b", "ran"}, zrec{"s", "ran"}, zrec{"i", "/"},
+		zrec{"b", "in progress"})
+	// A record half written: the hook is in the middle of it.
+	f, err := os.OpenFile(log, os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("b 1790000000 11\nin progr")
+	f.Close()
+	for range 2 {
+		st.importShells()
+	}
+	if h := shellHistory(st); !slices.Equal(h, []string{"first cleared"}) {
+		t.Fatalf("history %q", h)
+	}
+	if o := shellOrphans(st); len(o) > 0 {
+		t.Fatalf("a live shell's line is an orphan: %v", o)
+	}
+	if !exists(log) {
+		t.Fatal("the importer deleted a live shell's log")
+	}
+	state := filepath.Join(st.dir, "shell", fmt.Sprintf("zsh-%s-%d.import", shellHost(), pid))
+	if !exists(state) {
+		t.Fatal("no state file for the live shell")
+	}
+	// The hook finishes the record, then moves the log aside at the next
+	// prompt and opens a new one.
+	f, _ = os.OpenFile(log, os.O_WRONLY|os.O_APPEND, 0o600)
+	f.WriteString("ess\n")
+	f.Close()
+	appendShellLog(t, log, zrec{"s", "in progress"})
+	if err := os.Rename(log, strings.TrimSuffix(log, ".log")+".done"); err != nil {
+		t.Fatal(err)
+	}
+	st.importShells()
+	if exists(strings.TrimSuffix(log, ".log") + ".done") {
+		t.Fatal("the importer kept a log moved aside")
+	}
+	next := writeShellLog(t, st, shellLogName(pid, 2, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "second log"}, zrec{"i", "/"})
+	st.importShells()
+	st.importShells()
+	if h := shellHistory(st); !slices.Equal(h, []string{"first cleared", "second log"}) {
+		t.Fatalf("history %q", h)
+	}
+	logs := st.sentLogs()
+	if len(logs) != 1 || len(logs[0].messages) != 2 || logs[0].messages[1].Text != "in progress" {
+		t.Fatalf("sent logs %v, want one session with both lines", sentTexts(st))
+	}
+	if !exists(next) {
+		t.Fatal("the importer deleted the live shell's new log")
+	}
+}
+
+// Two .log files of one host and pid: the older shell ended and a newer
+// one took its pid. The older one's line is an orphan; the newer is live.
+func TestImportPidTakenByANewShell(t *testing.T) {
+	st := testStore(t)
+	pid := os.Getpid()
+	old := writeShellLog(t, st, shellLogName(pid, 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "the old shell's line"})
+	cur := writeShellLog(t, st, shellLogName(pid, 2, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "the new shell's line"})
+	st.importShells()
+	o := shellOrphans(st)
+	if len(o) != 1 || o[0].Draft != "the old shell's line" {
+		t.Fatalf("orphans %v", o)
+	}
+	if exists(old) || !exists(cur) {
+		t.Fatalf("old log there: %v, new log there: %v", exists(old), exists(cur))
+	}
+}
+
+// A log named for another host is that host's to import, unless nothing
+// has written to it for 30 days.
+func TestImportLeavesAnotherHostsLog(t *testing.T) {
+	st := testStore(t)
+	name := fmt.Sprintf("zsh-%s-%d-1.log", "elsewhere.invalid", deadPid(t))
+	log := writeShellLog(t, st, name, zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "typed on the other host"})
+	st.importShells()
+	if !exists(log) || len(shellOrphans(st)) > 0 {
+		t.Fatal("the importer took another host's log")
+	}
+	old := time.Now().Add(-31 * 24 * time.Hour)
+	if err := os.Chtimes(log, old, old); err != nil {
+		t.Fatal(err)
+	}
+	st.importShells()
+	if exists(log) || len(shellOrphans(st)) != 1 {
+		t.Fatalf("a 31-day-old log of another host: there %v, orphans %v", exists(log), shellOrphans(st))
+	}
+}
+
+// A log in a newer format, or with a broken record, is left for a later
+// unsent; a record torn by a failed write at the end of a log moved aside
+// is skipped, and the records before it count.
+func TestImportLeavesWhatItCannotRead(t *testing.T) {
+	st := testStore(t)
+	newer := writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "2"}, zrec{"i", "/"}, zrec{"b", "a newer unsent's line"})
+	broken := writeShellLog(t, st, shellLogName(deadPid(t), 2, ".log"), zrec{"v", "1"}, zrec{"i", "/"})
+	f, _ := os.OpenFile(broken, os.O_WRONLY|os.O_APPEND, 0o600)
+	f.WriteString("not a header\n")
+	f.Close()
+	torn := writeShellLog(t, st, shellLogName(deadPid(t), 3, ".done"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "before the failed write"})
+	f, _ = os.OpenFile(torn, os.O_WRONLY|os.O_APPEND, 0o600)
+	f.WriteString("b 1790000000 40\nbefore the failed write, and")
+	f.Close()
+	st.importShells()
+	if !exists(newer) || !exists(broken) {
+		t.Fatalf("newer there: %v, broken there: %v", exists(newer), exists(broken))
+	}
+	o := shellOrphans(st)
+	if len(o) != 1 || o[0].Draft != "before the failed write" || exists(torn) {
+		t.Fatalf("orphans %v, torn log there: %v", o, exists(torn))
+	}
+}
+
+// Shell lines count against their own cap and never push agent drafts out
+// of history, nor agent drafts shell lines.
+func TestShellHistoryCap(t *testing.T) {
+	st := testStore(t)
+	hist := filepath.Join(st.dir, "history")
+	seedFiles(t, hist, 20, []byte(`{"draft":"agent","agent":"claude"}`), func(i int) string { return fmt.Sprintf("20260101-%06d-1.json", i) })
+	seedFiles(t, hist, shellHistoryLimit+30, []byte(`{"draft":"line","agent":"zsh"}`), func(i int) string { return fmt.Sprintf("sh-20260101-%06d.json", i) })
+	st.prune()
+	count := func(prefix string) int {
+		n := 0
+		names, _ := filepath.Glob(filepath.Join(hist, "*.json"))
+		for _, name := range names {
+			if strings.HasPrefix(filepath.Base(name), prefix) {
+				n++
+			}
+		}
+		return n
+	}
+	if a, s := count("2026"), count("sh-"); a != 20 || s != shellHistoryLimit {
+		t.Fatalf("after pruning: %d agent drafts, %d shell lines", a, s)
+	}
+	if !exists(filepath.Join(hist, fmt.Sprintf("sh-20260101-%06d.json", shellHistoryLimit+29))) {
+		t.Fatal("the newest shell line was pruned")
+	}
+	seedFiles(t, hist, historyLimit+10, []byte(`{"draft":"agent","agent":"claude"}`), func(i int) string { return fmt.Sprintf("20260102-%06d-1.json", i) })
+	st.prune()
+	if a, s := count("2026"), count("sh-"); a != historyLimit || s != shellHistoryLimit {
+		t.Fatalf("after more agent drafts: %d agent drafts, %d shell lines", a, s)
+	}
+	// Restoring a shell line moves it to history under the shells' cap.
+	r := &record{ID: "zsh-x-1-1", Agent: "zsh", Draft: "a line", PID: 1}
+	if err := st.archive(r); err != nil {
+		t.Fatal(err)
+	}
+	if s := count("sh-"); s != shellHistoryLimit {
+		t.Fatalf("after archiving a shell line: %d shell lines", s)
+	}
+}
+
+// scenarioZshToStore types at a real zsh with the hooks: a line run with
+// Enter, one cleared with Ctrl+C, one matching HISTORY_IGNORE, one that
+// starts with a space, then one left at the prompt when end ends the
+// shell. unsent list must then show the last line and nothing of the
+// others but the cleared one.
+func scenarioZshToStore(t *testing.T, hooks string, end func(*zshSession)) error {
+	s := startZsh(t, hooks, true)
+	t.Setenv("UNSENT_HOME", filepath.Join(s.home, "state"))
+	s.send("HISTORY_IGNORE='(ignored*|ls)'\r")
+	s.mark("set")
+	s.send("echo ran with enter\r")
+	s.mark("ran")
+	s.line("cleared with ctrl-c")
+	s.clear()
+	s.echo("ignored secret", "ignored secret")
+	s.clear()
+	s.echo(" spaced secret", "spaced secret")
+	s.clear()
+	s.line("left at the prompt")
+	end(s)
+	<-s.ended
+	code, out, errOut := runCLI("list", "--all", "--agent", "zsh")
+	var errs []error
+	if code != 0 {
+		errs = append(errs, fmt.Errorf("unsent list: exit %d: %s", code, errOut))
+	}
+	st, err := openStore()
+	if err != nil {
+		return err
+	}
+	o := shellOrphans(st)
+	if len(o) != 1 || o[0].Draft != "left at the prompt" || o[0].Cwd != realPath(s.home) {
+		errs = append(errs, fmt.Errorf("orphans %v", o))
+	}
+	h := shellHistory(st)
+	if !slices.Contains(h, "cleared with ctrl-c") {
+		errs = append(errs, fmt.Errorf("history %q lacks the cleared line", h))
+	}
+	for _, secret := range []string{"ran with enter", "ignored secret", "spaced secret"} {
+		if strings.Contains(out, secret) || slices.ContainsFunc(h, func(x string) bool { return strings.Contains(x, secret) }) {
+			errs = append(errs, fmt.Errorf("%q reached the store: %q", secret, out))
+		}
+	}
+	if !strings.Contains(out, "left at the prompt") || !strings.Contains(out, "cleared with ctrl-c") {
+		errs = append(errs, fmt.Errorf("unsent list shows %q", out))
+	}
+	if l := s.logs(); len(l) > 0 {
+		errs = append(errs, fmt.Errorf("logs left after the shell ended: %v", l))
+	}
+	return errors.Join(errs...)
+}
+
+// TestZshLinesReachTheStore runs the hooks in a real zsh, ends it with
+// SIGHUP and with kill -9, and imports what it wrote. Without the
+// HISTORY_IGNORE check in the hooks the check must go red.
+func TestZshLinesReachTheStore(t *testing.T) {
+	t.Setenv("UNSENT_ON_SEND", "")
+	t.Setenv("UNSENT_ON_SEND_ZSH", "")
+	hup := func(s *zshSession) { syscall.Kill(s.cmd.Process.Pid, syscall.SIGHUP) }
+	kill := func(s *zshSession) { s.cmd.Process.Kill() }
+	for name, end := range map[string]func(*zshSession){"hup": hup, "kill-9": kill} {
+		t.Run(name, func(t *testing.T) {
+			if err := scenarioZshToStore(t, zshHooks, end); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	mutated := strings.Replace(zshHooks, "if [[ $t == ' '* ]] || (( ig )); then", "if [[ $t == ' '* ]]; then", 1)
+	if mutated == zshHooks {
+		t.Fatal("the mutation found nothing to change")
+	}
+	t.Run("mutated", func(t *testing.T) {
+		if err := scenarioZshToStore(t, mutated, kill); err == nil {
+			t.Fatal("the check passed with the HISTORY_IGNORE check taken out of the hooks")
+		}
+	})
+}
+
+// A HISTORY_IGNORE zsh cannot parse matches nothing, and the hooks go on
+// saving.
+func TestZshHooksSurviveABadHistoryIgnore(t *testing.T) {
+	s := startZsh(t, zshHooks, true)
+	s.send("HISTORY_IGNORE='(ls'\r")
+	s.mark("set")
+	r := s.line("ls still saved")
+	if !holds(r, "ls still saved") {
+		t.Fatalf("log %v", r)
+	}
+	s.mu.Lock()
+	out := s.out.String()
+	s.mu.Unlock()
+	if strings.Contains(out, "bad pattern") {
+		t.Fatal("the hooks printed zsh's pattern error")
+	}
+}

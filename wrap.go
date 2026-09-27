@@ -227,6 +227,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			// hides the draft this session left in the box, which a plain
 			// restore picks once we exit.
 			st.release()
+			st.importShells() // a shell may have closed with a line while the agent ran
 			fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {

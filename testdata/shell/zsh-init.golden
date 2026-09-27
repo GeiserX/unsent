@@ -36,10 +36,16 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     _unsent_fd=$1
   }
   function _unsent_line {
+    local -i xg=0 ig=0
+    [[ -o extended_glob ]] && xg=1
     emulate -L zsh
+    (( xg )) && setopt extended_glob
     [[ $CONTEXT == start || $CONTEXT == cont ]] || return 0
     local t=$PREBUFFER$BUFFER
-    if [[ $t == ' '* ]]; then
+    if [[ -n $t && -n $HISTORY_IGNORE ]]; then
+      { { [[ $t == ${~HISTORY_IGNORE} ]] && ig=1 } 2>/dev/null } always { TRY_BLOCK_ERROR=0 }
+    fi
+    if [[ $t == ' '* ]] || (( ig )); then
       (( _unsent_n )) && _unsent_put f ''
       _unsent_n=0 _unsent_last=' '
       return 0
