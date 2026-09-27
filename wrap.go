@@ -226,6 +226,7 @@ const maxFrameWait = 100 * time.Millisecond
 type session struct {
 	mu        sync.Mutex
 	screen    *vt.Emulator
+	strings   stringSeqs
 	dirty     bool
 	inFrame   bool
 	frameTail []byte
@@ -283,8 +284,8 @@ func (s *session) write(chunk []byte) {
 			s.broken = true
 		}
 	}()
-	// A submit key waiting for the agent's answer was typed into the screen
-	// as it stands now: keep it before this output changes it.
+	// Keys waiting for the agent's answer were typed into the screen as it
+	// stands now: keep it before this output changes it.
 	s.keys.answer(func() *screen {
 		if s.inFrame {
 			return nil
@@ -292,7 +293,7 @@ func (s *session) write(chunk []byte) {
 		return snapshot(s.screen)
 	})
 	s.trackFrames(chunk)
-	s.screen.Write(chunk)
+	s.screen.Write(s.strings.strip(chunk))
 	s.dirty = true
 }
 
@@ -368,10 +369,15 @@ func (s *session) save() {
 	}()
 	// Replay the keys in order. Each submit key comes with the screen it was
 	// typed into: that read shows the agent's answer to the keys before it,
-	// and the text the key sends, up to the last key the agent drew.
+	// and the text the key sends, up to the last key the agent drew. The
+	// first keys after it come with theirs: a box the agent had emptied
+	// before they arrived was sent, even though they are in it by now.
 	for _, e := range events {
 		switch e.kind {
 		case keyOther:
+			if s.armed && e.before != nil {
+				s.look(e.before)
+			}
 			s.armed = false
 		case keyClear:
 			s.armed, s.cleared = false, true
@@ -388,10 +394,11 @@ func (s *session) save() {
 
 // look reads the box off one screen and writes the draft to disk when it
 // changed. It reports whether the box was on screen. A box that empties
-// right after a submit key (armed), with no clear key since, was sent: the
-// draft follows the on-send setting. Any other box that empties archives
-// the draft it held, so a send the keys cannot vouch for counts as a clear
-// and costs one history entry, never text.
+// right after a submit key (armed), before any other key reached the
+// agent and with no clear key since, was sent: the draft follows the
+// on-send setting. Any other box that empties archives the draft it held,
+// so a send the keys cannot vouch for counts as a clear and costs one
+// history entry, never text.
 func (s *session) look(scr *screen) bool {
 	armed := s.armed
 	s.armed = false
@@ -413,6 +420,9 @@ func (s *session) look(scr *screen) bool {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
 	}
 	if draft == s.rec.Draft {
+		// Output that leaves the box as it was (a window title, a spinner
+		// above it) is not the agent's answer to a submit key yet.
+		s.armed = armed
 		return true
 	}
 	s.stitched = s.stitched || v.capped

@@ -576,3 +576,39 @@ func TestLogView(t *testing.T) {
 	}
 	logView(filepath.Join(path, "not-a-dir", "x"), before, view{}, after) // must not panic
 }
+
+// String sequences never reach the shadow screen, however the chunks split
+// them, and the text around them does. The emulator alone prints the end
+// of a title holding ✳ (its UTF-8 holds 0x9c, which it takes for ST).
+func TestStringSeqsStripped(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"a\x1b]0;✳ Claude Code\x07b", "ab"},
+		{"a\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\b", "alinkb"},
+		{"a\x1bPq✳ x\x1b\\b\x1b_apc\x1b\\c\x1b^pm\x07d\x1bXsos\x07e", "abcde"},
+		{"a\x1b]0;cancelled\x18b", "ab"},
+		{"a\x1b]0;cut short\x1b[1mb", "a\x1b[1mb"},
+		{"\x1b\x1b[1ma\x1b[m", "\x1b\x1b[1ma\x1b[m"},
+		{"plain", "plain"},
+	}
+	for _, c := range cases {
+		// Whole, and split at every byte.
+		var f stringSeqs
+		if got := string(f.strip([]byte(c.in))); got != c.want {
+			t.Errorf("%q: %q, want %q", c.in, got, c.want)
+		}
+		var g stringSeqs
+		var out []byte
+		for i := range len(c.in) {
+			out = append(out, g.strip([]byte{c.in[i]})...)
+		}
+		if string(out) != c.want {
+			t.Errorf("%q byte by byte: %q, want %q", c.in, out, c.want)
+		}
+	}
+	s := &session{screen: vt.NewEmulator(40, 3)}
+	go io.Copy(io.Discard, s.screen)
+	s.write([]byte("\x1b]0;✳ Claude Code\x07"))
+	if got := strings.TrimSpace(snapshot(s.screen).String()); got != "" {
+		t.Fatalf("the title reached the screen: %q", got)
+	}
+}

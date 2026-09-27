@@ -41,8 +41,9 @@ Usage:
                              print a session's sent messages (session: a number
                              from unsent log, or its id); --copy N copies
                              message N to the clipboard
-  unsent forget --log <session>
-                             delete one session's sent log
+  unsent forget --log <id>
+                             delete one session's sent log (id: the session id
+                             unsent log shows, never a number, which can move)
   unsent version
 
 A message you send goes to its session's sent log, not to history.
@@ -366,7 +367,7 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 			if n := len(l.messages); n > 0 {
 				last, _, _ = strings.Cut(l.messages[n-1].Text, "\n")
 			}
-			fmt.Fprintf(stdout, "%3d  %-*s  %s  %-24s  %4d sent  %s\n", i+1, width, l.Agent, when(l.Started), shortPath(l.Cwd, 24), len(l.messages), preview(last, 50))
+			fmt.Fprintf(stdout, "%3d  %s  %-*s  %s  %-24s  %4d sent  %s\n", i+1, l.Session, width, l.Agent, when(l.Started), shortPath(l.Cwd, 24), len(l.messages), preview(last, 40))
 		}
 		return 0
 	}
@@ -418,10 +419,16 @@ func findSent(logs []*sentLog, arg string) *sentLog {
 	return nil
 }
 
-// cmdForget deletes one session's sent log.
+// cmdForget deletes one session's sent log, named by its session id. A
+// number from unsent log is refused: a session that sends its first message
+// in between shifts the numbers, and the wrong log would be gone for good.
 func cmdForget(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 2 || args[0] != "--log" {
-		fmt.Fprintln(stderr, "unsent: usage: unsent forget --log <session>")
+		fmt.Fprintln(stderr, "unsent: usage: unsent forget --log <id>")
+		return 2
+	}
+	if _, err := strconv.Atoi(args[1]); err == nil {
+		fmt.Fprintf(stderr, "unsent: forget --log takes the session id that unsent log shows, not a number: the numbers move when another session sends its first message\n")
 		return 2
 	}
 	st, err := openStore()

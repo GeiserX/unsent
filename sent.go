@@ -14,10 +14,11 @@ import (
 
 // A send and a clear both empty the box; the keys seen on input tell them
 // apart. The save loop (session.look) counts a draft as sent only when a
-// submit key was the last key typed before the box read empty, no clear
-// key came with it, and the box was on screen when the key arrived.
-// Anything else counts as cleared and the draft goes to history, so doubt
-// never costs text: a missed send costs one history entry.
+// submit key was the last key typed before the box read empty, or the
+// first keys after it were typed into an empty box, no clear key came with
+// it, and the box was on screen when the key arrived. Anything else counts
+// as cleared and the draft goes to history, so doubt never costs text: a
+// missed send costs one history entry.
 
 // keyKind is what a key means to send detection.
 type keyKind int
@@ -31,8 +32,9 @@ const (
 // keyEvent is one submit or clear key, or a run of other keys.
 type keyEvent struct {
 	kind keyKind
-	// before is the screen a submit key was typed into, as the agent last
-	// drew it before the key reached it; nil when it was half drawn.
+	// before is the screen a submit key, or the first run of other keys
+	// after one, was typed into, as the agent last drew it before the key
+	// reached it; nil when it was half drawn, and for every other key.
 	before *screen
 }
 
@@ -112,16 +114,18 @@ func keyLen(b []byte) (int, bool) {
 }
 
 // keyLog collects the submit and clear keys typed between two saves. The
-// input side pushes keys; the output side gives a submit key the screen it
-// was typed into, just before the agent's next output changes it.
+// input side pushes keys; the output side gives a submit key, and the keys
+// typed right after it, the screen they were typed into, just before the
+// agent's next output changes it.
 type keyLog struct {
 	mu     sync.Mutex
 	events []*keyEvent
-	// pending is the last submit key while no output has followed it, and
-	// waiting stays true until output does.
-	pending *keyEvent
+	// pending holds the keys no output has followed yet that need a screen,
+	// and waiting stays true from a submit key until output follows it.
+	pending []*keyEvent
 	waiting bool
-	esc     bool // the last keys ended in a lone Esc
+	last    keyKind // the last key pushed, across takes
+	esc     bool    // the last keys ended in a lone Esc
 }
 
 func (l *keyLog) push(ks keyset, typed []byte) {
@@ -137,43 +141,57 @@ func (l *keyLog) push(ks keyset, typed []byte) {
 	kinds, esc := ks.kinds(typed)
 	l.esc = esc
 	for _, k := range kinds {
+		after := l.last
+		l.last = k
 		if n := len(l.events); k == keyOther && n > 0 && l.events[n-1].kind == keyOther {
 			continue
 		}
 		e := &keyEvent{kind: k}
 		l.events = append(l.events, e)
-		if k == keySubmit {
-			l.pending, l.waiting = e, true
+		switch {
+		case k == keySubmit:
+			l.pending, l.waiting = append(l.pending, e), true
+		case k == keyOther && after == keySubmit:
+			// Typed into the agent's answer to the submit key, if it has
+			// drawn one: a box that is empty there was sent.
+			l.pending = append(l.pending, e)
 		}
 	}
 }
 
 // answer runs before output from the agent is fed to the shadow screen.
-// No output has come since a pending submit key, so scr() is the screen it
-// was typed into.
+// No output has come since the pending keys, so scr() is the screen they
+// were typed into.
 func (l *keyLog) answer(scr func() *screen) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.pending != nil {
-		l.pending.before = scr()
-		l.pending = nil
-	}
+	l.settle(scr)
 	l.waiting = false
 }
 
 // take returns the keys since the last take, in order, and whether the
 // agent has drawn anything since the last submit key. scr is the screen
-// the save is about to read; a pending submit key was typed into it.
+// the save is about to read; the pending keys were typed into it.
 func (l *keyLog) take(scr func() *screen) ([]*keyEvent, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.pending != nil {
-		l.pending.before = scr()
-		l.pending = nil
-	}
+	l.settle(scr)
 	events := l.events
 	l.events = nil
 	return events, !l.waiting
+}
+
+// settle gives the pending keys their screen, one snapshot for all of
+// them. The caller holds l.mu.
+func (l *keyLog) settle(scr func() *screen) {
+	if len(l.pending) == 0 {
+		return
+	}
+	before := scr()
+	for _, e := range l.pending {
+		e.before = before
+	}
+	l.pending = nil
 }
 
 // onSend is the on-send setting for an agent: "log" appends a sent draft to

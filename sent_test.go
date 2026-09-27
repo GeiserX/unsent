@@ -216,6 +216,98 @@ func TestSendKeyAfterEnterIsAClear(t *testing.T) {
 	s.expect(nil, []string{"mistake"})
 }
 
+// Typing the next message right after Enter, before the next save: the
+// keys land in the box the agent emptied, so the first message was sent.
+// Long and short drafts alike (keepOld takes a short one's change for an
+// edit), and Up, which recalls the message just sent.
+func TestSendTypingRightAfterEnter(t *testing.T) {
+	for _, c := range []struct{ draft, next, shown string }{
+		{"a message longer than twenty four bytes", "n", "n"},
+		{"yes do it", "n", "n"},
+		{"yes do it", "\x1b[A", "yes do it"},
+	} {
+		t.Run(fmt.Sprintf("%q", c.draft+" "+c.next), func(t *testing.T) {
+			s := newSendSession(t, &claude)
+			s.draw(c.draft)
+			s.save()
+			s.input([]byte("\r"))
+			s.draw("")
+			s.input([]byte(c.next))
+			s.draw(c.shown)
+			s.save()
+			s.expect([]string{c.draft}, nil)
+			if s.rec.Draft != c.shown {
+				t.Fatalf("draft %q, want %q", s.rec.Draft, c.shown)
+			}
+		})
+	}
+}
+
+// Output that leaves the box as it was, such as the window title Claude
+// Code sets right after Enter, is not the answer to Enter: a save that
+// reads it in between must not lose the send.
+func TestSendTitleBeforeTheEmptyBox(t *testing.T) {
+	s := newSendSession(t, &claude)
+	s.draw("a message")
+	s.save()
+	s.input([]byte("\r"))
+	s.write([]byte("\x1b]0;✳ Claude Code\a"))
+	s.save()
+	s.draw("")
+	s.save()
+	s.expect([]string{"a message"}, nil)
+}
+
+// Two messages sent between the same two saves both reach the sent log.
+func TestSendTwiceInOneTick(t *testing.T) {
+	s := newSendSession(t, &claude)
+	s.draw("first")
+	s.save()
+	s.input([]byte("\r"))
+	s.draw("")
+	s.input([]byte("second"))
+	s.draw("second")
+	s.input([]byte("\r"))
+	s.draw("")
+	s.save()
+	s.expect([]string{"first", "second"}, nil)
+}
+
+// A key typed after Enter but before the agent answered it: the box never
+// read empty, so this is doubt, and the draft goes to history.
+func TestSendKeyBeforeTheAnswerIsAClear(t *testing.T) {
+	s := newSendSession(t, &claude)
+	s.draw("a message longer than twenty four bytes")
+	s.save()
+	s.input([]byte("\r"))
+	s.input([]byte("n"))
+	s.draw("n")
+	s.save()
+	s.expect(nil, []string{"a message longer than twenty four bytes"})
+}
+
+// Enter typed into a half-drawn frame is doubt: what the frame shows so far
+// is not what Enter sent. The frame closes before the save (the answer path)
+// or is still open when the save gives up waiting (the take path).
+func TestSendEnterIntoAHalfDrawnFrame(t *testing.T) {
+	for _, saveInFrame := range []bool{false, true} {
+		t.Run(fmt.Sprint("save in frame ", saveInFrame), func(t *testing.T) {
+			s := newSendSession(t, &claude)
+			s.draw("full draft here")
+			s.save()
+			s.write([]byte("\x1b[?2026h" + drawBox(100, "full")))
+			s.input([]byte("\r"))
+			if saveInFrame {
+				s.save()
+			}
+			s.write([]byte("\x1b[?2026l"))
+			s.draw("")
+			s.save()
+			s.expect(nil, []string{"full draft here"})
+		})
+	}
+}
+
 // Enter typed at a dialog does not send the box, even if the box then
 // comes back empty.
 func TestSendEnterAtADialog(t *testing.T) {
@@ -436,40 +528,64 @@ func TestSentLogTrimsAt5MB(t *testing.T) {
 	}
 }
 
-func TestSentLogRetention(t *testing.T) {
+// ageLog writes a sent log in dir last written age ago.
+func ageLog(t *testing.T, dir, name string, age time.Duration) string {
+	t.Helper()
+	path := filepath.Join(dir, name+".jsonl")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	os.Chtimes(path, time.Now(), time.Now().Add(-age))
+	return path
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// Logs not written for 90 days go, however few there are.
+func TestSentLogRetentionAge(t *testing.T) {
 	st := testStore(t)
 	dir := filepath.Join(st.dir, "sent")
-	old := filepath.Join(dir, "old.jsonl")
-	os.WriteFile(old, []byte("{}\n"), 0o600)
-	os.Chtimes(old, time.Now(), time.Now().Add(-sentMaxAge-time.Hour))
-	recent := filepath.Join(dir, "recent.jsonl")
-	os.WriteFile(recent, []byte("{}\n"), 0o600)
-	os.Chtimes(recent, time.Now(), time.Now().Add(-sentMaxAge+time.Hour))
+	old := ageLog(t, dir, "old", sentMaxAge+24*time.Hour)
+	young := ageLog(t, dir, "young", sentMaxAge-24*time.Hour)
+	st.pruneSent()
+	if exists(old) || !exists(young) {
+		t.Fatalf("after pruning: 91 days old kept %v, 89 days old kept %v", exists(old), exists(young))
+	}
+}
+
+// At most 2,000 logs stay, the oldest deleted first.
+func TestSentLogRetentionCap(t *testing.T) {
+	st := testStore(t)
+	dir := filepath.Join(st.dir, "sent")
 	for i := range sentLimit + 5 {
-		name := filepath.Join(dir, fmt.Sprintf("n%04d.jsonl", i))
-		os.WriteFile(name, []byte("{}\n"), 0o600)
-		os.Chtimes(name, time.Now(), time.Now().Add(time.Duration(i-sentLimit)*time.Minute))
+		ageLog(t, dir, fmt.Sprintf("n%04d", i), time.Duration(sentLimit+5-i)*time.Minute)
 	}
 	st.pruneSent()
-	names, _ := filepath.Glob(filepath.Join(dir, "*.jsonl"))
-	if len(names) != sentLimit {
+	if names, _ := filepath.Glob(filepath.Join(dir, "*.jsonl")); len(names) != sentLimit {
 		t.Fatalf("%d logs kept, want %d", len(names), sentLimit)
 	}
-	for _, gone := range []string{old, recent, filepath.Join(dir, "n0000.jsonl"), filepath.Join(dir, "n0004.jsonl")} {
-		if _, err := os.Stat(gone); err == nil {
-			t.Errorf("%s kept", filepath.Base(gone))
+	for i, want := range map[int]bool{0: false, 4: false, 5: true, sentLimit + 4: true} {
+		if got := exists(filepath.Join(dir, fmt.Sprintf("n%04d.jsonl", i))); got != want {
+			t.Errorf("log %d kept %v, want %v", i, got, want)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(dir, "n0005.jsonl")); err != nil {
-		t.Error("the oldest log within the cap was deleted")
+}
+
+// A live session prunes too, when it starts a new log: a user who never
+// runs unsent log still gets the limits.
+func TestSentLogPrunesOnANewLog(t *testing.T) {
+	st := testStore(t)
+	stale := ageLog(t, filepath.Join(st.dir, "sent"), "stale", sentMaxAge+time.Hour)
+	r := testRecord("fresh", "claude", "/work", time.Now())
+	r.Draft = "hello"
+	if err := st.logSent(r); err != nil {
+		t.Fatal(err)
 	}
-	// A log younger than the age limit stays when under the cap.
-	os.WriteFile(recent, []byte("{}\n"), 0o600)
-	os.Chtimes(recent, time.Now(), time.Now().Add(-sentMaxAge+time.Hour))
-	os.Remove(filepath.Join(dir, "n2004.jsonl"))
-	st.pruneSent()
-	if _, err := os.Stat(recent); err != nil {
-		t.Error("a log younger than 90 days was deleted")
+	if exists(stale) || !exists(st.sentPath("fresh")) {
+		t.Fatalf("stale kept %v, fresh written %v", exists(stale), exists(st.sentPath("fresh")))
 	}
 }
 
@@ -492,14 +608,14 @@ func TestCLILog(t *testing.T) {
 	seedSent(t, st, "older", "claude", "/elsewhere", 60, "fix the build")
 	seedSent(t, st, "newer", "codex", realPath(here), 5, "first message", "second message\nwith a second line")
 	code, out, _ := runCLI("log")
-	if code != 0 || !strings.Contains(out, "  1  codex ") || !strings.Contains(out, "2 sent  second message\n") ||
-		!strings.Contains(out, "  2  claude") || !strings.Contains(out, "1 sent  fix the build") {
+	if code != 0 || !strings.Contains(out, "  1  newer  codex ") || !strings.Contains(out, "2 sent  second message\n") ||
+		!strings.Contains(out, "  2  older  claude") || !strings.Contains(out, "1 sent  fix the build") {
 		t.Fatalf("log %d:\n%s", code, out)
 	}
-	if _, out, _ := runCLI("log", "--agent", "claude"); strings.Contains(out, "codex") || !strings.Contains(out, "  2  claude") {
+	if _, out, _ := runCLI("log", "--agent", "claude"); strings.Contains(out, "codex") || !strings.Contains(out, "  2  older  claude") {
 		t.Fatalf("log --agent claude:\n%s", out)
 	}
-	if _, out, _ := runCLI("log", "--here"); strings.Contains(out, "claude") || !strings.Contains(out, "  1  codex") {
+	if _, out, _ := runCLI("log", "--here"); strings.Contains(out, "claude") || !strings.Contains(out, "  1  newer  codex") {
 		t.Fatalf("log --here:\n%s", out)
 	}
 	for _, arg := range []string{"1", "newer"} {
@@ -560,17 +676,18 @@ func TestCLIForgetLog(t *testing.T) {
 	st := testStore(t)
 	seedSent(t, st, "a", "claude", "/work", 2, "keep me")
 	seedSent(t, st, "b", "claude", "/work", 1, "forget me")
-	code, _, errOut := runCLI("forget", "--log", "1")
+	// A number is refused, not taken as a position that may have moved.
+	if code, _, errOut := runCLI("forget", "--log", "1"); code != 2 || !strings.Contains(errOut, "session id") || len(st.sentLogs()) != 2 {
+		t.Fatalf("forget --log 1: exit %d %q, %d logs left", code, errOut, len(st.sentLogs()))
+	}
+	code, _, errOut := runCLI("forget", "--log", "b")
 	if code != 0 || !strings.Contains(errOut, "Deleted the sent log") {
 		t.Fatalf("forget %d %q", code, errOut)
 	}
 	if logs := st.sentLogs(); len(logs) != 1 || logs[0].Session != "a" {
 		t.Fatalf("left %d logs", len(logs))
 	}
-	if code, _, _ := runCLI("forget", "--log", "a"); code != 0 {
-		t.Fatal("forget by id")
-	}
-	for _, args := range [][]string{{"forget"}, {"forget", "1"}, {"forget", "--log", "1"}} {
+	for _, args := range [][]string{{"forget"}, {"forget", "a"}, {"forget", "--log", "b"}} {
 		if code, _, _ := runCLI(args...); code != 2 {
 			t.Errorf("%q: exit %d, want 2", args, code)
 		}

@@ -77,15 +77,8 @@ func replayRecord(t *testing.T, name string) {
 		}
 	}
 	checked := 0
-	for len(data) > 0 {
-		// Each chunk: its length, seconds, microseconds and direction.
-		if len(data) < 24 {
-			t.Fatal("truncated record")
-		}
-		n := binary.LittleEndian.Uint64(data)
-		now = time.Unix(int64(binary.LittleEndian.Uint64(data[8:])), int64(binary.LittleEndian.Uint32(data[16:]))*1000)
-		dir, chunk := data[20], data[24:24+n]
-		data = data[24+n:]
+	eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+		now = at
 		switch dir {
 		case 'i':
 			if string(chunk) == "\x07" {
@@ -109,10 +102,27 @@ func replayRecord(t *testing.T, name string) {
 				}
 			}
 		}
-	}
+	})
 	files, _ := filepath.Glob(filepath.Join("testdata", "claude", "2.1.282", name+".editor-*.txt"))
 	if checked == 0 || checked != len(files) {
 		t.Fatalf("%d Ctrl+G checks for %d editor copies", checked, len(files))
+	}
+}
+
+// eachChunk calls fn with each chunk of a `script -r` record, in order:
+// when it happened, its direction ('i' keys in, 'o' output out, others
+// for start and end) and its bytes.
+func eachChunk(t *testing.T, data []byte, fn func(at time.Time, dir byte, chunk []byte)) {
+	t.Helper()
+	for len(data) > 0 {
+		// Each chunk: its length, seconds, microseconds and direction.
+		if len(data) < 24 {
+			t.Fatal("truncated record")
+		}
+		n := binary.LittleEndian.Uint64(data)
+		at := time.Unix(int64(binary.LittleEndian.Uint64(data[8:])), int64(binary.LittleEndian.Uint32(data[16:]))*1000)
+		fn(at, data[20], data[24:24+n])
+		data = data[24+n:]
 	}
 }
 
@@ -134,6 +144,59 @@ func replayRecord(t *testing.T, name string) {
 func TestReplayClaudeKeysAndOutput(t *testing.T) {
 	for _, name := range []string{"deletes", "bursts", "trailing-rows", "blank-lines", "wide-run"} {
 		t.Run(name, func(t *testing.T) { replayRecord(t, name) })
+	}
+}
+
+// sends is Claude Code answering the keys that send or clear a box, run on
+// a dummy key so every send fails at once with a 401: Enter on a draft
+// holding a paste placeholder, Ctrl+C, Esc Esc, Enter and Ctrl+C in one
+// read, and Enter with the next message typed 0.2 s later (the agent had
+// drawn the empty box by then), then cleared with Ctrl+C. It is replayed
+// with a save after every output frame and with one every 0.4 s of
+// recorded time, as a live session saves.
+func TestReplayClaudeSends(t *testing.T) {
+	sent := []string{
+		"send this, with a paste: pasted line 1\npasted line 2\npasted line 3\npasted line 4\npasted line 5\npasted line 6\npasted line 7 and the end",
+		"sent, then typing right away",
+	}
+	history := []string{"cleared with ctrl-c", "cleared with esc esc", "enter then ctrl-c at once", "next one"}
+	for _, tick := range []time.Duration{0, saveInterval} {
+		t.Run(fmt.Sprint("save every ", tick), func(t *testing.T) {
+			s := newSendSession(t, &claude)
+			s.screen = vt.NewEmulator(120, 40)
+			go io.Copy(io.Discard, s.screen)
+			var next time.Time
+			eachChunk(t, readFixture(t, "2.1.282/sends.rec"), func(at time.Time, dir byte, chunk []byte) {
+				for tick > 0 && !next.IsZero() && !at.Before(next) {
+					s.save()
+					next = next.Add(tick)
+				}
+				if next.IsZero() {
+					next = at.Add(tick)
+				}
+				switch dir {
+				case 'i':
+					s.input(chunk)
+				case 'o':
+					for len(chunk) > 0 {
+						k := len(chunk)
+						if i := bytes.Index(chunk, frameEnd); i >= 0 {
+							k = i + len(frameEnd)
+						}
+						s.write(chunk[:k])
+						chunk = chunk[k:]
+						if tick == 0 && !s.inFrame {
+							s.save()
+						}
+					}
+				}
+			})
+			s.save()
+			s.expect(sent, history)
+			if s.rec.Draft != "" {
+				t.Fatalf("draft %q at the end", s.rec.Draft)
+			}
+		})
 	}
 }
 

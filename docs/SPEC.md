@@ -307,7 +307,7 @@ The shell prompt is in scope, not optional (decision 5). A command typed at the 
 - **Must. Retention.** The sent log is a convenience copy of text the agent already holds, so unlike orphans it expires [design]:
   - a session log over 5 MB drops its oldest messages first and records how many at the top;
   - logs older than 90 days are deleted, and at most 2,000 session logs are kept, oldest deleted first;
-  - `unsent forget --log <session>` deletes one at once.
+  - `unsent forget --log <session>` deletes one at once. Here `<session>` is unsent's session id, which `unsent log` shows on every row, never the list number: a session that sends its first message in between shifts the numbers, and the deletion cannot be undone [design].
 - **Must. Off.** `UNSENT_ON_SEND=delete` keeps no text recognized as sent for any agent; the per-name variable does it for one. Turning it off does not delete existing logs; `unsent forget --log` does.
 
 ### 2.14 Distribution

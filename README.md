@@ -69,10 +69,12 @@ unsent log                 # sessions with sent messages, newest first
 unsent log 1               # every message sent in session 1
 unsent log 1 --copy 3      # copy message 3 of it to the clipboard
 unsent log --here --agent claude   # only Claude Code's sessions in this folder
-unsent forget --log 1      # delete session 1's sent log
+unsent forget --log 20260927-101500-4242   # delete one session's sent log, by the id unsent log shows
 ```
 
-A send and a clear both empty the box, and the key you pressed tells them apart. A draft counts as sent only when Enter was the last key before the box emptied, with no Ctrl+C or Esc Esc next to it, and the box was on screen when you pressed it. When `unsent` can't be sure, it treats the draft as cleared and keeps it in history. A missed send costs one history entry, never text.
+`unsent forget --log` takes the session id, not the number: the numbers move when another session sends its first message.
+
+A send and a clear both empty the box, and the key you pressed tells them apart. A draft counts as sent only when Enter was the last key before the box emptied, with no Ctrl+C or Esc Esc next to it, and the box was on screen when you pressed it. Typing the next message into the emptied box doesn't change that. When `unsent` can't be sure, it treats the draft as cleared and keeps it in history. A missed send costs one history entry, never text.
 
 To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_CLAUDE=delete` does the same for Claude Code alone, and wins over `UNSENT_ON_SEND`. Turning it off doesn't delete existing logs; `unsent forget --log` does.
 
