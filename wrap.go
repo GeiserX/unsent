@@ -824,15 +824,20 @@ func similar(a, b string) bool {
 	if len(a) < 24 {
 		return true
 	}
-	p := 0
+	p, q := sharedEnds(a, b)
+	return 2*(p+q) >= len(a)
+}
+
+// sharedEnds returns how many bytes a and b share at the start, and then
+// at the end of what is left.
+func sharedEnds(a, b string) (p, q int) {
 	for p < len(a) && p < len(b) && a[p] == b[p] {
 		p++
 	}
-	q := 0
 	for q < len(a)-p && q < len(b)-p && a[len(a)-1-q] == b[len(b)-1-q] {
 		q++
 	}
-	return 2*(p+q) >= len(a)
+	return p, q
 }
 
 func termSize(in *os.File) (int, int) {

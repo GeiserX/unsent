@@ -742,6 +742,33 @@ func TestZshHooksRecoverFromAFailedWrite(t *testing.T) {
 	}
 }
 
+// scenarioLogGone deletes the live log behind the hooks' back, as an
+// importer that takes the shell for dead does. The next prompt must open
+// a fresh log that saves again.
+func scenarioLogGone(s *zshSession) error {
+	s.line("before the log went")
+	for _, l := range s.logs() {
+		os.Remove(l)
+	}
+	s.clear()
+	return s.takes("after the log went", "after the log went")
+}
+
+// TestZshHooksReopenAGoneLog runs scenarioLogGone, and again with hooks
+// that never check the log is there, where it must go red.
+func TestZshHooksReopenAGoneLog(t *testing.T) {
+	if err := scenarioLogGone(startZsh(t, zshHooks, true)); err != nil {
+		t.Fatal(err)
+	}
+	blind := strings.Replace(zshHooks, "(( _unsent_fd >= 0 )) && [[ ! -e $_unsent_log ]]", "(( 0 ))", 1)
+	if blind == zshHooks {
+		t.Fatal("the mutation found nothing to change")
+	}
+	if err := scenarioLogGone(startZsh(t, blind, true)); err == nil {
+		t.Fatal("the check passed with hooks that write on into a deleted log")
+	}
+}
+
 // scenarioForeignFolder points UNSENT_HOME below a folder another user
 // owns, root's /tmp, and makes the hooks open a new log there: they must
 // create nothing and save nothing. Pointed back at a folder of the
@@ -756,7 +783,7 @@ func scenarioForeignFolder(s *zshSession, foreign string) error {
 	}
 	s.clear()
 	s.send("UNSENT_HOME=$HOME/mine\r")
-	s.echo("y", "y")
+	s.echo("q", "q") // not "y": the prompt holds one, which can show before line-init runs
 	mine, _ := filepath.Glob(filepath.Join(s.home, "mine", "shell", "zsh-*.log"))
 	if len(mine) != 1 {
 		return fmt.Errorf("no log under the shell's own folder: %v", mine)

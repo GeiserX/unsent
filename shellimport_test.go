@@ -287,22 +287,186 @@ func TestImportReplacedLine(t *testing.T) {
 	}
 }
 
-// A forget mark drops the line, and whatever of it already went to history.
-func TestImportForgetDropsTheLine(t *testing.T) {
+// Short lines follow the same rule: a recall of another short line that
+// Enter runs keeps the typed one, and small edits keep nothing.
+func TestImportReplacedShortLine(t *testing.T) {
 	st := testStore(t)
 	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
 		zrec{"v", "1"}, zrec{"i", "/"},
-		zrec{"b", "export TOKEN=pw1 and a long enough tail"},
-		zrec{"b", "recalled from the history, long enough"},
-		zrec{"f", ""},
-		zrec{"b", "typed after the space came off"},
+		zrec{"b", "git push -f"}, zrec{"s", "make test"},
 		zrec{"i", "/"},
-		zrec{"b", "kept at the next prompt"},
+		zrec{"b", "git comit"}, zrec{"b", "git commit"}, zrec{"b", "'git commit'"},
+		zrec{"b", "echo hi"}, zrec{"b", "cd"}, zrec{"s", "cd"},
 		zrec{"i", "/"})
 	st.importShells()
-	want := []string{"kept at the next prompt", "typed after the space came off"}
+	want := []string{"'git commit'", "echo hi", "git push -f"}
 	if h := shellHistory(st); !slices.Equal(h, want) {
 		t.Fatalf("history %q, want %q", h, want)
+	}
+}
+
+// A forget mark drops the line the user edited into an ignored text, and
+// nothing else: a line cleared or replaced earlier at that prompt was
+// another line, and one marked new was replaced by the ignored text.
+func TestImportForgetDropsOnlyThatLine(t *testing.T) {
+	kubectl := "kubectl apply -f deploy.yaml --context prod"
+	for _, c := range []struct {
+		name string
+		recs []zrec
+		want []string
+	}{
+		{"edited into a space", []zrec{{"b", "export TOKEN=pw1"}, {"f", ""}, {"b", "typed after"}}, []string{"typed after"}},
+		// Ctrl+U, then a line typed with a leading space.
+		{"after a clear", []zrec{{"b", kubectl}, {"b", ""}, {"f", ""}}, []string{kubectl}},
+		// Ctrl+U, then ls typed under HISTORY_IGNORE='(ls|cd)'.
+		{"a clear, then an ignored line", []zrec{{"b", kubectl}, {"b", ""}, {"b", "l"}, {"f", ""}}, []string{kubectl}},
+		// Up recalls ls or a line with a leading space, and Enter runs it.
+		{"replaced by an ignored recall", []zrec{{"b", kubectl}, {"f", "new"}}, []string{kubectl}},
+		{"replaced, then the new line forgotten", []zrec{
+			{"b", "export TOKEN=pw1 and a long enough tail"},
+			{"b", "recalled from the history, long enough"},
+			{"f", ""}}, []string{"export TOKEN=pw1 and a long enough tail"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			st := testStore(t)
+			recs := append([]zrec{{"v", "1"}, {"i", "/"}}, c.recs...)
+			writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"), append(recs, zrec{"i", "/"})...)
+			st.importShells()
+			if h := shellHistory(st); !slices.Equal(h, c.want) {
+				t.Fatalf("history %q, want %q", h, c.want)
+			}
+			if o := shellOrphans(st); len(o) > 0 {
+				t.Fatalf("orphans %v", o)
+			}
+		})
+	}
+}
+
+// The h record, the line when the window closed, is the dead shell's last
+// line even when the last redraw showed less.
+func TestImportHupRecord(t *testing.T) {
+	st := testStore(t)
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "partial"}, zrec{"h", "partial and the rest"})
+	st.importShells()
+	if o := shellOrphans(st); len(o) != 1 || o[0].Draft != "partial and the rest" {
+		t.Fatalf("orphans %v", o)
+	}
+}
+
+// liveChild starts a process that lives until kill, which also reaps it.
+func liveChild(t *testing.T) (pid int, kill func()) {
+	t.Helper()
+	cmd := exec.Command("/bin/sleep", "30")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	kill = func() {
+		cmd.Process.Kill()
+		cmd.Wait()
+	}
+	t.Cleanup(kill)
+	return cmd.Process.Pid, kill
+}
+
+// A failed write moves the only log aside; the import reads it while the
+// shell lives, and the window closes before a new log exists. The next
+// import finds only the state file, and the line at the prompt becomes an
+// orphan.
+func TestImportShellEndedAfterItsLogsWent(t *testing.T) {
+	st := testStore(t)
+	pid, kill := liveChild(t)
+	writeShellLog(t, st, shellLogName(pid, 1, ".done"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "typed before the disk filled"})
+	st.importShells()
+	state := filepath.Join(st.dir, "shell", fmt.Sprintf("zsh-%s-%d.import", shellHost(), pid))
+	if !exists(state) || len(shellOrphans(st)) > 0 {
+		t.Fatalf("after the first import: state there %v, orphans %v", exists(state), shellOrphans(st))
+	}
+	kill()
+	st.importShells()
+	if o := shellOrphans(st); len(o) != 1 || o[0].Draft != "typed before the disk filled" {
+		t.Fatalf("orphans %v", o)
+	}
+	if exists(state) {
+		t.Fatal("the state file of an ended shell is still there")
+	}
+}
+
+// The clock steps back and a live shell opens its next log: that log's
+// stamp sorts before the one the state names. It is read, never deleted.
+func TestImportLogOpenedAfterTheClockSteppedBack(t *testing.T) {
+	st := testStore(t)
+	pid := os.Getpid()
+	first := writeShellLog(t, st, shellLogName(pid, 200, ".log"), zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "first log"}, zrec{"i", "/"})
+	st.importShells()
+	if err := os.Rename(first, strings.TrimSuffix(first, ".log")+".done"); err != nil {
+		t.Fatal(err)
+	}
+	next := writeShellLog(t, st, shellLogName(pid, 100, ".log"),
+		zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "after the clock stepped back"}, zrec{"i", "/"})
+	st.importShells()
+	if !exists(next) {
+		t.Fatal("the importer deleted the live shell's new log")
+	}
+	if h := shellHistory(st); !slices.Equal(h, []string{"after the clock stepped back", "first log"}) {
+		t.Fatalf("history %q", h)
+	}
+}
+
+// An import that reads nothing new leaves a live shell's state file alone:
+// rewriting it costs two syncs per shell on every unsent command.
+func TestImportWithNothingNewWritesNothing(t *testing.T) {
+	st := testStore(t)
+	pid := os.Getpid()
+	log := writeShellLog(t, st, shellLogName(pid, 1, ".log"), zrec{"v", "1"}, zrec{"i", "/"}, zrec{"b", "in progress"})
+	st.importShells()
+	state := filepath.Join(st.dir, "shell", fmt.Sprintf("zsh-%s-%d.import", shellHost(), pid))
+	old := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(state, old, old); err != nil {
+		t.Fatal(err)
+	}
+	mtime := func() time.Time {
+		fi, err := os.Stat(state)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return fi.ModTime()
+	}
+	st.importShells()
+	if !mtime().Equal(old) {
+		t.Fatal("an import with nothing new rewrote the state file")
+	}
+	appendShellLog(t, log, zrec{"b", "in progress, more"})
+	st.importShells()
+	if mtime().Equal(old) {
+		t.Fatal("an import with a new record left the state file as it was")
+	}
+}
+
+// Imported shell lines go to history under their own cap: they never push
+// agent drafts out, and one import of many cleared lines keeps the cap.
+func TestImportKeepsTheShellCap(t *testing.T) {
+	st := testStore(t)
+	hist := filepath.Join(st.dir, "history")
+	seedFiles(t, hist, historyLimit, []byte(`{"draft":"agent","agent":"claude"}`), func(i int) string { return fmt.Sprintf("20260101-%06d-1.json", i) })
+	recs := []zrec{{"v", "1"}, {"i", "/"}}
+	for i := range shellHistoryLimit + 20 {
+		recs = append(recs, zrec{"b", fmt.Sprintf("cleared line %d", i)}, zrec{"i", "/"})
+	}
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"), recs...)
+	st.importShells()
+	names, _ := filepath.Glob(filepath.Join(hist, "*.json"))
+	agents, shells := 0, 0
+	for _, n := range names {
+		if strings.HasPrefix(filepath.Base(n), shellHistoryPrefix) {
+			shells++
+		} else {
+			agents++
+		}
+	}
+	if agents != historyLimit || shells != shellHistoryLimit {
+		t.Fatalf("after the import: %d agent drafts, %d shell lines", agents, shells)
 	}
 }
 
@@ -474,10 +638,11 @@ func TestShellHistoryCap(t *testing.T) {
 }
 
 // scenarioZshToStore types at a real zsh with the hooks: a line run with
-// Enter, one cleared with Ctrl+C, one matching HISTORY_IGNORE, one that
-// starts with a space, then one left at the prompt when end ends the
-// shell. unsent list must then show the last line and nothing of the
-// others but the cleared one.
+// Enter, one cleared with Ctrl+C, one typed until it matches
+// HISTORY_IGNORE, one that starts with a space, one that gains a space at
+// its start, then one left at the prompt when end ends the shell. unsent
+// list must then show the last line, and history exactly the cleared line
+// and the marks: no prefix of an ignored line either.
 func scenarioZshToStore(t *testing.T, hooks string, end func(*zshSession)) error {
 	s := startZsh(t, hooks, true)
 	t.Setenv("UNSENT_HOME", filepath.Join(s.home, "state"))
@@ -487,9 +652,15 @@ func scenarioZshToStore(t *testing.T, hooks string, end func(*zshSession)) error
 	s.mark("ran")
 	s.line("cleared with ctrl-c")
 	s.clear()
-	s.echo("ignored secret", "ignored secret")
+	s.line("ignore") // saved: it does not match yet
+	s.echo("d secret", "d secret")
 	s.clear()
 	s.echo(" spaced secret", "spaced secret")
+	s.clear()
+	n := len(s.records())
+	s.line("spaced later")
+	s.send("\x01 ") // Ctrl+A, then a space at the start
+	s.waitFor("a forget mark", func(r []zrec) bool { return s.index(r, n, "f", "") >= 0 })
 	s.clear()
 	s.line("left at the prompt")
 	end(s)
@@ -508,12 +679,12 @@ func scenarioZshToStore(t *testing.T, hooks string, end func(*zshSession)) error
 		errs = append(errs, fmt.Errorf("orphans %v", o))
 	}
 	h := shellHistory(st)
-	if !slices.Contains(h, "cleared with ctrl-c") {
-		errs = append(errs, fmt.Errorf("history %q lacks the cleared line", h))
+	if want := []string{"cleared with ctrl-c", "mark-ran", "mark-ready", "mark-set"}; !slices.Equal(h, want) {
+		errs = append(errs, fmt.Errorf("history %q, want %q", h, want))
 	}
-	for _, secret := range []string{"ran with enter", "ignored secret", "spaced secret"} {
-		if strings.Contains(out, secret) || slices.ContainsFunc(h, func(x string) bool { return strings.Contains(x, secret) }) {
-			errs = append(errs, fmt.Errorf("%q reached the store: %q", secret, out))
+	for _, secret := range []string{"ran with enter", "ignore", "spaced secret", "spaced later"} {
+		if strings.Contains(out, secret) {
+			errs = append(errs, fmt.Errorf("%q reached unsent list: %q", secret, out))
 		}
 	}
 	if !strings.Contains(out, "left at the prompt") || !strings.Contains(out, "cleared with ctrl-c") {
@@ -549,6 +720,90 @@ func TestZshLinesReachTheStore(t *testing.T) {
 			t.Fatal("the check passed with the HISTORY_IGNORE check taken out of the hooks")
 		}
 	})
+	// Hooks that stop saving when a line comes to match, but write no
+	// forget mark, leave the prefix typed before it in the log.
+	unmarked := strings.Replace(zshHooks, "    if [[ $t == ' '* ]] || (( ig )); then\n",
+		"    (( ig )) && { _unsent_n=0 _unsent_last=' '; return 0 }\n    if [[ $t == ' '* ]] || (( ig )); then\n", 1)
+	if unmarked == zshHooks {
+		t.Fatal("the mutation found nothing to change")
+	}
+	t.Run("no forget mark", func(t *testing.T) {
+		if err := scenarioZshToStore(t, unmarked, kill); err == nil {
+			t.Fatal("the check passed with hooks that write no forget mark for a line that comes to match")
+		}
+	})
+}
+
+// scenarioRecall browses the shell's history with Up in a real zsh. A line
+// typed and then replaced by a recall that Enter runs goes to history,
+// even when the recalled line matches HISTORY_IGNORE; the recalled lines,
+// which the shell keeps, never do.
+func scenarioRecall(t *testing.T, hooks string) error {
+	s := startZsh(t, hooks, true)
+	t.Setenv("UNSENT_HOME", filepath.Join(s.home, "state"))
+	s.send("setopt hist_ignore_dups; HISTORY_IGNORE='(ls)'\r")
+	s.mark("set")
+	for _, c := range []string{"ls", "true alpha", ": beta words"} {
+		s.send(c + "\r")
+		s.mark(c[:2])
+	}
+	up := func(n int) {
+		for range n {
+			s.send("\x1b[A")
+			time.Sleep(300 * time.Millisecond) // a redraw each, as a person gets
+		}
+	}
+	s.line("typed then replaced")
+	up(3) // ls, which HISTORY_IGNORE keeps out of the history file only
+	s.send("\r")
+	s.mark("ran")
+	s.line("browsed past")
+	up(2)
+	s.send("\x1b[B\x1b[B")
+	if err := s.takes("!", "browsed past!"); err != nil {
+		return err
+	}
+	s.clear()
+	s.mark("end")
+	st, err := openStore()
+	if err != nil {
+		return err
+	}
+	var h []string
+	for _, x := range shellHistory(st) {
+		if !strings.HasPrefix(x, "mark-") {
+			h = append(h, x)
+		}
+	}
+	if want := []string{"browsed past!", "typed then replaced"}; !slices.Equal(h, want) {
+		return fmt.Errorf("history %q, want %q", h, want)
+	}
+	return nil
+}
+
+// TestZshRecallsStayOutOfHistory runs scenarioRecall, and again with hooks
+// that save recalled lines, and with hooks that never mark a forget as
+// new, where it must go red.
+func TestZshRecallsStayOutOfHistory(t *testing.T) {
+	t.Setenv("UNSENT_ON_SEND", "")
+	t.Setenv("UNSENT_ON_SEND_ZSH", "")
+	if err := scenarioRecall(t, zshHooks); err != nil {
+		t.Fatal(err)
+	}
+	for name, m := range map[string][2]string{
+		"recalls saved":    {"    [[ $1 != s ]] && (( HISTNO != HISTCMD ))", "    [[ $1 != s ]] && (( 0 ))"},
+		"forget never new": {"|| k=new", "|| k="},
+	} {
+		mutated := strings.Replace(zshHooks, m[0], m[1], 1)
+		if mutated == zshHooks {
+			t.Fatalf("%s: the mutation found nothing to change", name)
+		}
+		t.Run(name, func(t *testing.T) {
+			if err := scenarioRecall(t, mutated); err == nil {
+				t.Fatalf("the check passed with %s", name)
+			}
+		})
+	}
 }
 
 // A HISTORY_IGNORE zsh cannot parse matches nothing, and the hooks go on

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,12 +22,14 @@ import (
 // the shell's name and the folder each prompt ran in:
 //
 //   - a line cleared at its prompt (an i with no s before it), or replaced
-//     wholesale, goes through keepOld to history, as an agent draft does;
+//     wholesale (shellEdit says it is not an edit), goes to history, as an
+//     agent draft does;
 //   - a line run with Enter (an s with no c after it) follows the on-send
 //     setting, delete by default for shells;
 //   - the last line of a shell that is gone becomes an orphan draft;
-//   - a forget mark (f) drops the line's earlier records and whatever went
-//     to history from them.
+//   - a forget mark (f) drops the line at the prompt, the one that gained
+//     the leading space or came to match; an f marked new says the ignored
+//     text replaced that line instead, so the line goes to history.
 //
 // The importer deletes a log only when nothing writes to it any more: a
 // log the hooks moved aside (.done), or the log of a shell on this host
@@ -35,7 +39,10 @@ import (
 // importer keeps how far it got, and the line in progress, in a state file
 // per shell (shell/zsh-<host>-<pid>.import), so no record is imported twice.
 // A shell's logs are one session from its first prompt to its end, across
-// logs the hooks moved aside past 256 KB.
+// logs the hooks moved aside past 256 KB. They are read by stamp, except
+// that the log the state names comes first: the importer removes a log it
+// has read before it goes on to the next, so a log with an older stamp is
+// one opened after the clock stepped back, and is read, never deleted.
 //
 // Every file the import writes is named after the log and the offset of the
 // record that caused it, so an import that stops half way and runs again
@@ -138,10 +145,9 @@ func pidAlive(pid int) bool {
 // shellStateFormat.
 type shellState struct {
 	Format int `json:"format"`
-	// Stem and Stamp name the log the import read last, and Offset is where
-	// its next record starts.
+	// Stem names the log the import read last, and Offset is where its next
+	// record starts.
 	Stem   string `json:"stem"`
-	Stamp  string `json:"stamp"`
 	Offset int    `json:"offset"`
 	// Line is the shell's session: its id, pid and first prompt, and the
 	// line at the prompt now, with that prompt's folder.
@@ -149,9 +155,6 @@ type shellState struct {
 	// Ran is set by an s record and cleared by a c after it: Enter ran the
 	// line, unless it only opened a continuation prompt.
 	Ran bool `json:"ran,omitempty"`
-	// Kept names the history files this prompt's line went to, which a
-	// forget mark removes.
-	Kept []string `json:"kept,omitempty"`
 }
 
 // shellGroup is every log and the state file of one shell, by host and pid.
@@ -217,7 +220,6 @@ func (s *store) importShells() {
 
 // importShell imports one shell's logs, oldest first.
 func (s *store) importShell(g *shellGroup, host string) {
-	sort.Slice(g.logs, func(i, j int) bool { return before(g.logs[i].stamp, g.logs[j].stamp) })
 	statePath := g.state
 	if statePath == "" {
 		statePath = filepath.Join(s.dir, "shell", fmt.Sprintf("zsh-%s-%d.import", g.host, g.pid))
@@ -240,13 +242,16 @@ func (s *store) importShell(g *shellGroup, host string) {
 			}
 		}
 	}
+	sort.Slice(g.logs, func(i, j int) bool { return before(g.logs[i].stamp, g.logs[j].stamp) })
+	if st != nil {
+		if i := slices.IndexFunc(g.logs, func(l shellLog) bool { return l.stem == st.Stem }); i > 0 {
+			l := g.logs[i]
+			copy(g.logs[1:i+1], g.logs[:i])
+			g.logs[0] = l
+		}
+	}
 	alive := !foreign && pidAlive(g.pid)
 	for i, l := range g.logs {
-		if st != nil && before(l.stamp, st.Stamp) {
-			// Read to its end before, and its removal failed.
-			os.Remove(l.path)
-			continue
-		}
 		if st == nil {
 			st = s.newShellState(l)
 		}
@@ -255,16 +260,23 @@ func (s *store) importShell(g *shellGroup, host string) {
 			from = st.Offset
 		}
 		end, ok := s.readShellLog(st, l, from)
-		st.Stem, st.Stamp, st.Offset = l.stem, l.stamp, end
+		// Nothing new: the state file already says all this, and a write
+		// costs two syncs per live shell on every unsent command.
+		changed := end != from || st.Stem != l.stem
+		st.Stem, st.Offset = l.stem, end
 		if !ok {
 			// A newer format or a broken record: leave it for a later unsent.
-			s.saveShellState(statePath, st)
+			if changed {
+				s.saveShellState(statePath, st)
+			}
 			return
 		}
 		last := i == len(g.logs)-1
 		if !l.done && alive && last {
 			// The shell writes here still.
-			s.saveShellState(statePath, st)
+			if changed {
+				s.saveShellState(statePath, st)
+			}
 			return
 		}
 		// Nothing writes to this log any more. A .log that is not the last
@@ -281,7 +293,11 @@ func (s *store) importShell(g *shellGroup, host string) {
 		} else if s.saveShellState(statePath, st) != nil {
 			return
 		}
-		os.Remove(l.path)
+		if err := os.Remove(l.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			// The next import starts here again: at its end if the state
+			// names it, or from the start, writing the same files.
+			return
+		}
 	}
 	if len(g.logs) == 0 && st != nil && !alive {
 		// The logs went earlier and the shell has ended since.
@@ -392,24 +408,25 @@ func (s *store) applyShellRecord(st *shellState, kind byte, when time.Time, text
 			return err
 		}
 		st.Ran = st.Line.Draft != ""
-	case 'f': // the line gained a leading space or matches HISTORY_IGNORE
-		s.forgetLine(st)
+	case 'f': // the line gained a leading space or came to match HISTORY_IGNORE
+		return s.forgetLine(st, text == "new", at)
 	}
 	return nil
 }
 
-// setLine replaces the line at the prompt. keepOld sends the old line to
-// history when the new one empties it or replaces it wholesale, as a
-// history recall does. A line that starts with a space is never kept.
+// setLine replaces the line at the prompt. The old line goes to history
+// when the new one empties it or is not an edit of it, as when a widget
+// such as atuin's writes a recalled line into the buffer. A line that
+// starts with a space is never kept.
 func (s *store) setLine(st *shellState, text string, when time.Time, at string) error {
 	if strings.HasPrefix(text, " ") {
-		s.forgetLine(st)
+		return s.forgetLine(st, false, at)
+	}
+	old := st.Line.Draft
+	if text == old {
 		return nil
 	}
-	if text == st.Line.Draft {
-		return nil
-	}
-	if history, _ := keepOld(st.Line.Draft, text, false); history {
+	if strings.TrimSpace(old) != "" && (text == "" || !shellEdit(old, text)) {
 		if err := s.keepLine(st, at); err != nil {
 			return err
 		}
@@ -417,6 +434,18 @@ func (s *store) setLine(st *shellState, text string, when time.Time, at string) 
 	st.Line.Draft = text
 	st.Line.Updated = when
 	return nil
+}
+
+// shellEdit reports whether the line b is an edit of the line a rather
+// than another line: what they share at the start and end covers at least
+// half of a, or b holds all of a. Unlike similar it holds at any length,
+// since most command lines are shorter than similar's 24 bytes.
+func shellEdit(a, b string) bool {
+	if strings.Contains(b, a) {
+		return true
+	}
+	p, q := sharedEnds(a, b)
+	return 2*(p+q) >= len(a)
 }
 
 // endLine closes the line at the prompt: one Enter ran follows the on-send
@@ -431,7 +460,7 @@ func (s *store) endLine(st *shellState, when time.Time, at string) error {
 			return err
 		}
 	}
-	st.Line.Draft, st.Ran, st.Kept = "", false, nil
+	st.Line.Draft, st.Ran = "", false
 	return nil
 }
 
@@ -439,19 +468,22 @@ func (s *store) endLine(st *shellState, when time.Time, at string) error {
 // record that replaced or ended it.
 func (s *store) keepLine(st *shellState, at string) error {
 	id := shellHistoryPrefix + st.Line.Updated.Format("20060102-150405") + "-" + at
-	if err := s.archiveAs(&st.Line, id); err != nil {
-		return err
-	}
-	st.Kept = append(st.Kept, id)
-	return nil
+	return s.archiveAs(&st.Line, id)
 }
 
-// forgetLine drops the line at the prompt and what went to history from it.
-func (s *store) forgetLine(st *shellState) {
-	for _, id := range st.Kept {
-		os.Remove(filepath.Join(s.dir, "history", id+".json"))
+// forgetLine takes a forget mark. It drops the line at the prompt, which
+// the user edited into the text zsh ignores, unless replaced says the
+// ignored text took the line's place instead, such as a recall of a line
+// that starts with a space: then the line goes to history. Lines that went
+// to history earlier at this prompt were other lines, and stay.
+func (s *store) forgetLine(st *shellState, replaced bool, at string) error {
+	if replaced && strings.TrimSpace(st.Line.Draft) != "" {
+		if err := s.keepLine(st, at); err != nil {
+			return err
+		}
 	}
-	st.Line.Draft, st.Ran, st.Kept = "", false, nil
+	st.Line.Draft, st.Ran = "", false
+	return nil
 }
 
 // lineSent follows the on-send setting for a line Enter ran: delete, the

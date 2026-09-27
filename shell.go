@@ -24,7 +24,9 @@ import (
 // the hook renames the log to the same name ending in .done at the next
 // prompt and starts a new one. A write that fails does the same at once,
 // so a torn record is only ever the tail of a log nothing writes to any
-// more, and the next prompt opens a fresh log. So the importer
+// more, and the next prompt opens a fresh log. The next prompt also opens
+// a fresh log when the log is gone, as when an importer in a container
+// with its own pids took the shell for dead and deleted it. So the importer
 // (shellimport.go) deletes a .done log, or the log of a shell on its own
 // host whose pid is gone, and reads a live shell's log only up to where it
 // got. A log named for another host, such as a second machine sharing the
@@ -41,16 +43,23 @@ import (
 //	s  Enter ended the line; its text
 //	h  the window closed; the line at that moment
 //	f  the line gained a leading space, or came to match HISTORY_IGNORE:
-//	   drop this line's earlier records
+//	   drop the line. The text is "new" when the ignored text does not
+//	   hold the first half of the last line saved, so it replaced that
+//	   line (a recall of an ignored line) and the line stands
+//
+// A line recalled from the shell's history and not edited since, one
+// whose $BUFFER is still ${history[$HISTNO]}, gets no b or h record: the
+// shell keeps it, and browsing with Up would fill unsent's history with
+// copies. The line typed before the recall stays the last one saved, as
+// zsh keeps it too, and Enter's s record says what ran.
 //
 // Only the shell's own prompt and its continuation lines are saved, never
 // vared or select, and nothing while the line starts with a space or
 // matches the user's HISTORY_IGNORE. zsh matches that pattern itself, as
 // it does for its history file, with the user's extended_glob; a pattern
 // zsh cannot parse matches nothing. The importer (shellimport.go) drops
-// the line's earlier records at the forget mark. A
-// password read by sudo, ssh or read -s never passes through the line
-// editor. zsh skips a redraw when more input is pending, so a shell killed
+// the line at the forget mark. A password read by sudo, ssh or read -s
+// never passes through the line editor. zsh skips a redraw when more input is pending, so a shell killed
 // in that gap loses its last keys. The hooks write only into a folder the
 // shell's user owns, so a root shell that reads the user's rc file, as
 // sudo -s does on macOS, saves nothing there and creates nothing.
@@ -69,7 +78,7 @@ import (
 // hangs up ${sysparams[pid]}, the process it runs in.
 const zshHooks = `# The command line, saved as you type it, for unsent list and restore.
 if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
-    zmodload zsh/system zsh/datetime 2>/dev/null &&
+    zmodload zsh/system zsh/datetime zsh/parameter 2>/dev/null &&
     zmodload -F zsh/files b:zf_mkdir b:zf_mv b:zf_rm 2>/dev/null &&
     emulate zsh -c 'autoload -Uz add-zle-hook-widget'; then
   typeset -gi _unsent_fd=-1 _unsent_size=0 _unsent_n=0 _unsent_trapped=0
@@ -110,12 +119,16 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     emulate -L zsh
     (( xg )) && setopt extended_glob
     [[ $CONTEXT == start || $CONTEXT == cont ]] || return 0
-    local t=$PREBUFFER$BUFFER
+    [[ $1 != s ]] && (( HISTNO != HISTCMD )) && [[ $BUFFER == "${history[$HISTNO]}" ]] && return 0
+    local t=$PREBUFFER$BUFFER k=
     if [[ -n $t && -n $HISTORY_IGNORE ]]; then
       { { [[ $t == ${~HISTORY_IGNORE} ]] && ig=1 } 2>/dev/null } always { TRY_BLOCK_ERROR=0 }
     fi
     if [[ $t == ' '* ]] || (( ig )); then
-      (( _unsent_n )) && _unsent_put f ''
+      if (( _unsent_n )); then
+        [[ $t == *"${_unsent_last[1,${#_unsent_last}/2]}"* ]] || k=new
+        _unsent_put f "$k"
+      fi
       _unsent_n=0 _unsent_last=' '
       return 0
     fi
@@ -129,7 +142,9 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     if [[ $CONTEXT == cont ]]; then
       _unsent_put c ''
     elif [[ $CONTEXT == start ]]; then
-      if (( _unsent_fd >= 0 && _unsent_size > 262144 )); then
+      if (( _unsent_fd >= 0 )) && [[ ! -e $_unsent_log ]]; then
+        _unsent_shut -1
+      elif (( _unsent_fd >= 0 && _unsent_size > 262144 )); then
         _unsent_shut -1
       elif (( _unsent_fd == -2 )); then
         _unsent_fd=-1

@@ -1,6 +1,6 @@
 # The command line, saved as you type it, for unsent list and restore.
 if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
-    zmodload zsh/system zsh/datetime 2>/dev/null &&
+    zmodload zsh/system zsh/datetime zsh/parameter 2>/dev/null &&
     zmodload -F zsh/files b:zf_mkdir b:zf_mv b:zf_rm 2>/dev/null &&
     emulate zsh -c 'autoload -Uz add-zle-hook-widget'; then
   typeset -gi _unsent_fd=-1 _unsent_size=0 _unsent_n=0 _unsent_trapped=0
@@ -41,12 +41,16 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     emulate -L zsh
     (( xg )) && setopt extended_glob
     [[ $CONTEXT == start || $CONTEXT == cont ]] || return 0
-    local t=$PREBUFFER$BUFFER
+    [[ $1 != s ]] && (( HISTNO != HISTCMD )) && [[ $BUFFER == "${history[$HISTNO]}" ]] && return 0
+    local t=$PREBUFFER$BUFFER k=
     if [[ -n $t && -n $HISTORY_IGNORE ]]; then
       { { [[ $t == ${~HISTORY_IGNORE} ]] && ig=1 } 2>/dev/null } always { TRY_BLOCK_ERROR=0 }
     fi
     if [[ $t == ' '* ]] || (( ig )); then
-      (( _unsent_n )) && _unsent_put f ''
+      if (( _unsent_n )); then
+        [[ $t == *"${_unsent_last[1,${#_unsent_last}/2]}"* ]] || k=new
+        _unsent_put f "$k"
+      fi
       _unsent_n=0 _unsent_last=' '
       return 0
     fi
@@ -60,7 +64,9 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     if [[ $CONTEXT == cont ]]; then
       _unsent_put c ''
     elif [[ $CONTEXT == start ]]; then
-      if (( _unsent_fd >= 0 && _unsent_size > 262144 )); then
+      if (( _unsent_fd >= 0 )) && [[ ! -e $_unsent_log ]]; then
+        _unsent_shut -1
+      elif (( _unsent_fd >= 0 && _unsent_size > 262144 )); then
         _unsent_shut -1
       elif (( _unsent_fd == -2 )); then
         _unsent_fd=-1
