@@ -26,6 +26,10 @@ var claude = profile{
 		submit: [][]byte{{'\r'}},
 		clear:  [][]byte{{0x03}, []byte("\x1b\x1b")},
 	},
+	// The fixtures in testdata/claude; `claude --version` prints
+	// "2.1.282 (Claude Code)".
+	verified: "2.1.282",
+	version:  []string{"--version"},
 }
 
 // claudeBox reads Claude Code's input box. It is drawn as:

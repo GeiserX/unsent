@@ -50,6 +50,8 @@ A message you send goes to its session's sent log, not to history.
 UNSENT_ON_SEND=delete keeps nothing of it; UNSENT_ON_SEND_CLAUDE=delete does
 that for one agent, and wins over UNSENT_ON_SEND.
 
+UNSENT_OFF=1 runs the agent directly, as if unsent were not there.
+
 Put "alias claude='unsent claude'" in your shell profile to never think
 about it again. Use "unsent -- list" to run a program called list.
 `

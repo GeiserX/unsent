@@ -43,7 +43,7 @@ func replayBytes(t *testing.T, cols, rows int, data []byte) []string {
 		s.write(data[:n])
 		data = data[n:]
 		s.save()
-		if s.broken {
+		if s.broken.Load() {
 			t.Fatal("the session stopped saving")
 		}
 		if d := s.rec.Draft; d != drafts[len(drafts)-1] {
@@ -72,7 +72,7 @@ func replayRecord(t *testing.T, name string) {
 	var now time.Time
 	s.deletes.now = func() time.Time { return now }
 	save := func() {
-		if s.save(); s.broken {
+		if s.save(); s.broken.Load() {
 			t.Fatal("the session stopped saving")
 		}
 	}

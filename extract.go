@@ -49,6 +49,11 @@ type profile struct {
 	// its first group, when it matches, is the paste's line count.
 	placeholder *regexp.Regexp
 	keys        keyset
+	// verified is the agent version the reader was last checked against,
+	// and version the arguments that make the agent print its own: when
+	// the reader never finds the box, the user learns both.
+	verified string
+	version  []string
 }
 
 // profiles are the agents unsent can read.

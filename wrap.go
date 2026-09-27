@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +11,10 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -34,10 +37,10 @@ func wrap(agent string, args []string, in, out *os.File) int {
 		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
 		return 127
 	}
-	if !term.IsTerminal(int(in.Fd())) || !term.IsTerminal(int(out.Fd())) {
-		// Piped (git diff | claude -p ...) or redirected: the agent draws no
-		// input box, and a pseudo-terminal would turn the pipe into
-		// keystrokes. Get out of the way.
+	if off() || !term.IsTerminal(int(in.Fd())) || !term.IsTerminal(int(out.Fd())) {
+		// Switched off, or piped (git diff | claude -p ...) or redirected:
+		// the agent draws no input box, and a pseudo-terminal would turn the
+		// pipe into keystrokes. Get out of the way.
 		if err := execAgent(bin, args); err != nil {
 			fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
 			return 126
@@ -62,11 +65,6 @@ func wrap(agent string, args []string, in, out *os.File) int {
 	}
 	defer ptmx.Close()
 
-	cooked, err := term.MakeRaw(int(in.Fd()))
-	if err == nil {
-		defer term.Restore(int(in.Fd()), cooked)
-	}
-
 	s := &session{
 		rec:    newRecord(args, cwd),
 		store:  st,
@@ -76,17 +74,23 @@ func wrap(agent string, args []string, in, out *os.File) int {
 	}
 	s.rec.Agent = agent
 	if s.prof == nil {
-		fmt.Fprintf(os.Stderr, "unsent: no reader for %q yet, running it without saving drafts\n", agent)
+		s.off = fmt.Sprintf("unsent: no reader for %q yet, running it without saving drafts", agent)
+	} else if err := st.hold(s.rec); err != nil {
+		// Without the lock another unsent would take this live session for
+		// a dead one and could clean up its files.
+		s.off = fmt.Sprintf("unsent: %v; running without saving drafts", err)
+		s.prof = nil
 	}
-	if s.prof != nil {
-		if err := st.hold(s.rec); err != nil {
-			// Without the lock another unsent would take this live session
-			// for a dead one and could clean up its files.
-			fmt.Fprintf(os.Stderr, "unsent: %v; running without saving drafts\n", err)
-			s.prof = nil
-		}
+	if s.off != "" {
+		fmt.Fprintln(os.Stderr, s.off)
 	}
 	defer st.release()
+	// Raw mode only now: in raw mode the line feed ending the line above
+	// would not bring the cursor back to the first column.
+	cooked, err := term.MakeRaw(int(in.Fd()))
+	if err == nil {
+		defer term.Restore(int(in.Fd()), cooked)
+	}
 	// The emulator answers terminal queries (cursor position, device
 	// attributes) into its own pipe. The real terminal already answers the
 	// agent, so these replies are drained and dropped.
@@ -115,7 +119,9 @@ func wrap(agent string, args []string, in, out *os.File) int {
 		buf := make([]byte, 32*1024)
 		for {
 			n, err := in.Read(buf)
-			if n == 1 && buf[0] == ctrlZ && !s.pastes.inPaste() {
+			// After a panic the paste tracker is no longer fed, and could
+			// be stuck inside a paste.
+			if n == 1 && buf[0] == ctrlZ && (s.broken.Load() || !s.pastes.inPaste()) {
 				suspend <- struct{}{}
 				continue
 			}
@@ -185,6 +191,14 @@ func wrap(agent string, args []string, in, out *os.File) int {
 			time.Sleep(50 * time.Millisecond)
 			s.save()
 			s.finish()
+			// The agent has left the screen, and with it anything printed
+			// while it ran: say now what the user must know.
+			if cooked != nil {
+				term.Restore(int(in.Fd()), cooked)
+			}
+			for _, l := range s.exitLines(bin) {
+				fmt.Fprintln(os.Stderr, l)
+			}
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
 				if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
@@ -210,6 +224,13 @@ var execAgent = func(bin string, args []string) error {
 	return syscall.Exec(bin, args, os.Environ())
 }
 
+// off reports whether UNSENT_OFF switches unsent off: the way out when a
+// reader misbehaves after an agent update, with no rc file to edit.
+func off() bool {
+	v := os.Getenv("UNSENT_OFF")
+	return v != "" && v != "0"
+}
+
 // Agents wrap some redraws in "synchronized output" marks. The screen is
 // not read between them, so a save never sees half of one.
 var (
@@ -230,7 +251,18 @@ type session struct {
 	dirty     bool
 	inFrame   bool
 	frameTail []byte
-	broken    bool
+	// broken is set when reading or saving code panics (see fail): the
+	// session is plain passthrough from then on.
+	broken   atomic.Bool
+	failOnce sync.Once
+	failure  string
+	failedAt time.Time
+	// typed is set once the user types a key, and matched once the reader
+	// finds the box: typing that never met a box saved nothing.
+	typed   atomic.Bool
+	matched bool
+	// off says why this session saves nothing, when it saves nothing.
+	off string
 	// quietUntil holds saves back just after a resize, until the agent
 	// has redrawn at the new size.
 	quietUntil time.Time
@@ -257,11 +289,71 @@ type session struct {
 // control bytes (Word pastes \x0b for line breaks); only keys typed outside
 // a paste count.
 func (s *session) input(keys []byte) {
+	if s.broken.Load() {
+		return
+	}
+	defer s.guard()
 	typed := s.pastes.feed(keys)
 	if s.prof != nil {
+		if !s.typed.Load() && typedKeys(keys) {
+			s.typed.Store(true)
+		}
 		s.deletes.push(s.prof.keys.deletes(typed))
 		s.keys.push(s.prof.keys, typed)
 	}
+}
+
+// guard, deferred, turns a panic into plain passthrough for the rest of
+// the session: a bug in reading or saving must never end the session.
+func (s *session) guard() {
+	if r := recover(); r != nil {
+		s.fail(r)
+	}
+}
+
+// fail stops saving for the rest of the session, and keeps the first
+// panic to say so.
+func (s *session) fail(r any) {
+	s.failOnce.Do(func() {
+		s.failure, s.failedAt = fmt.Sprint(r), time.Now()
+		s.broken.Store(true)
+	})
+}
+
+// typedKeys reports whether b holds a key the user typed, not only focus
+// and mouse reports or the terminal's answers to the agent's queries: a
+// string (OSC, DCS, APC, PM, SOS) or a CSI with a private marker (?, >, =),
+// which no key carries.
+func typedKeys(b []byte) bool {
+	for i := 0; i < len(b); {
+		if b[i] == 0x1b && i+1 < len(b) {
+			switch b[i+1] {
+			case ']', 'P', '_', '^', 'X':
+				end := bytes.IndexAny(b[i+2:], "\x07\x1b")
+				switch {
+				case end < 0:
+					return false
+				case b[i+2+end] == 0x07:
+					i += 2 + end + 1
+				default:
+					i += 2 + end + 2 // ESC \
+				}
+				continue
+			case '[':
+				if i+2 < len(b) && bytes.IndexByte([]byte("?>="), b[i+2]) >= 0 {
+					n, _ := keyLen(b[i:])
+					i += n
+					continue
+				}
+			}
+		}
+		n, key := keyLen(b[i:])
+		if key {
+			return true
+		}
+		i += n
+	}
+	return false
 }
 
 func (s *session) feedScreen(output <-chan []byte) {
@@ -276,14 +368,10 @@ func (s *session) feedScreen(output <-chan []byte) {
 func (s *session) write(chunk []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.broken {
+	if s.broken.Load() {
 		return
 	}
-	defer func() {
-		if recover() != nil {
-			s.broken = true
-		}
-	}()
+	defer s.guard()
 	// Keys waiting for the agent's answer were typed into the screen as it
 	// stands now: keep it before this output changes it.
 	s.keys.answer(func() *screen {
@@ -315,10 +403,14 @@ func (s *session) trackFrames(chunk []byte) {
 
 func (s *session) resize(cols, rows int) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.broken.Load() {
+		return
+	}
+	defer s.guard()
 	s.screen.Resize(cols, rows)
 	s.dirty = true
 	s.quietUntil = time.Now().Add(resizeQuiet)
-	s.mu.Unlock()
 }
 
 // resizeQuiet is how long saves wait after a resize for the redraw.
@@ -331,42 +423,22 @@ func (s *session) save() {
 	if s.prof == nil {
 		return
 	}
-	// If the agent is halfway through drawing, give it a moment to finish.
-	for deadline := time.Now().Add(maxFrameWait); ; time.Sleep(5 * time.Millisecond) {
-		s.mu.Lock()
-		if !s.inFrame || time.Now().After(deadline) {
-			break
+	// A bug reading the screen, here or on the way in or out, must not take
+	// the session down: stop saving, say so once, and keep passing bytes
+	// through. (Deferred calls run last first: guard recovers, then this.)
+	defer func() {
+		if s.broken.Load() {
+			s.store.warn(fmt.Errorf("stopped saving after an internal error: %v", s.failure))
 		}
-		s.mu.Unlock()
-	}
-	if !s.dirty || s.broken || time.Now().Before(s.quietUntil) {
-		s.mu.Unlock()
+	}()
+	defer s.guard()
+	scr, events, answered := s.take()
+	if scr == nil {
 		return
 	}
-	s.dirty = false
-	scr := snapshot(s.screen)
-	inFrame := s.inFrame
-	events, answered := s.keys.take(func() *screen {
-		if inFrame {
-			return nil
-		}
-		return scr
-	})
-	s.mu.Unlock()
-
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		os.WriteFile(filepath.Join(dir, "screen.txt"), []byte(scr.String()), 0o600)
 	}
-	defer func() {
-		// A bug reading the screen must not take the session down: stop
-		// saving, say so once, and keep passing bytes through.
-		if r := recover(); r != nil {
-			s.mu.Lock()
-			s.broken = true
-			s.mu.Unlock()
-			s.store.warn(fmt.Errorf("stopped saving after an internal error: %v", r))
-		}
-	}()
 	// Replay the keys in order. Each submit key comes with the screen it was
 	// typed into: that read shows the agent's answer to the keys before it,
 	// and the text the key sends, up to the last key the agent drew. The
@@ -392,6 +464,33 @@ func (s *session) save() {
 	}
 }
 
+// take snapshots the shadow screen for a save, with the keys typed since
+// the last one, or returns a nil screen when there is nothing to read.
+func (s *session) take() (scr *screen, events []*keyEvent, answered bool) {
+	// If the agent is halfway through drawing, give it a moment to finish.
+	for deadline := time.Now().Add(maxFrameWait); ; time.Sleep(5 * time.Millisecond) {
+		s.mu.Lock()
+		if !s.inFrame || time.Now().After(deadline) {
+			break
+		}
+		s.mu.Unlock()
+	}
+	defer s.mu.Unlock()
+	if !s.dirty || s.broken.Load() || time.Now().Before(s.quietUntil) {
+		return nil, nil, false
+	}
+	s.dirty = false
+	scr = snapshot(s.screen)
+	inFrame := s.inFrame
+	events, answered = s.keys.take(func() *screen {
+		if inFrame {
+			return nil
+		}
+		return scr
+	})
+	return scr, events, answered
+}
+
 // look reads the box off one screen and writes the draft to disk when it
 // changed. It reports whether the box was on screen. A box that empties
 // right after a submit key (armed), before any other key reached the
@@ -408,6 +507,7 @@ func (s *session) look(scr *screen) bool {
 		// keep the last draft we saw.
 		return false
 	}
+	s.matched = true
 	sent := false
 	if v.empty {
 		sent = armed && !s.cleared
@@ -484,6 +584,46 @@ func (s *session) finish() {
 		s.store.warn(err)
 	}
 }
+
+// exitLines are what the user must know once the agent has exited: that it
+// ran without saving, or that saving stopped. An agent on the alternate
+// screen hid whatever was printed while it ran, and silence here is the
+// worst failure: after an agent update a reader stops matching and nothing
+// else would say so. bin is the agent's binary, asked for its version.
+func (s *session) exitLines(bin string) []string {
+	switch {
+	case s.off != "":
+		return []string{s.off}
+	case s.prof == nil:
+		return nil
+	case s.broken.Load():
+		return []string{fmt.Sprintf("unsent: an internal error stopped saving %s's box at %s (%s); what was typed after that was not saved",
+			s.prof.name, s.failedAt.Format("15:04"), s.failure)}
+	case !s.matched && s.typed.Load():
+		name := s.prof.name
+		if v := agentVersion(bin, s.prof.version); v != "" {
+			name += " " + v
+		}
+		return []string{fmt.Sprintf("unsent: could not read %s's box this session (last verified %s), nothing was saved", name, s.prof.verified)}
+	}
+	return nil
+}
+
+// agentVersion asks the agent for its version with args, and returns the
+// first version number it prints, or "" when it gives none within a second.
+func agentVersion(bin string, args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.WaitDelay = time.Second // a child left holding the output open
+	out, _ := cmd.Output()
+	return versionRE.FindString(string(out))
+}
+
+var versionRE = regexp.MustCompile(`\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?`)
 
 // logView appends one save's view and the stitcher's state around it, for
 // replaying a real session offline (UNSENT_DEBUG_DIR only).

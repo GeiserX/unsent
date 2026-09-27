@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -27,6 +28,10 @@ func TestMain(m *testing.M) {
 }
 
 func fakeAgent() {
+	if len(os.Args) > 1 && os.Args[1] == "--version" {
+		fmt.Println("9.9.9 (Fake Agent)")
+		return
+	}
 	if old, err := term.MakeRaw(0); err == nil {
 		defer term.Restore(0, old)
 	}
@@ -130,6 +135,14 @@ func runWrapped(t *testing.T, script func(type_ func(string))) (int, *store) {
 // line names it.
 func runWrappedAs(t *testing.T, command string, argv []string, script func(type_ func(string))) (int, *store) {
 	t.Helper()
+	code, st, _, _ := runWrappedOut(t, command, argv, script)
+	return code, st
+}
+
+// runWrappedOut is runWrappedAs that also returns everything the terminal
+// showed and what unsent printed on its own stderr.
+func runWrappedOut(t *testing.T, command string, argv []string, script func(type_ func(string))) (code int, st *store, screen, stderr string) {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("UNSENT_HOME", home)
 	t.Setenv("UNSENT_FAKE_AGENT", "1")
@@ -150,22 +163,23 @@ func runWrappedAs(t *testing.T, command string, argv []string, script func(type_
 	}
 	pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
 	ready := make(chan struct{})
+	var mu sync.Mutex
+	var shown []byte
 	go func() {
 		// Drain the screen, and start typing once the box is drawn, as a
 		// person would: keys sent earlier reach a terminal not yet in raw
 		// mode, which echoes them and turns Enter into a line feed.
-		var seen []byte
 		waiting := true
 		buf := make([]byte, 4096)
 		for {
 			n, err := user.Read(buf)
-			if waiting {
-				seen = append(seen, buf[:n]...)
-				if strings.Contains(string(seen), "❯") {
-					close(ready)
-					waiting, seen = false, nil
-				}
+			mu.Lock()
+			shown = append(shown, buf[:n]...)
+			if waiting && strings.Contains(string(shown), "❯") {
+				close(ready)
+				waiting = false
 			}
+			mu.Unlock()
 			if err != nil {
 				return
 			}
@@ -173,12 +187,19 @@ func runWrappedAs(t *testing.T, command string, argv []string, script func(type_
 	}()
 	defer func() { user.Close(); term.Close() }()
 
-	// run wraps on the process's own terminal, so lend it the pair.
-	oldIn, oldOut := os.Stdin, os.Stdout
-	os.Stdin, os.Stdout = term, term
-	defer func() { os.Stdin, os.Stdout = oldIn, oldOut }()
-	code := make(chan int, 1)
-	go func() { code <- run(argv, io.Discard, io.Discard) }()
+	// run wraps on the process's own terminal, so lend it the pair, and
+	// keep what unsent itself prints.
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	errOut := make(chan string, 1)
+	go func() { b, _ := io.ReadAll(errR); errOut <- string(b) }()
+	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
+	os.Stdin, os.Stdout, os.Stderr = term, term, errW
+	defer func() { os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr }()
+	exit := make(chan int, 1)
+	go func() { exit <- run(argv, io.Discard, io.Discard) }()
 	select {
 	case <-ready:
 	case <-time.After(10 * time.Second):
@@ -189,13 +210,16 @@ func runWrappedAs(t *testing.T, command string, argv []string, script func(type_
 		time.Sleep(3 * saveInterval)
 	})
 	select {
-	case c := <-code:
-		st, _ := openStore()
-		return c, st
+	case code = <-exit:
 	case <-time.After(10 * time.Second):
 		t.Fatal("wrapper did not exit")
 	}
-	return 0, nil
+	errW.Close()
+	stderr = <-errOut
+	st, _ = openStore()
+	mu.Lock()
+	defer mu.Unlock()
+	return code, st, string(shown), stderr
 }
 
 func TestWrapSavesDraftLeftInTheBox(t *testing.T) {
@@ -438,14 +462,218 @@ func TestSessionWaitsForTheFrameToEnd(t *testing.T) {
 }
 
 func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
-	s := &session{prof: &profile{read: func(*screen) (view, bool) { t.Fatal("read a broken screen"); return view{}, false }}}
+	st := testStore(t)
+	st.warned = true // keep the test output quiet
+	s := &session{store: st, pastes: &pasteTracker{}, prof: &profile{name: "claude", read: func(*screen) (view, bool) { t.Fatal("read a broken screen"); return view{}, false }}}
 	s.write([]byte("x")) // s.screen is nil: the emulator write panics
-	if !s.broken {
+	if !s.broken.Load() {
 		t.Fatal("panic not caught")
 	}
 	s.write([]byte("more output keeps flowing"))
+	s.resize(80, 24)
+	s.input([]byte("typing keeps flowing"))
 	s.dirty = true
 	s.save()
+	if l := s.exitLines(""); len(l) != 1 || !strings.Contains(l[0], "an internal error stopped saving claude's box") {
+		t.Fatalf("exit lines %q", l)
+	}
+}
+
+// A reader that panics on one crafted screen stops saving for the rest of
+// the session, says so once, and keeps the last good draft.
+func TestSessionSurvivesAReaderPanic(t *testing.T) {
+	st := testStore(t)
+	prof := claude
+	prof.read = func(scr *screen) (view, bool) {
+		if strings.Contains(scr.String(), "boom") {
+			panic("crafted screen")
+		}
+		return claudeBox(scr)
+	}
+	s := &session{screen: vt.NewEmulator(100, 30), rec: newRecord([]string{"claude"}, "/w"), store: st, pastes: &pasteTracker{}, prof: &prof}
+	go io.Copy(io.Discard, s.screen)
+	s.write([]byte(drawBox(100, "hello")))
+	s.save()
+	s.write([]byte(drawBox(100, "hello boom")))
+	old := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	s.save()
+	os.Stderr = old
+	w.Close()
+	said, _ := io.ReadAll(r)
+	if !s.broken.Load() || s.rec.Draft != "hello" {
+		t.Fatalf("broken %v, draft %q", s.broken.Load(), s.rec.Draft)
+	}
+	if !strings.Contains(string(said), "stopped saving after an internal error: crafted screen") {
+		t.Fatalf("said %q", said)
+	}
+	s.write([]byte(drawBox(100, "hello again")))
+	s.save()
+	if s.rec.Draft != "hello" {
+		t.Fatalf("draft %q saved after the panic", s.rec.Draft)
+	}
+}
+
+// The passthrough path runs input on every key. A panic there must not
+// take the terminal down, and turns the session into plain passthrough.
+func TestSessionInputCannotPanic(t *testing.T) {
+	s := &session{prof: &claude} // no paste tracker: feeding it panics
+	s.input([]byte("abc"))
+	if !s.broken.Load() || s.failure == "" {
+		t.Fatal("input panic not caught")
+	}
+	s.input([]byte("more keys"))
+}
+
+// Through the whole wrapper: after the reader panics, keys still reach the
+// agent (it quits on Ctrl+E), its output still reaches the terminal, the
+// draft saved before the panic stays, and the exit line says what happened.
+func TestWrapReaderPanicFallsBackToPassthrough(t *testing.T) {
+	old := claude.read
+	claude.read = func(scr *screen) (view, bool) {
+		if strings.Contains(scr.String(), "boom") {
+			panic("crafted screen")
+		}
+		return old(scr)
+	}
+	defer func() { claude.read = old }()
+	code, st, shown, said := runWrappedOut(t, "claude", []string{"claude"}, func(type_ func(string)) {
+		type_("hello")
+		type_(" boom")
+		type_(" still typing")
+		type_("\x05")
+	})
+	if code != 3 {
+		t.Fatalf("exit %d, want the agent's 3: keys stopped reaching it", code)
+	}
+	if !strings.Contains(shown, "hello boom still typing") {
+		t.Fatal("the agent's output stopped reaching the terminal")
+	}
+	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" {
+		t.Fatalf("orphans %+v, want the draft from before the panic", rs)
+	}
+	if !strings.Contains(said, "an internal error stopped saving claude's box") || !strings.Contains(said, "crafted screen") {
+		t.Fatalf("stderr %q", said)
+	}
+}
+
+// When the reader never finds the box in a session the user typed in, the
+// exit line names the running and the last verified version. A box read,
+// or a session with nothing typed, says nothing.
+func TestWrapSaysWhenTheBoxWasNeverRead(t *testing.T) {
+	want := "unsent: could not read claude 9.9.9's box this session (last verified " + claude.verified + "), nothing was saved\n"
+	for _, c := range []struct {
+		name     string
+		blind    bool
+		script   func(type_ func(string))
+		wantLine bool
+	}{
+		{"never read, typed", true, func(type_ func(string)) { type_("hello"); type_("\x04") }, true},
+		{"never read, nothing typed", true, func(func(string)) { syscall.Kill(os.Getpid(), syscall.SIGHUP); time.Sleep(time.Second) }, false},
+		{"read", false, func(type_ func(string)) { type_("hello"); type_("\x04") }, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if c.blind {
+				old := claude.read
+				claude.read = func(*screen) (view, bool) { return view{}, false }
+				defer func() { claude.read = old }()
+			}
+			_, _, _, said := runWrappedOut(t, "claude", []string{"claude"}, c.script)
+			if got := strings.Contains(said, want); got != c.wantLine {
+				t.Fatalf("stderr %q, want the line: %v", said, c.wantLine)
+			}
+		})
+	}
+}
+
+// An agent with no reader is told about before it starts and again after
+// it exits, because the alternate screen hides the first line at once.
+func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
+	t.Setenv("UNSENT_HOME", t.TempDir())
+	user, term, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go io.Copy(io.Discard, user)
+	defer func() { user.Close(); term.Close() }()
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+	code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term)
+	os.Stderr = old
+	w.Close()
+	said, _ := io.ReadAll(r)
+	line := "unsent: no reader for \"sh\" yet, running it without saving drafts\n"
+	if code != 0 || strings.Count(string(said), line) != 2 {
+		t.Fatalf("exit %d, stderr %q", code, said)
+	}
+}
+
+// UNSENT_OFF=1 hands over to the agent at once, even on a terminal; 0
+// leaves unsent on.
+func TestWrapOff(t *testing.T) {
+	t.Setenv("UNSENT_HOME", t.TempDir())
+	user, term, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go io.Copy(io.Discard, user)
+	defer func() { user.Close(); term.Close() }()
+	var ran []string
+	oldExec := execAgent
+	execAgent = func(bin string, args []string) error { ran = args; return nil }
+	defer func() { execAgent = oldExec }()
+	t.Setenv("UNSENT_OFF", "1")
+	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term); code != 0 || len(ran) != 3 {
+		t.Fatalf("exit %d, ran %q: UNSENT_OFF=1 did not hand over", code, ran)
+	}
+	ran = nil
+	t.Setenv("UNSENT_OFF", "0")
+	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term); code != 7 || ran != nil {
+		t.Fatalf("exit %d, ran %q: UNSENT_OFF=0 switched unsent off", code, ran)
+	}
+}
+
+func TestTypedKeys(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		want bool
+	}{
+		{"a", true},
+		{"\r", true},
+		{"\x03", true},
+		{"\x1b", true},
+		{"\x1b\x1b", true},
+		{"\x1b[A", true},
+		{"\x1b[200~text\x1b[201~", true},
+		{"\x1b[I\x1b[O", false},                      // focus
+		{"\x1b[<35;10;5M\x1b[<0;1;1m", false},        // mouse
+		{"\x1b]11;rgb:1e1e/1e1e/1e1e\x1b\\", false},  // OSC answer, ST
+		{"\x1b]10;rgb:ffff/ffff/ffff\x07", false},    // OSC answer, BEL
+		{"\x1bP>|WezTerm 2024\x1b\\", false},         // XTVERSION
+		{"\x1b[?62;22c\x1b[>1;10;0c\x1b[?1u", false}, // DA1, DA2, kitty flags
+		{"\x1b]11;rgb:0/0/0", false},                 // cut short
+		{"\x1b[?1u" + "x", true},
+		{"\x1b]11;rgb:0/0/0\x07" + "\x1b[I" + "y", true},
+	} {
+		if got := typedKeys([]byte(c.in)); got != c.want {
+			t.Errorf("typedKeys(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
+func TestAgentVersion(t *testing.T) {
+	if v := agentVersion("/bin/sh", []string{"-c", "echo '2.1.283 (Claude Code)'"}); v != "2.1.283" {
+		t.Fatalf("version %q", v)
+	}
+	if v := agentVersion("/bin/sh", nil); v != "" {
+		t.Fatalf("version %q with no version arguments", v)
+	}
+	start := time.Now()
+	if v := agentVersion("/bin/sh", []string{"-c", "sleep 10; echo 1.2.3"}); v != "" || time.Since(start) > 5*time.Second {
+		t.Fatalf("version %q after %v from an agent that hangs", v, time.Since(start))
+	}
 }
 
 // A session without a profile (an unknown agent, or a failed lock) still

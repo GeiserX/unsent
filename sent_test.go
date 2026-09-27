@@ -41,7 +41,7 @@ func (s sendSession) draw(text string) { s.write([]byte(drawBox(100, text))) }
 
 func (s sendSession) save() {
 	s.t.Helper()
-	if s.session.save(); s.broken {
+	if s.session.save(); s.broken.Load() {
 		s.t.Fatal("the session stopped saving")
 	}
 }

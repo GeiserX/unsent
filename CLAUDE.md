@@ -7,7 +7,7 @@
 | File | Job |
 | --- | --- |
 | `main.go` | CLI: `unsent <agent>`, `--as`, `list`, `show`, `restore`, `log`, `forget --log`, `version`; the recovery notice; drafts filtered by agent and folder (the resolved real path) |
-| `wrap.go` | Pseudo-terminal passthrough, shadow screen, save loop, signals, Ctrl+Z suspend |
+| `wrap.go` | Pseudo-terminal passthrough, shadow screen, save loop, signals, Ctrl+Z suspend; `UNSENT_OFF`; a panic anywhere in reading or saving turns the session into plain passthrough (`session.guard`); the lines printed after the agent exits (`exitLines`: no reader, saving stopped, box never read) |
 | `screen.go` | Snapshot of the shadow screen (text, dim cells, cursor) |
 | `extract.go` | The `profile` type (one per agent: name, command names, box reader, paste placeholder, delete, submit and clear keys), `profileFor`, and `agentFor` (`--as`, then a base name a profile answers to, then `UNSENT_AGENT`, then the base name) |
 | `agent_claude.go` | Claude Code's profile and its box reader (`claudeBox`) |
@@ -36,7 +36,7 @@
 - Enter prints the sent message above the box and draws the empty box within about 35 ms (`sends.rec`). Just before that it sets the window title (OSC 0) to a spinner glyph, and to `✳ Claude Code` when done. The emulator ends a string sequence at a 0x9c byte even inside a UTF-8 character, and ✳ is `e2 9c b3`, so the rest of the title landed in the box; `stringSeqs` strips OSC, DCS, APC, PM and SOS before the shadow screen.
 - While Claude Code is working (a request retrying), Ctrl+C interrupts the request and leaves the box as it is.
 
-Re-measure these when a Claude Code release changes the prompt. A reader that stops matching fails safe (keeps the last draft) but saves nothing new.
+Re-measure these when a Claude Code release changes the prompt, and set the profile's `verified` to the version the fixtures come from. A reader that stops matching fails safe (keeps the last draft) but saves nothing new, and says so on exit with the running and the verified version.
 
 ## Rules
 
