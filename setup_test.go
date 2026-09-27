@@ -621,10 +621,13 @@ func TestSetupWithTwoBlocks(t *testing.T) {
 // rcZsh starts a real zsh on a pseudo-terminal the way a terminal starts
 // one, reading the scratch rc file (no -f), under an empty environment but
 // for HOME, ZDOTDIR, UNSENT_HOME, TERM and path, and waits for its prompt.
+// skip_global_compinit stops the Linux distribution's global rc from
+// running compinit, whose "insecure directories" question stalls the shell
+// on a shared runner; macOS's global rc ignores the variable.
 func (h setupHome) rcZsh(t *testing.T, sh, path string) *zshSession {
 	t.Helper()
 	state := filepath.Join(h.home, "state")
-	env := []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=xterm", "UNSENT_HOME=" + state}
+	env := []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=xterm", "UNSENT_HOME=" + state, "skip_global_compinit=1"}
 	s := openZsh(t, exec.Command(sh, "-i"), env, h.home, filepath.Join(state, "shell"))
 	s.echo("PS1='"+zshPrompt[:1]+"''"+zshPrompt[1:]+"'\r", zshPrompt)
 	return s
