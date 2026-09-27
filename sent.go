@@ -299,7 +299,9 @@ func (s *store) logSent(r *record) error {
 		return err
 	}
 	if created {
-		syncDir(filepath.Dir(path))
+		if err := syncDir(filepath.Dir(path)); err != nil {
+			return err
+		}
 		s.pruneSent()
 	}
 	if size > sentMaxBytes {

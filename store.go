@@ -300,17 +300,21 @@ func writeFileDurable(path string, data []byte) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return err
 	}
-	syncDir(filepath.Dir(path))
-	return nil
+	// A failed folder sync means the rename may not survive a power cut:
+	// the write is not durable, and a caller about to remove the old copy
+	// (restore, or a save replacing a draft) must not.
+	return syncDir(filepath.Dir(path))
 }
 
 // syncDir flushes a folder's entries, so a new or renamed file in it
 // survives a power cut.
-func syncDir(dir string) {
-	if d, err := os.Open(dir); err == nil {
-		d.Sync()
-		d.Close()
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
 	}
+	defer d.Close()
+	return d.Sync()
 }
 
 // load reads every record in drafts/ (and history/ when withHistory is set),

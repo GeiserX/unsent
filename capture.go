@@ -173,6 +173,11 @@ func cmdCapture(args []string, stderr io.Writer) int {
 		err = os.WriteFile(filepath.Join(tmp, "editor"), []byte(editorCopy), 0o700)
 	}
 	base := filepath.Join(dir, "capture-"+time.Now().Format("20060102-150405"))
+	if abs, err := filepath.Abs(base); err == nil {
+		// The editor script resolves $UNSENT_CAPTURE_TO against the agent's
+		// working directory at Ctrl+G time, which need not be ours.
+		base = abs
+	}
 	var raw *rawLog
 	if err == nil {
 		raw, err = openRaw(base, agent, version)

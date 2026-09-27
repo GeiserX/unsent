@@ -166,7 +166,14 @@ func TestCapture(t *testing.T) {
 		t.Fatalf("captures %q, stderr %q", recs, said)
 	}
 	base := strings.TrimSuffix(recs[0], ".rec")
-	if !strings.Contains(said, "unsent: captured claude 9.9.9 in "+base+".rec") || !strings.Contains(said, "2 editor copies") {
+	absBase, err := filepath.Abs(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The message and $UNSENT_CAPTURE_TO carry the absolute path: the editor
+	// script resolves it against the agent's working directory at Ctrl+G
+	// time, which need not be the one capture started in.
+	if !strings.Contains(said, "unsent: captured claude 9.9.9 in "+absBase+".rec") || !strings.Contains(said, "2 editor copies") {
 		t.Fatalf("stderr %q", said)
 	}
 	_, keys, _, meta := readRaw(t, base)
