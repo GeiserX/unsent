@@ -29,7 +29,13 @@ func TestMain(m *testing.M) {
 
 func fakeAgent() {
 	if len(os.Args) > 1 && os.Args[1] == "--version" {
-		fmt.Println("9.9.9 (Fake Agent)")
+		// UNSENT_FAKE_VERSION names a file that, once written, holds the
+		// version of an update installed while the agent runs.
+		v, err := os.ReadFile(os.Getenv("UNSENT_FAKE_VERSION"))
+		if err != nil {
+			v = []byte("9.9.9")
+		}
+		fmt.Printf("%s (Fake Agent)\n", v)
 		return
 	}
 	if old, err := term.MakeRaw(0); err == nil {
@@ -474,7 +480,7 @@ func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
 	s.input([]byte("typing keeps flowing"))
 	s.dirty = true
 	s.save()
-	if l := s.exitLines(""); len(l) != 1 || !strings.Contains(l[0], "an internal error stopped saving claude's box") {
+	if l := s.exitLines(); len(l) != 1 || !strings.Contains(l[0], "an internal error stopped saving claude's box") {
 		t.Fatalf("exit lines %q", l)
 	}
 }
@@ -526,6 +532,43 @@ func TestSessionInputCannotPanic(t *testing.T) {
 	s.input([]byte("more keys"))
 }
 
+// resize runs on the main loop (a window resize, fg after Ctrl+Z): a panic
+// there must not take unsent down either.
+func TestSessionResizeCannotPanic(t *testing.T) {
+	s := &session{prof: &claude} // no screen: resizing it panics
+	s.resize(80, 24)
+	if !s.broken.Load() || s.failure == "" {
+		t.Fatal("resize panic not caught")
+	}
+}
+
+// After a panic the paste tracker is no longer fed, so it can stay inside a
+// paste that has long ended. Ctrl+Z must still suspend unsent, or the agent
+// gets it and hangs.
+func TestWrapCtrlZSuspendsAfterAPanicMidPaste(t *testing.T) {
+	stops := 0
+	oldStop := stopSelf
+	stopSelf = func() { stops++ }
+	defer func() { stopSelf = oldStop }()
+	old := claude.read
+	claude.read = func(scr *screen) (view, bool) {
+		if strings.Contains(scr.String(), "boom") {
+			panic("crafted screen")
+		}
+		return old(scr)
+	}
+	defer func() { claude.read = old }()
+	runWrapped(t, func(type_ func(string)) {
+		type_("boom\x1b[200~x") // a paste starts; the next save panics
+		type_("\x1b[201~")      // the paste ends, unseen by the tracker
+		type_("\x1a")
+		type_("\x04")
+	})
+	if stops != 1 {
+		t.Fatalf("stopped %d times, want 1", stops)
+	}
+}
+
 // Through the whole wrapper: after the reader panics, keys still reach the
 // agent (it quits on Ctrl+E), its output still reaches the terminal, the
 // draft saved before the panic stays, and the exit line says what happened.
@@ -559,29 +602,48 @@ func TestWrapReaderPanicFallsBackToPassthrough(t *testing.T) {
 }
 
 // When the reader never finds the box in a session the user typed in, the
-// exit line names the running and the last verified version. A box read,
-// or a session with nothing typed, says nothing.
+// exit line names the version that ran, asked at startup, and the last
+// verified one. A command the profile does not answer to (--as) is never
+// asked. A box read, or a session with nothing typed or only the
+// terminal's answers, says nothing.
 func TestWrapSaysWhenTheBoxWasNeverRead(t *testing.T) {
-	want := "unsent: could not read claude 9.9.9's box this session (last verified " + claude.verified + "), nothing was saved\n"
+	line := func(name string) string {
+		return "unsent: could not read " + name + "'s box this session (last verified " + claude.verified + "), nothing was saved\n"
+	}
+	update := filepath.Join(t.TempDir(), "version")
+	t.Setenv("UNSENT_FAKE_VERSION", update)
+	hangUp := func() { syscall.Kill(os.Getpid(), syscall.SIGHUP); time.Sleep(time.Second) }
 	for _, c := range []struct {
-		name     string
-		blind    bool
-		script   func(type_ func(string))
-		wantLine bool
+		name    string
+		blind   bool
+		command string
+		argv    []string
+		script  func(type_ func(string))
+		want    string
 	}{
-		{"never read, typed", true, func(type_ func(string)) { type_("hello"); type_("\x04") }, true},
-		{"never read, nothing typed", true, func(func(string)) { syscall.Kill(os.Getpid(), syscall.SIGHUP); time.Sleep(time.Second) }, false},
-		{"read", false, func(type_ func(string)) { type_("hello"); type_("\x04") }, false},
+		{"never read, typed", true, "claude", []string{"claude"}, func(type_ func(string)) {
+			type_("hello")
+			os.WriteFile(update, []byte("10.0.0"), 0o600) // updated while it runs
+			type_("\x04")
+		}, line("claude 9.9.9")},
+		{"never read, typed, --as", true, "launcher", []string{"--as", "claude", "launcher"}, func(type_ func(string)) { type_("hello"); type_("\x04") }, line("claude")},
+		{"never read, nothing typed", true, "claude", []string{"claude"}, func(func(string)) { hangUp() }, ""},
+		{"never read, terminal answers only", true, "claude", []string{"claude"}, func(type_ func(string)) {
+			type_("\x1b[I\x1b]11;rgb:0/0/0\x07\x1b[?62;22c")
+			hangUp()
+		}, ""},
+		{"read", false, "claude", []string{"claude"}, func(type_ func(string)) { type_("hello"); type_("\x04") }, ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			os.Remove(update)
 			if c.blind {
 				old := claude.read
 				claude.read = func(*screen) (view, bool) { return view{}, false }
 				defer func() { claude.read = old }()
 			}
-			_, _, _, said := runWrappedOut(t, "claude", []string{"claude"}, c.script)
-			if got := strings.Contains(said, want); got != c.wantLine {
-				t.Fatalf("stderr %q, want the line: %v", said, c.wantLine)
+			_, _, _, said := runWrappedOut(t, c.command, c.argv, c.script)
+			if c.want == "" && strings.Contains(said, "could not read") || c.want != "" && !strings.Contains(said, c.want) {
+				t.Fatalf("stderr %q, want %q", said, c.want)
 			}
 		})
 	}

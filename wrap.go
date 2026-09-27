@@ -83,6 +83,12 @@ func wrap(agent string, args []string, in, out *os.File) int {
 	}
 	if s.off != "" {
 		fmt.Fprintln(os.Stderr, s.off)
+	} else if profileFor(args[0]) == s.prof {
+		// Asked now, the version is the one that runs: an agent that updates
+		// itself while it runs would name the new one at exit. Only a command
+		// the profile answers to is asked; with --as it may be npx or node.
+		s.version = make(chan string, 1)
+		go func() { s.version <- agentVersion(bin, s.prof.version) }()
 	}
 	defer st.release()
 	// Raw mode only now: in raw mode the line feed ending the line above
@@ -196,7 +202,7 @@ func wrap(agent string, args []string, in, out *os.File) int {
 			if cooked != nil {
 				term.Restore(int(in.Fd()), cooked)
 			}
-			for _, l := range s.exitLines(bin) {
+			for _, l := range s.exitLines() {
 				fmt.Fprintln(os.Stderr, l)
 			}
 			var exit *exec.ExitError
@@ -263,6 +269,9 @@ type session struct {
 	matched bool
 	// off says why this session saves nothing, when it saves nothing.
 	off string
+	// version delivers the agent's version, asked at startup, or is nil
+	// when the command is not one the profile answers to.
+	version chan string
 	// quietUntil holds saves back just after a resize, until the agent
 	// has redrawn at the new size.
 	quietUntil time.Time
@@ -589,8 +598,8 @@ func (s *session) finish() {
 // ran without saving, or that saving stopped. An agent on the alternate
 // screen hid whatever was printed while it ran, and silence here is the
 // worst failure: after an agent update a reader stops matching and nothing
-// else would say so. bin is the agent's binary, asked for its version.
-func (s *session) exitLines(bin string) []string {
+// else would say so.
+func (s *session) exitLines() []string {
 	switch {
 	case s.off != "":
 		return []string{s.off}
@@ -601,8 +610,10 @@ func (s *session) exitLines(bin string) []string {
 			s.prof.name, s.failedAt.Format("15:04"), s.failure)}
 	case !s.matched && s.typed.Load():
 		name := s.prof.name
-		if v := agentVersion(bin, s.prof.version); v != "" {
-			name += " " + v
+		if s.version != nil {
+			if v := <-s.version; v != "" {
+				name += " " + v
+			}
 		}
 		return []string{fmt.Sprintf("unsent: could not read %s's box this session (last verified %s), nothing was saved", name, s.prof.verified)}
 	}

@@ -36,7 +36,7 @@
 - Enter prints the sent message above the box and draws the empty box within about 35 ms (`sends.rec`). Just before that it sets the window title (OSC 0) to a spinner glyph, and to `✳ Claude Code` when done. The emulator ends a string sequence at a 0x9c byte even inside a UTF-8 character, and ✳ is `e2 9c b3`, so the rest of the title landed in the box; `stringSeqs` strips OSC, DCS, APC, PM and SOS before the shadow screen.
 - While Claude Code is working (a request retrying), Ctrl+C interrupts the request and leaves the box as it is.
 
-Re-measure these when a Claude Code release changes the prompt, and set the profile's `verified` to the version the fixtures come from. A reader that stops matching fails safe (keeps the last draft) but saves nothing new, and says so on exit with the running and the verified version.
+Re-measure these when a Claude Code release changes the prompt, and set the profile's `verified` to the version the fixtures come from. A reader that stops matching fails safe (keeps the last draft) but saves nothing new, and says so on exit with the running and the verified version. The running version is asked at startup, and only from a command the profile answers to: with `--as` the command may be npx or node.
 
 ## Rules
 
