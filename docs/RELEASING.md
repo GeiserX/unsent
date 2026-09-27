@@ -37,6 +37,12 @@ With the secret missing or empty, goreleaser skips the tap step and the release 
 
 `brews` is deprecated in goreleaser v2, so `goreleaser check` warns and exits 2 even though the config is valid. goreleaser removes deprecated options only on a major, and the workflow pins `~> v2`. The replacement is a cask, but macOS quarantines cask binaries, so a cask needs notarization first.
 
+`goreleaser check` also passes a broken template, so CI's `release-snapshot` job runs `goreleaser release --snapshot --clean` on pushes to `main` and on pull requests, without the tap token, and fails if `dist/homebrew/Formula/unsent.rb` is missing. Snapshot mode publishes nothing, so it cannot test the token gate itself. To run the same check locally:
+
+```sh
+goreleaser release --snapshot --clean && test -s dist/homebrew/Formula/unsent.rb
+```
+
 ## After the release
 
 - Check the release run and the release page for 4 tarballs and `checksums.txt`.
