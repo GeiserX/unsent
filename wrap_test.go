@@ -323,6 +323,21 @@ func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
 	s.save()
 }
 
+// A session without a profile (an unknown agent, or a failed lock) still
+// sees every key, and must not crash on the delete keys.
+func TestSessionWithoutProfileIgnoresDeleteKeys(t *testing.T) {
+	s := &session{pastes: &pasteTracker{}}
+	s.input([]byte("abc\x7f\x17"))
+	if n, ahead := s.deletes.recent(); n != 0 || ahead {
+		t.Fatalf("recent %d %v, want nothing", n, ahead)
+	}
+	s.prof = &claude
+	s.input([]byte("abc\x7f"))
+	if n, _ := s.deletes.recent(); n != 1 {
+		t.Fatalf("recent %d with a profile, want 1", n)
+	}
+}
+
 func TestDeleteKeys(t *testing.T) {
 	cases := []struct {
 		keys  string
