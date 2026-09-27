@@ -7,7 +7,7 @@
 | File | Job |
 | --- | --- |
 | `main.go` | CLI: `unsent <agent>`, `--as`, `list`, `show`, `restore`, `log`, `forget --log`, `capture`, `version`; the recovery notice; drafts filtered by agent and folder (the resolved real path) |
-| `wrap.go` | Pseudo-terminal passthrough, shadow screen, save loop, signals, Ctrl+Z suspend; `UNSENT_OFF`; a panic anywhere in reading or saving turns the session into plain passthrough (`session.guard`); the lines printed after the agent exits (`exitLines`: no reader, saving stopped, box never read) |
+| `wrap.go` | Pseudo-terminal passthrough, shadow screen, save loop, signals, Ctrl+Z suspend; `UNSENT_OFF`; a panic anywhere in reading or saving turns the session into plain passthrough (`session.guard`); the lines printed after the agent exits (`exitLines`: no reader, saving stopped, box never read), then the recovery notice again, asked afresh |
 | `screen.go` | Snapshot of the shadow screen (text, dim cells, cursor) |
 | `extract.go` | The `profile` type (one per agent: name, command names, box reader, paste placeholder, delete, submit and clear keys), `profileFor`, and `agentFor` (`--as`, then a base name a profile answers to, then `UNSENT_AGENT`, then the base name) |
 | `agent_claude.go` | Claude Code's profile and its box reader (`claudeBox`) |

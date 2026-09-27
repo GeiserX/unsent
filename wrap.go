@@ -56,7 +56,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	}
 	cwd, _ := os.Getwd()
 	cwd = realPath(cwd)
-	noticeOrphans(st, cwd, agent)
+	fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
 
 	cmd := exec.Command(bin, args[1:]...)
 	cols, rows := termSize(in)
@@ -217,6 +217,10 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			for _, l := range s.exitLines() {
 				fmt.Fprintln(os.Stderr, l)
 			}
+			// The notice printed before the agent started is hidden too, on
+			// the alternate screen. Asked again, it leaves out a draft that
+			// was restored while the agent ran.
+			fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
 				if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {

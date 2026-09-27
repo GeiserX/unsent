@@ -18,7 +18,7 @@ Remember Word's AutoRecover? The laptop dies at 3 a.m. the night before the dead
 
 You spend ten minutes writing a careful prompt. Then the terminal window closes, the machine reboots for an update, Claude Code crashes, or you press Ctrl+C one time too many, and the prompt is gone. Claude Code saves your *conversations*, not the message you haven't sent yet. The request to change that, [anthropics/claude-code#18755](https://github.com/anthropics/claude-code/issues/18755), was closed as not planned.
 
-With `unsent`, the next time you start Claude Code in that folder you see:
+With `unsent`, the next time you start Claude Code in that folder you see this line, before it starts and again after it exits, because Claude Code's screen covers the first one while it runs:
 
 ```text
 unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to copy it.
@@ -60,7 +60,7 @@ unsent list --all    # also drafts you cleared or replaced
 unsent list --here --agent claude   # only Claude Code's drafts from this folder
 ```
 
-Each draft remembers the agent and the folder it came from. The notice at start only offers a draft back to that agent in that folder, and counts the ones left in subfolders. `unsent restore --agent claude` copies that agent's newest draft from this folder, and a number from `unsent list` reaches any draft.
+Each draft remembers the agent and the folder it came from. The notice only offers a draft back to that agent in that folder, and counts the ones left in subfolders. `unsent restore --agent claude` copies that agent's newest draft from this folder, and a number from `unsent list` reaches any draft.
 
 ## Sent messages
 

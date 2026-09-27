@@ -696,6 +696,46 @@ func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
 	}
 }
 
+// The recovery notice is printed before the agent starts and again after it
+// exits, because an agent on the alternate screen hides the first one. The
+// second is asked afresh: a draft restored while the agent ran is not
+// offered again.
+func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
+	st := testStore(t)
+	work := realPath(t.TempDir())
+	t.Chdir(work)
+	seedAs(t, st, "left", "claude", work, "a draft left behind", 5)
+	user, term, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go io.Copy(io.Discard, user)
+	defer func() { user.Close(); term.Close() }()
+	agent := func(script string, args ...string) string {
+		r, w, _ := os.Pipe()
+		old := os.Stderr
+		os.Stderr = w
+		code := wrap("claude", append([]string{"sh", "-c", script, "sh"}, args...), term, term, nil)
+		os.Stderr = old
+		w.Close()
+		said, _ := io.ReadAll(r)
+		if code != 0 {
+			t.Fatalf("exit %d, stderr %q", code, said)
+		}
+		return string(said)
+	}
+	line := orphanNotice(st, work, "claude")
+	if !strings.HasPrefix(line, "unsent: recovered a draft from ") {
+		t.Fatalf("notice %q", line)
+	}
+	if said := agent(`printf '\033[?1049h'; printf '\033[?1049l'`); said != line+line {
+		t.Fatalf("stderr %q, want the notice before and after", said)
+	}
+	if said := agent(`rm "$1"`, st.draftPath("left")); said != line {
+		t.Fatalf("stderr %q, want the notice only before: the draft was restored meanwhile", said)
+	}
+}
+
 // UNSENT_OFF=1 hands over to the agent at once, even on a terminal; 0
 // leaves unsent on.
 func TestWrapOff(t *testing.T) {

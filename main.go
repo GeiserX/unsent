@@ -461,11 +461,11 @@ func cmdForget(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// noticeOrphans tells the user, before the agent starts, that a draft this
-// agent left in this folder is waiting, the way a word processor offers
-// recovered files. A draft is only offered back to the agent it came from,
-// and one left in a subfolder is counted, not offered.
-func noticeOrphans(st *store, cwd, agent string) {
+// orphanNotice is the line that tells the user a draft this agent left in
+// this folder is waiting, the way a word processor offers recovered files,
+// or "" when there is none. A draft is only offered back to the agent it
+// came from, and one left in a subfolder is counted, not offered.
+func orphanNotice(st *store, cwd, agent string) string {
 	var here []*record
 	var first *record // this folder's newest, of any agent: what a plain restore picks
 	sub := 0
@@ -490,9 +490,9 @@ func noticeOrphans(st *store, cwd, agent string) {
 	}
 	if len(here) == 0 {
 		if subs != "" {
-			fmt.Fprintf(os.Stderr, "unsent: %s of this folder: `unsent list`.\n", subs)
+			return fmt.Sprintf("unsent: %s of this folder: `unsent list`.\n", subs)
 		}
-		return
+		return ""
 	}
 	r := here[0]
 	more := ""
@@ -507,7 +507,7 @@ func noticeOrphans(st *store, cwd, agent string) {
 	if subs != "" {
 		subs = " " + subs + ": `unsent list`."
 	}
-	fmt.Fprintf(os.Stderr, "unsent: recovered a draft from %s, %s%s. Run `%s` to copy it.%s\n",
+	return fmt.Sprintf("unsent: recovered a draft from %s, %s%s. Run `%s` to copy it.%s\n",
 		when(r.Updated), lines(r.Draft), more, restore, subs)
 }
 

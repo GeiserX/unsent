@@ -107,25 +107,12 @@ func TestCLIRestoreWithoutClipboard(t *testing.T) {
 	}
 }
 
-// notice returns what noticeOrphans prints.
-func notice(st *store, cwd, agent string) string {
-	r, w, _ := os.Pipe()
-	old := os.Stderr
-	os.Stderr = w
-	noticeOrphans(st, cwd, agent)
-	w.Close()
-	os.Stderr = old
-	var b bytes.Buffer
-	b.ReadFrom(r)
-	return b.String()
-}
-
 func TestNoticeOrphans(t *testing.T) {
 	st := seed(t, "one", "two")
-	if got := notice(st, "/work", "claude"); strings.Count(got, "\n") != 1 || !strings.Contains(got, "(and 1 more). Run `unsent restore` to copy it.\n") {
+	if got := orphanNotice(st, "/work", "claude"); strings.Count(got, "\n") != 1 || !strings.Contains(got, "(and 1 more). Run `unsent restore` to copy it.\n") {
 		t.Fatalf("notice %q", got)
 	}
-	if got := notice(st, "/elsewhere", "claude"); got != "" {
+	if got := orphanNotice(st, "/elsewhere", "claude"); got != "" {
 		t.Fatalf("notice in another folder %q", got)
 	}
 }
@@ -158,7 +145,7 @@ func TestNoticeFiltersByFolderAndAgent(t *testing.T) {
 	seedAs(t, st, "e", "codex", filepath.Join(work, "sub"), "codex in a subfolder", 4)
 	seedAs(t, st, "f", "claude", work+"-sibling", "a folder that only shares the prefix", 5)
 
-	got := notice(st, work, "claude")
+	got := orphanNotice(st, work, "claude")
 	if !strings.Contains(got, "1 line.") || strings.Contains(got, "more)") {
 		t.Fatalf("claude notice %q: offered another agent's draft", got)
 	}
@@ -166,24 +153,24 @@ func TestNoticeFiltersByFolderAndAgent(t *testing.T) {
 	if !strings.Contains(got, "Run `unsent restore --agent claude` to copy it. 2 drafts wait in subfolders: `unsent list`.") {
 		t.Fatalf("claude notice %q", got)
 	}
-	got = notice(st, work, "codex")
+	got = orphanNotice(st, work, "codex")
 	if !strings.Contains(got, "Run `unsent restore` to copy it. 1 draft waits in a subfolder: `unsent list`.") {
 		t.Fatalf("codex notice %q", got)
 	}
-	if got := notice(st, filepath.Join(work, "sub"), "claude"); !strings.Contains(got, "1 draft waits in a subfolder") || !strings.Contains(got, "recovered a draft") {
+	if got := orphanNotice(st, filepath.Join(work, "sub"), "claude"); !strings.Contains(got, "1 draft waits in a subfolder") || !strings.Contains(got, "recovered a draft") {
 		t.Fatalf("notice in the subfolder %q", got)
 	}
 	// Only subfolder drafts: counted, not offered.
-	if got := notice(st, filepath.Dir(work), "codex"); got != "unsent: 2 drafts wait in subfolders of this folder: `unsent list`.\n" {
+	if got := orphanNotice(st, filepath.Dir(work), "codex"); got != "unsent: 2 drafts wait in subfolders of this folder: `unsent list`.\n" {
 		t.Fatalf("notice above %q", got)
 	}
-	if got := notice(st, work, "gemini"); got != "" {
+	if got := orphanNotice(st, work, "gemini"); got != "" {
 		t.Fatalf("an agent with no drafts got a notice %q", got)
 	}
 	// The folder is compared by its real path: a symlink to it is the same folder.
 	link := filepath.Join(t.TempDir(), "link")
 	os.Symlink(work, link)
-	if got := notice(st, link, "claude"); !strings.Contains(got, "recovered a draft") {
+	if got := orphanNotice(st, link, "claude"); !strings.Contains(got, "recovered a draft") {
 		t.Fatalf("notice through a symlink %q", got)
 	}
 }
