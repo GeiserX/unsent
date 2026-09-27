@@ -15,7 +15,8 @@
 | `paste.go` | Captures bracketed pastes and expands the profile's placeholders, such as `[Pasted text #N +M lines]`; puts back the middle of a long draft the agent cut out of the box |
 | `store.go` | Durable writes, history, per-session lock files |
 | `capture.go` | The raw log (`rawLog`: keys and output in `script -r` format, window sizes beside it, files `0600`), written only under `UNSENT_DEBUG_DIR` or by `unsent capture`, which records a fixture bundle into `testdata/<agent>/<version>/` with an editor copy per Ctrl+G |
-| `setup.go` | `unsent setup [zsh\|bash]` and `--undo`: one marked block in the rc file (`$ZDOTDIR/.zshrc` when set) that wraps each profile's commands in a `function name { }` (never `name() { }`, which an existing alias breaks) that looks the agent up on PATH when called, leaves a user's function of that name alone; undo takes out exactly what setup added; warns, never edits, about aliases to a path and launchers that start an agent through `env`, `command`, `exec` or a full path |
+| `shell.go` | `zshHooks`, the zsh line editor hooks that save the command line to a per-shell log (`<state>/shell/zsh-<pid>-<µs>.log`, moved aside as `.done` past 256 KB), and `unsent init zsh`, which prints them; the record format is in the comment above `zshHooks` |
+| `setup.go` | `unsent setup [zsh\|bash]` and `--undo`: one marked block in the rc file (`$ZDOTDIR/.zshrc` when set) that wraps each profile's commands in a `function name { }` (never `name() { }`, which an existing alias breaks) that looks the agent up on PATH when called, leaves a user's function of that name alone; undo takes out exactly what setup added; warns, never edits, about aliases to a path and launchers that start an agent through `env`, `command`, `exec` or a full path; the zsh block also holds `zshHooks` |
 | `status.go` | `unsent status [zsh\|bash]`: one fact per line; asks the shell itself (`-l -i -c` as a new terminal starts it, this environment, a session of its own with no terminal, bounded by a timeout) what each agent name resolves to, since a child cannot see its parent's functions; block present and current, profile and verified version, setup's bypass scan, `UNSENT_OFF`, the on-send setting and the variable that set it (`onSendFrom`) |
 | `sent.go` | Send detection (submit and clear keys in order, each submit and the first keys after it with the screen they were typed into), `UNSENT_ON_SEND`, the per-session sent logs in `sent/` and their limits |
 | `testdata/claude/<version>/` | Real Claude Code captures (raw bytes, keys with output, screens, editor copies) that `replay_test.go` replays through the reader and stitcher |
@@ -43,10 +44,19 @@
 
 Re-measure these when a Claude Code release changes the prompt, and set the profile's `verified` to the version the fixtures come from. A reader that stops matching fails safe (keeps the last draft) but saves nothing new, and says so on exit with the running and the verified version. The running version is asked at startup, and only from a command the profile answers to: with `--as` the command may be npx or node.
 
+## Facts about zsh's line editor (measured on 5.9)
+
+- `line-pre-redraw` fires before each redraw, never for a fresh prompt, and zsh skips it while more input is pending: keys sent in one write with a Ctrl+C may get no redraw at all.
+- `line-init` fires at every prompt, after Ctrl+C too, with `$CONTEXT` `start`, or `cont` at a continuation prompt. `line-finish` fires on every Enter, including one that only opens a continuation prompt (`echo "a`), so a finish is a send only when no `cont` init follows it.
+- vared runs the same hooks with `$CONTEXT` `vared`; `read -s` never starts the line editor.
+- Inside `TRAPHUP`, `$BUFFER` and `$CONTEXT` hold the prompt's line, and `zle` with no arguments returns 0; during `read -s` or a running command `$CONTEXT` is unset and `zle` returns 1. A `TRAPHUP` that returns keeps the shell running; `unfunction TRAPHUP; kill -HUP $$` exits as the default does and hangs up the jobs.
+- Ctrl+C drops input still queued in the terminal (seen on Linux), so a test waits for the next prompt before typing again.
+
 ## Rules
 
 - Tests: `go test -race ./...`. Coverage target 90% (`codecov.yml`).
 - `wrap_test.go` re-runs the test binary as a fake agent; keep it drawing the box the way the real one does.
+- `shell_test.go` runs the hooks in a real `zsh -f -i` on a pseudo-terminal under an empty environment with a scratch `HOME` and `ZDOTDIR`, types at it and reads the log's records; `testdata/shell/zsh-init.golden` pins what `unsent init zsh` prints (`UNSENT_UPDATE_GOLDEN=1` rewrites it). Keep the mutation tests red: without the `i` mark a Ctrl+C runs into the next line, without the `$CONTEXT` check vared text is saved.
 - `setup_test.go` and `status_test.go` run the block in every real zsh and bash they find (`-i -c`, `-l -i -c` for status, an empty environment, `HOME` and `ZDOTDIR` in a scratch folder, a fake `claude` and `unsent` on `PATH`; status swaps `statusEnv` for that environment). Never let a setup or status test reach a real rc file or a real agent.
 - Never add network access. Drafts stay on the machine.
 - Adding an agent means one profile file (`agent_<name>.go`, listed in `profiles`) plus tests built from real screen captures.
