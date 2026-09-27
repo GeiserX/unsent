@@ -257,10 +257,32 @@ func TestCaptureRefuses(t *testing.T) {
 			t.Fatalf("%q: exit %d", args, code)
 		}
 	}
+	// On a terminal with stderr on a file, the wrapper would hand over and
+	// record nothing, so the capture refuses too.
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { user.Close(); tty.Close() }()
+	errLog, err := os.Create(filepath.Join(t.TempDir(), "err.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer errLog.Close()
+	oldExec := execAgent
+	execAgent = func(string, []string) error { return nil } // a regression fails, not execs
+	defer func() { execAgent = oldExec }()
+	oldOut, oldErr := os.Stdout, os.Stderr
+	os.Stdin, os.Stdout, os.Stderr = tty, tty, errLog
+	code := run([]string{"capture", "sh"}, io.Discard, &said)
+	os.Stdout, os.Stderr = oldOut, oldErr
+	if code != 2 {
+		t.Fatalf("capture with stderr on a file: exit %d", code)
+	}
 	if _, err := os.Stat("testdata"); !os.IsNotExist(err) {
 		t.Fatalf("a refused capture wrote testdata: %v", err)
 	}
-	if !strings.Contains(said.String(), "capture needs a terminal") {
+	if strings.Count(said.String(), "capture needs a terminal") != 2 {
 		t.Fatalf("stderr %q", said.String())
 	}
 }

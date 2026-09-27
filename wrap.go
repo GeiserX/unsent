@@ -39,10 +39,12 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
 		return 127
 	}
-	if off() || !term.IsTerminal(int(in.Fd())) || !term.IsTerminal(int(out.Fd())) {
-		// Switched off, or piped (git diff | claude -p ...) or redirected:
-		// the agent draws no input box, and a pseudo-terminal would turn the
-		// pipe into keystrokes. Get out of the way.
+	if off() || !onTerminal(in, out) {
+		// Switched off, or piped (git diff | claude -p ...) or redirected
+		// (claude 2>err.log): the agent draws no input box, a
+		// pseudo-terminal would turn the pipe into keystrokes, and the
+		// agent's stderr would land in it instead of the file. Get out of
+		// the way.
 		if err := execAgent(bin, args); err != nil {
 			fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
 			return 126
@@ -252,6 +254,13 @@ var stopSelf = func() {
 // timedSave is the save each tick runs. Tests hook it to type the next key
 // only once a save has read the screen the last key drew.
 var timedSave = (*session).save
+
+// onTerminal reports whether in, out and the process's stderr are all
+// terminals. The pseudo-terminal replaces all three for the agent, so any
+// one of them redirected would lose that redirect.
+func onTerminal(in, out *os.File) bool {
+	return term.IsTerminal(int(in.Fd())) && term.IsTerminal(int(out.Fd())) && term.IsTerminal(int(os.Stderr.Fd()))
+}
 
 // execAgent replaces the wrapper with the agent.
 var execAgent = func(bin string, args []string) error {

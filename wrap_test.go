@@ -22,6 +22,13 @@ import (
 // The test binary doubles as a fake agent that draws a box like Claude
 // Code's, so the wrapper can be tested end to end without the real thing.
 func TestMain(m *testing.M) {
+	// The test binary as unsent in front of the fake agent: only the
+	// agent it starts is the fake one.
+	if os.Getenv("UNSENT_TEST_RUN") == "wrap" {
+		os.Unsetenv("UNSENT_TEST_RUN")
+		os.Setenv("UNSENT_FAKE_AGENT", "1")
+		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+	}
 	if os.Getenv("UNSENT_FAKE_AGENT") == "1" {
 		fakeAgent()
 		return
@@ -45,6 +52,8 @@ func fakeAgent() {
 		fmt.Printf("%s (Fake Agent)\n", v)
 		return
 	}
+	// UNSENT_FAKE_STDERR is what the agent writes to its stderr at start.
+	os.Stderr.WriteString(os.Getenv("UNSENT_FAKE_STDERR"))
 	if old, err := term.MakeRaw(0); err == nil {
 		defer term.Restore(0, old)
 	}
@@ -225,15 +234,10 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 
 	// run wraps on the process's own terminal, so lend it the pair, and
 	// keep what unsent itself prints.
-	errR, errW, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	errOut := make(chan string, 1)
-	go func() { b, _ := io.ReadAll(errR); errOut <- string(b) }()
-	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
-	os.Stdin, os.Stdout, os.Stderr = term, term, errW
-	defer func() { os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr }()
+	said := lendStderr(t)
+	oldIn, oldOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = term, term
+	defer func() { os.Stdin, os.Stdout = oldIn, oldOut }()
 	// saved holds when the last timed save to end began.
 	var saved atomic.Int64
 	oldSave := timedSave
@@ -279,12 +283,71 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 	case <-time.After(10 * time.Second):
 		t.Fatal("wrapper did not exit")
 	}
-	errW.Close()
-	stderr = <-errOut
+	stderr = said()
 	st, _ = openStore()
 	mu.Lock()
 	defer mu.Unlock()
 	return code, st, string(shown), stderr
+}
+
+// lendStderr makes a terminal the process's stderr, as a shell does, since
+// unsent wraps only when stderr is one too. said puts the old stderr back
+// and returns what was printed on the terminal; raw mode keeps line feeds
+// as written.
+func lendStderr(t *testing.T) (said func() string) {
+	t.Helper()
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := term.MakeRaw(int(tty.Fd())); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var got []byte
+	grew := make(chan struct{}, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := user.Read(buf)
+			mu.Lock()
+			got = append(got, buf[:n]...)
+			mu.Unlock()
+			select {
+			case grew <- struct{}{}:
+			default:
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	old := os.Stderr
+	os.Stderr = tty
+	var once sync.Once
+	restore := func() { once.Do(func() { os.Stderr = old }) }
+	t.Cleanup(func() { restore(); user.Close(); tty.Close() })
+	return func() string {
+		restore()
+		// The terminal keeps order: once the end mark is read, so is
+		// everything printed before it.
+		const end = "\x00end of stderr\x00"
+		tty.WriteString(end)
+		deadline := time.After(10 * time.Second)
+		for {
+			mu.Lock()
+			s := string(got)
+			mu.Unlock()
+			if i := strings.Index(s, end); i >= 0 {
+				return s[:i]
+			}
+			select {
+			case <-grew:
+			case <-deadline:
+				t.Fatalf("stderr never showed the end mark: %q", s)
+			}
+		}
+	}
 }
 
 func TestWrapSavesDraftLeftInTheBox(t *testing.T) {
@@ -458,6 +521,7 @@ func TestWrapEmptyBoxLeavesNothing(t *testing.T) {
 
 func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 	t.Setenv("UNSENT_HOME", t.TempDir())
+	lendStderr(t)
 	user, term, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -490,6 +554,117 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 	execAgent = func(string, []string) error { return os.ErrPermission }
 	if code := wrap("sh", []string{"sh"}, r, w, nil); code != 126 {
 		t.Fatalf("exit %d on exec failure", code)
+	}
+}
+
+// claude 2>err.log keeps its redirect: with stdin and stdout on the
+// terminal and stderr on a file, unsent hands over to the agent, so the
+// agent's stderr reaches the file and its exit status comes through. With
+// stderr on the terminal too, the same run is wrapped and saves the draft.
+func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("UNSENT_HOME", home)
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	// unsent claude in a terminal of its own; errLog, when not nil, is
+	// where its stderr goes instead.
+	start := func(errLog *os.File) (code int, shown string) {
+		t.Helper()
+		user, tty, err := pty.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { user.Close(); tty.Close() }()
+		pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
+		cmd := exec.Command(self, "claude")
+		cmd.Env = append(os.Environ(), "UNSENT_TEST_RUN=wrap", "UNSENT_FAKE_STDERR=to-stderr",
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+		if errLog != nil {
+			cmd.Stderr = errLog
+		}
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		var mu sync.Mutex
+		var out []byte
+		go func() {
+			buf := make([]byte, 4096)
+			for {
+				n, err := user.Read(buf)
+				mu.Lock()
+				out = append(out, buf[:n]...)
+				mu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}()
+		waitFor := func(want string) {
+			t.Helper()
+			for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
+				mu.Lock()
+				s := string(out)
+				mu.Unlock()
+				if strings.Contains(s, want) {
+					return
+				}
+				if time.Since(start) > 10*time.Second {
+					cmd.Process.Kill()
+					t.Fatalf("the terminal never showed %q: %q", want, s)
+				}
+			}
+		}
+		waitFor("❯")
+		user.WriteString("hello")
+		waitFor("hello")
+		time.Sleep(3 * saveInterval) // a wrapper has saved it by now
+		user.WriteString("\x05")     // the fake agent quits with 3
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			cmd.Process.Kill()
+			t.Fatal("unsent claude did not exit")
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		return cmd.ProcessState.ExitCode(), string(out)
+	}
+
+	errLog, err := os.Create(filepath.Join(t.TempDir(), "err.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer errLog.Close()
+	code, shown := start(errLog)
+	logged, _ := os.ReadFile(errLog.Name())
+	if code != 3 || string(logged) != "to-stderr" || strings.Contains(shown, "to-stderr") {
+		t.Fatalf("stderr on a file: exit %d, file %q, terminal showed it: %v; want 3, the text in the file only",
+			code, logged, strings.Contains(shown, "to-stderr"))
+	}
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rs := st.orphans(); len(rs) != 0 {
+		t.Fatalf("stderr on a file: orphans %+v, want none: unsent should have handed over", rs)
+	}
+
+	code, shown = start(nil)
+	if code != 3 || !strings.Contains(shown, "to-stderr") {
+		t.Fatalf("stderr on the terminal: exit %d, terminal showed it: %v", code, strings.Contains(shown, "to-stderr"))
+	}
+	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" {
+		t.Fatalf("stderr on the terminal: orphans %+v, want the draft: unsent should have wrapped", rs)
 	}
 }
 
@@ -730,13 +905,9 @@ func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
 	}
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
-	r, w, _ := os.Pipe()
-	old := os.Stderr
-	os.Stderr = w
+	stderr := lendStderr(t)
 	code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term, nil)
-	os.Stderr = old
-	w.Close()
-	said, _ := io.ReadAll(r)
+	said := stderr()
 	line := "unsent: no reader for \"sh\" yet, running it without saving drafts\n"
 	if code != 0 || strings.Count(string(said), line) != 2 {
 		t.Fatalf("exit %d, stderr %q", code, said)
@@ -759,17 +930,13 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
 	agent := func(want int, script string, args ...string) string {
-		r, w, _ := os.Pipe()
-		old := os.Stderr
-		os.Stderr = w
+		stderr := lendStderr(t)
 		code := wrap("claude", append([]string{"sh", "-c", script, "sh"}, args...), term, term, nil)
-		os.Stderr = old
-		w.Close()
-		said, _ := io.ReadAll(r)
+		said := stderr()
 		if code != want {
 			t.Fatalf("exit %d, want %d, stderr %q", code, want, said)
 		}
-		return string(said)
+		return said
 	}
 	line := orphanNotice(st, work, "claude")
 	if !strings.HasPrefix(line, "unsent: recovered a draft from ") {
@@ -816,6 +983,7 @@ func TestWrapNoticeOnExitNamesTheDraftRestoreTakes(t *testing.T) {
 // leaves unsent on.
 func TestWrapOff(t *testing.T) {
 	t.Setenv("UNSENT_HOME", t.TempDir())
+	lendStderr(t)
 	user, term, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)

@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-
-	"golang.org/x/term"
 )
 
 // rawLog records the bytes that pass between the terminal and the agent,
@@ -141,7 +139,7 @@ func cmdCapture(args []string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "unsent: usage: unsent capture <agent> [args...]")
 		return 2
 	}
-	if off() || !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+	if off() || !onTerminal(os.Stdin, os.Stdout) {
 		fmt.Fprintln(stderr, "unsent: capture needs a terminal, and UNSENT_OFF unset")
 		return 2
 	}
