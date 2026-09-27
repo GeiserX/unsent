@@ -1,0 +1,40 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.280[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus 5.5 (1M context) · API Usage Billing[39m
+[38;5;174m  ▝▝ ▝▝  [39m  [38;5;246m/private/tmp/unsent-spec-claude/work[39m
+
+[38;5;220m⚠[39m [38;5;220mRemote managed settings failed to load (authentication rejected (401)) · no remote policy applied[38;5;246m · /status for [39m
+  [38;5;246mdetails[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                      [38;5;246mctrl+g to edit in Grab-editor.sh[39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m❯ do nothing; reply ok
+  two[Pasted text #1 +3 lines][7m [0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;246mpaste again to expand[39m

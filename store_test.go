@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -63,21 +65,45 @@ func TestStoreCleansDeadEmptySessions(t *testing.T) {
 	}
 }
 
+// seedFiles writes n plain files named by name(i) into dir, holding data,
+// each i minutes older than the one before: a full history in moments,
+// where writing each through the store would cost a durable write apiece.
+func seedFiles(t *testing.T, dir string, n int, data []byte, name func(int) string) {
+	t.Helper()
+	for i := range n {
+		path := filepath.Join(dir, name(i))
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		old := time.Now().Add(-time.Duration(n-i) * time.Minute)
+		os.Chtimes(path, old, old)
+	}
+}
+
 func TestStoreArchiveAndPrune(t *testing.T) {
 	st := testStore(t)
 	r := newRecord([]string{"claude"}, "/work")
 	st.archive(r) // empty: nothing to keep
+	old, _ := json.Marshal(&record{Draft: "old"})
+	seed := func(i int) string { return fmt.Sprintf("20000101-000000.%06d-1.json", i) }
+	seedFiles(t, filepath.Join(st.dir, "history"), historyLimit+3, old, seed)
 	r.Draft = "draft"
-	for i := 0; i < historyLimit+5; i++ {
-		r.PID = i // distinct names within the same millisecond
+	for pid := range 2 {
+		r.PID = pid // distinct names within the same microsecond
 		st.archive(r)
 	}
 	names, _ := filepath.Glob(filepath.Join(st.dir, "history", "*.json"))
 	if len(names) != historyLimit {
 		t.Fatalf("history holds %d, want %d", len(names), historyLimit)
 	}
-	if got := st.load(true); len(got) != historyLimit {
-		t.Fatalf("load %d", len(got))
+	for i, want := range map[int]bool{0: false, 4: false, 5: true, historyLimit + 2: true} {
+		if got := exists(filepath.Join(st.dir, "history", seed(i))); got != want {
+			t.Errorf("archive %d kept %v, want %v", i, got, want)
+		}
+	}
+	got := st.load(true)
+	if len(got) != historyLimit || got[0].Draft != "draft" || got[1].Draft != "draft" {
+		t.Fatalf("load %d, newest %q", len(got), got[0].Draft)
 	}
 }
 
@@ -207,16 +233,24 @@ func TestStoreVersionsAreCappedAndDropped(t *testing.T) {
 
 func TestStoreVersionsGlobalCap(t *testing.T) {
 	st := testStore(t)
-	for i := 0; i < versionsLimit+3; i++ {
-		r := newRecord([]string{"claude"}, "/w")
-		r.ID, r.Draft = fmt.Sprintf("s%03d", i), "draft"
-		if err := st.keepVersion(r); err != nil {
-			t.Fatal(err)
-		}
+	seed := func(i int) string { return fmt.Sprintf("v-s%03d-20000101-000000.000000.json", i) }
+	seedFiles(t, filepath.Join(st.dir, "history"), versionsLimit+2, []byte(`{"draft":"old","version":true}`), seed)
+	r := newRecord([]string{"claude"}, "/w")
+	r.ID, r.Draft = "new", "draft"
+	if err := st.keepVersion(r); err != nil {
+		t.Fatal(err)
 	}
 	names, _ := filepath.Glob(filepath.Join(st.dir, "history", "v-*.json"))
 	if len(names) != versionsLimit {
 		t.Fatalf("%d versions kept, want %d", len(names), versionsLimit)
+	}
+	for i, want := range map[int]bool{0: false, 2: false, 3: true, versionsLimit + 1: true} {
+		if got := exists(filepath.Join(st.dir, "history", seed(i))); got != want {
+			t.Errorf("version %d kept %v, want %v", i, got, want)
+		}
+	}
+	if kept, _ := filepath.Glob(filepath.Join(st.dir, "history", "v-new-*.json")); len(kept) != 1 {
+		t.Fatal("the newest version was trimmed")
 	}
 }
 
@@ -260,4 +294,136 @@ func TestStoreHoldTwice(t *testing.T) {
 		t.Fatalf("lock not free after release: %v", err)
 	}
 	other.release()
+}
+
+// A draft file written before records had a format field, byte for byte in
+// the layout unsent used then.
+const formatlessRecord = `{
+  "id": "20260901-120000-4242",
+  "command": [
+    "claude"
+  ],
+  "cwd": "/work",
+  "pid": 4242,
+  "started": "2026-09-01T12:00:00Z",
+  "updated": "2026-09-01T12:05:00Z",
+  "draft": "the old draft\nsecond line",
+  "pastes": [
+    "pasted text"
+  ]
+}`
+
+func TestStoreLoadsFileWithoutFormat(t *testing.T) {
+	st := testStore(t)
+	id := "20260901-120000-4242"
+	os.WriteFile(st.draftPath(id), []byte(formatlessRecord), 0o600)
+	os.WriteFile(filepath.Join(st.dir, "history", "20260901-120500.000000-4242.json"), []byte(formatlessRecord), 0o600)
+
+	got := st.orphans()
+	if len(got) != 1 || got[0].Draft != "the old draft\nsecond line" || got[0].Cwd != "/work" ||
+		len(got[0].Pastes) != 1 || got[0].Format != 0 {
+		t.Fatalf("orphans %+v", got)
+	}
+	// Written before records named their agent: it comes from the command.
+	if got[0].Agent != "" || got[0].agent() != "claude" {
+		t.Fatalf("agent %q, fallback %q", got[0].Agent, got[0].agent())
+	}
+	if _, err := os.Stat(st.draftPath(id)); err != nil {
+		t.Fatalf("old draft file removed: %v", err)
+	}
+	if all := st.load(true); len(all) != 2 || all[0].Draft != "the old draft\nsecond line" || all[1].Draft != all[0].Draft {
+		t.Fatalf("load %+v", all)
+	}
+}
+
+func TestStoreWritesFormat(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/work")
+	r.Draft = "draft"
+	if err := st.write(r); err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	data, _ := os.ReadFile(st.draftPath(r.ID))
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw["format"] != float64(recordFormat) {
+		t.Fatalf("format %v, want %d", raw["format"], recordFormat)
+	}
+	// Copies in history keep it.
+	st.archive(r)
+	st.keepVersion(r)
+	for _, h := range st.load(true) {
+		if h.Format != recordFormat {
+			t.Fatalf("record %s has format %d", h.ID, h.Format)
+		}
+	}
+}
+
+func TestStoreKeepsNewerFormat(t *testing.T) {
+	st := testStore(t)
+	// A later unsent renamed the draft field; this build reads it as empty.
+	id := "20270101-120000-4242"
+	newer := fmt.Sprintf(`{"format": %d, "id": %q, "cwd": "/work", "text": "a draft this build cannot see"}`, recordFormat+1, id)
+	os.WriteFile(st.draftPath(id), []byte(newer), 0o600)
+	os.WriteFile(st.lockPath(id), nil, 0o600)
+	if got := st.orphans(); len(got) != 0 {
+		t.Fatalf("orphans %+v", got)
+	}
+	if _, err := os.Stat(st.draftPath(id)); err != nil {
+		t.Fatalf("a newer draft file was deleted as empty: %v", err)
+	}
+	// The same file at this build's format really is empty, and goes.
+	os.WriteFile(st.draftPath(id), []byte(strings.Replace(newer, fmt.Sprint(recordFormat+1), fmt.Sprint(recordFormat), 1)), 0o600)
+	st.orphans()
+	if _, err := os.Stat(st.draftPath(id)); !os.IsNotExist(err) {
+		t.Fatal("control: an empty current-format file was kept")
+	}
+}
+
+func TestRecordAgent(t *testing.T) {
+	for _, c := range []struct {
+		r    record
+		want string
+	}{
+		{record{Agent: "claude", Command: []string{"npx"}}, "claude"},
+		{record{Command: []string{"/opt/homebrew/bin/claude", "--resume"}}, "claude"},
+		{record{Command: []string{"npx", "@anthropic-ai/claude-code"}}, "npx"},
+		{record{}, ""},
+	} {
+		if got := c.r.agent(); got != c.want {
+			t.Fatalf("agent of %+v = %q, want %q", c.r, got, c.want)
+		}
+	}
+}
+
+func TestAgentFor(t *testing.T) {
+	t.Setenv("UNSENT_AGENT", "")
+	if got := agentFor("", "/usr/local/bin/claude"); got != "claude" {
+		t.Fatalf("base name: %q", got)
+	}
+	if got := agentFor("", "npx"); got != "npx" {
+		t.Fatalf("unknown command: %q", got)
+	}
+	t.Setenv("UNSENT_AGENT", "claude")
+	if got := agentFor("", "node"); got != "claude" {
+		t.Fatalf("UNSENT_AGENT: %q", got)
+	}
+	// --as wins over the variable.
+	if got := agentFor("codex", "node"); got != "codex" {
+		t.Fatalf("--as: %q", got)
+	}
+	if p := profileFor(agentFor("", "node")); p != &claude {
+		t.Fatal("UNSENT_AGENT did not pick the profile")
+	}
+	// A command that names a known agent keeps it: an exported variable
+	// must not tag it as another agent. --as still wins.
+	t.Setenv("UNSENT_AGENT", "codex")
+	if got := agentFor("", "/usr/local/bin/claude"); got != "claude" {
+		t.Fatalf("known base name under UNSENT_AGENT=codex: %q", got)
+	}
+	if got := agentFor("codex", "claude"); got != "codex" {
+		t.Fatalf("--as over a known base name: %q", got)
+	}
 }

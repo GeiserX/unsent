@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.282
+▝▜██████▀  Opus 5.5 (1M context) · API Usage Billing
+ ▝▝   ▝▝   /private/tmp/unsent-spec-claude/work
+
+⚠ Remote managed settings failed to load (authentication rejected (401)) · no remote policy applied · /status for
+  details
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ [Pasted text #12 +4 lines]
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  paste again to expand

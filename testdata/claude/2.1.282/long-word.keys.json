@@ -1,0 +1,11 @@
+[
+{"wait": 5},
+{"type": "token-abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrst"},
+{"wait": 0.3},
+{"keys": ["C-j"]},
+{"wait": 0.1},
+{"type": "after the long word"},
+{"wait": 1},
+{"keys": ["C-g"]},
+{"wait": 2}
+]

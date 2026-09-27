@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -118,4 +119,66 @@ func screenFromText(text string, cols int) *screen {
 		s.rows = append(s.rows, row)
 	}
 	return s
+}
+
+// stringSeqs strips terminal string sequences (OSC, DCS, APC, PM and SOS)
+// from the agent's output before the shadow screen sees it. They carry
+// window titles, links and queries, never text in cells. The emulator ends
+// one at a 0x9c byte even inside a UTF-8 character, so the ✳ (e2 9c b3)
+// Claude Code puts in its window title after a send printed the rest of
+// the title into the box. The state carries over from chunk to chunk.
+type stringSeqs struct {
+	state int
+}
+
+const (
+	seqText  = iota // outside a string sequence
+	seqEsc          // after an Esc that may start one
+	seqIn           // inside one
+	seqInEsc        // after an Esc inside one, which may end it
+)
+
+func (f *stringSeqs) strip(b []byte) []byte {
+	if f.state == seqText && bytes.IndexByte(b, 0x1b) < 0 {
+		return b
+	}
+	out := make([]byte, 0, len(b)+1)
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		switch f.state {
+		case seqText:
+			if c == 0x1b {
+				f.state = seqEsc
+			} else {
+				out = append(out, c)
+			}
+		case seqEsc:
+			switch c {
+			case ']', 'P', '_', '^', 'X':
+				f.state = seqIn
+			case 0x1b:
+				out = append(out, 0x1b)
+			default:
+				out = append(out, 0x1b, c)
+				f.state = seqText
+			}
+		case seqIn:
+			switch c {
+			case 0x07, 0x18, 0x1a: // BEL ends an OSC; CAN and SUB cancel any
+				f.state = seqText
+			case 0x1b:
+				f.state = seqInEsc
+			}
+		case seqInEsc:
+			if c == '\\' {
+				f.state = seqText
+				continue
+			}
+			// Any other byte after the Esc cancels the string and starts a
+			// new sequence.
+			f.state = seqEsc
+			i--
+		}
+	}
+	return out
 }

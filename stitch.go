@@ -81,12 +81,16 @@ func (st *stitcher) update(v view) string {
 		a = st.a
 	}
 	// Below the view: text after the cursor, which only Delete, Ctrl+K or
-	// undo remove. Or, with the cursor at the very end of the view, text
-	// Backspace just took: as long as no more vanished than was deleted.
+	// undo remove. Those remove text from the cursor on, so words still in
+	// view below the cursor's row mean the ones gone after them moved out
+	// of sight (the cursor went up, taking the view with it). Or, with the
+	// cursor at the very end of the view, text Backspace just took: as
+	// long as no more vanished than was deleted.
 	if b < st.b {
 		gone := utf8.RuneCountInString(st.text[b:min(st.b, len(st.text))])
 		atViewEnd := v.cursor == len(v.rows)-1 && v.cursorEnd
-		if v.deletedAhead || (atViewEnd && gone <= v.deleted) {
+		cutAhead := v.deletedAhead && strings.TrimSpace(strings.Join(v.rows[v.cursor+1:], "")) == ""
+		if cutAhead || (atViewEnd && gone <= v.deleted) {
 			b = min(st.b, len(st.text))
 		}
 	}
@@ -357,8 +361,8 @@ func removed(str, word string) int {
 // unwrap joins rows that the agent wrapped back into the lines typed.
 //
 // A row was wrapped when the next row's first word would not have fitted
-// after it; the space the wrap swallowed is put back. A row that fills the
-// whole width with no space in it was a long word broken mid-way.
+// after it; the space the wrap swallowed is put back. A word longer than a
+// row is broken mid-way instead (see brokenWord), and joins with no space.
 //
 // The screen cannot tell a wrap from a line the user ended by hand right
 // where the row happened to be full. That case comes back joined with a
@@ -374,7 +378,7 @@ func unwrap(rows []string, width int) string {
 		prev, next := rows[i-1], rows[i]
 		pw := runewidth.StringWidth(prev)
 		switch {
-		case width > 0 && pw >= width && !strings.Contains(prev, " ") && next != "":
+		case width > 0 && brokenWord(prev, next, pw, width):
 			// A word longer than a row, broken at the edge.
 		case width > 0 && next != "" && prev != "" && !startsBlock(next) &&
 			pw+1+runewidth.StringWidth(firstWord(next)) > width:
@@ -385,6 +389,23 @@ func unwrap(rows []string, width int) string {
 		b.WriteString(next)
 	}
 	return b.String()
+}
+
+// brokenWord reports whether the break between prev (pw columns wide) and
+// next cuts one word longer than a row. Such a word fills the row, or all
+// but one column when the next character is wide and did not fit. A word
+// that fits in a row moves whole to the next one, so the two halves must
+// add up to more than a row.
+func brokenWord(prev, next string, pw, width int) bool {
+	if next == "" || strings.HasSuffix(prev, " ") {
+		return false
+	}
+	r, _ := utf8.DecodeRuneInString(next)
+	if pw < width && !(pw == width-1 && runewidth.RuneWidth(r) == 2) {
+		return false
+	}
+	last := prev[strings.LastIndexByte(prev, ' ')+1:]
+	return runewidth.StringWidth(last)+runewidth.StringWidth(firstWord(next)) > width
 }
 
 var blockStart = regexp.MustCompile("^(?:[-*+>#|] |\\d+[.)] |```|#+ )")

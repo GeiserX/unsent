@@ -21,10 +21,22 @@ const (
 	versionsLimit      = 300
 )
 
+// recordFormat is the layout of a record file. Files written before the
+// field existed read as 0 and have the same layout as format 1. Never rename
+// or retype a field without bumping this and adding a migration test: a
+// renamed field would read back as an empty draft.
+const recordFormat = 1
+
 // record is one wrapped session and the draft its input box last held.
 type record struct {
-	ID      string    `json:"id"`
-	Command []string  `json:"command"`
+	Format  int      `json:"format"`
+	ID      string   `json:"id"`
+	Command []string `json:"command"`
+	// Agent names the agent the draft came from (see agentFor), so it is
+	// only offered back to that agent.
+	Agent string `json:"agent"`
+	// Cwd is the folder the agent ran in, as a resolved real path. Files
+	// written before that may hold a path through a symlink.
 	Cwd     string    `json:"cwd"`
 	PID     int       `json:"pid"`
 	Started time.Time `json:"started"`
@@ -39,9 +51,22 @@ type record struct {
 	Version bool `json:"version,omitempty"`
 }
 
+// agent is the agent the draft came from. Files written before records named
+// it fall back to the base name of the command.
+func (r *record) agent() string {
+	if r.Agent != "" {
+		return r.Agent
+	}
+	if len(r.Command) == 0 {
+		return ""
+	}
+	return agentName(filepath.Base(r.Command[0]))
+}
+
 func newRecord(args []string, cwd string) *record {
 	now := time.Now()
 	return &record{
+		Format:  recordFormat,
 		ID:      fmt.Sprintf("%s-%d", now.Format("20060102-150405"), os.Getpid()),
 		Command: args,
 		Cwd:     cwd,
@@ -52,7 +77,8 @@ func newRecord(args []string, cwd string) *record {
 }
 
 // store is the state directory: one file per live or unrecovered session in
-// drafts/, and every draft that left an input box in history/.
+// drafts/, drafts that were cleared or replaced in history/, and each
+// session's sent messages in sent/ (see sent.go).
 type store struct {
 	dir    string
 	warned bool
@@ -78,7 +104,7 @@ func openStore() (*store, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, sub := range []string{"drafts", "history"} {
+	for _, sub := range []string{"drafts", "history", "sent"} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), 0o700); err != nil {
 			return nil, err
 		}
@@ -249,6 +275,12 @@ func writeDurable(path string, r *record) error {
 	if err != nil {
 		return err
 	}
+	return writeFileDurable(path, data)
+}
+
+// writeFileDurable replaces path with data so that a crash or a power cut
+// leaves the old file or the new one, never half of one.
+func writeFileDurable(path string, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
 	if err != nil {
 		return err
@@ -268,11 +300,21 @@ func writeDurable(path string, r *record) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return err
 	}
-	if d, err := os.Open(filepath.Dir(path)); err == nil {
-		d.Sync()
-		d.Close()
+	// A failed folder sync means the rename may not survive a power cut:
+	// the write is not durable, and a caller about to remove the old copy
+	// (restore, or a save replacing a draft) must not.
+	return syncDir(filepath.Dir(path))
+}
+
+// syncDir flushes a folder's entries, so a new or renamed file in it
+// survives a power cut.
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
 	}
-	return nil
+	defer d.Close()
+	return d.Sync()
 }
 
 // load reads every record in drafts/ (and history/ when withHistory is set),
@@ -316,6 +358,11 @@ func (s *store) orphans() []*record {
 		if json.Unmarshal(data, &r) != nil {
 			continue
 		}
+		// A newer unsent wrote this file. Its draft may sit in a field this
+		// build does not know, so an empty Draft here proves nothing.
+		if r.Format > recordFormat {
+			continue
+		}
 		// The file name, not the content, says which files belong to it.
 		r.ID = strings.TrimSuffix(filepath.Base(n), ".json")
 		if s.alive(&r) {
@@ -335,7 +382,7 @@ func (s *store) orphans() []*record {
 // sweepTemp removes temporary files left by a crash in the middle of a
 // write. A live write finishes in milliseconds; an hour is plenty.
 func (s *store) sweepTemp() {
-	for _, sub := range []string{"drafts", "history"} {
+	for _, sub := range []string{"drafts", "history", "sent"} {
 		names, _ := filepath.Glob(filepath.Join(s.dir, sub, ".tmp-*"))
 		for _, n := range names {
 			if fi, err := os.Stat(n); err == nil && time.Since(fi.ModTime()) > time.Hour {
