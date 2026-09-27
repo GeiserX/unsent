@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -260,4 +262,86 @@ func TestStoreHoldTwice(t *testing.T) {
 		t.Fatalf("lock not free after release: %v", err)
 	}
 	other.release()
+}
+
+// A draft file written before records had a format field, byte for byte in
+// the layout unsent used then.
+const formatlessRecord = `{
+  "id": "20260901-120000-4242",
+  "command": [
+    "claude"
+  ],
+  "cwd": "/work",
+  "pid": 4242,
+  "started": "2026-09-01T12:00:00Z",
+  "updated": "2026-09-01T12:05:00Z",
+  "draft": "the old draft\nsecond line",
+  "pastes": [
+    "pasted text"
+  ]
+}`
+
+func TestStoreLoadsFileWithoutFormat(t *testing.T) {
+	st := testStore(t)
+	id := "20260901-120000-4242"
+	os.WriteFile(st.draftPath(id), []byte(formatlessRecord), 0o600)
+	os.WriteFile(filepath.Join(st.dir, "history", "20260901-120500.000000-4242.json"), []byte(formatlessRecord), 0o600)
+
+	got := st.orphans()
+	if len(got) != 1 || got[0].Draft != "the old draft\nsecond line" || got[0].Cwd != "/work" ||
+		len(got[0].Pastes) != 1 || got[0].Format != 0 {
+		t.Fatalf("orphans %+v", got)
+	}
+	if _, err := os.Stat(st.draftPath(id)); err != nil {
+		t.Fatalf("old draft file removed: %v", err)
+	}
+	if all := st.load(true); len(all) != 2 || all[0].Draft != "the old draft\nsecond line" || all[1].Draft != all[0].Draft {
+		t.Fatalf("load %+v", all)
+	}
+}
+
+func TestStoreWritesFormat(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/work")
+	r.Draft = "draft"
+	if err := st.write(r); err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	data, _ := os.ReadFile(st.draftPath(r.ID))
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw["format"] != float64(recordFormat) {
+		t.Fatalf("format %v, want %d", raw["format"], recordFormat)
+	}
+	// Copies in history keep it.
+	st.archive(r)
+	st.keepVersion(r)
+	for _, h := range st.load(true) {
+		if h.Format != recordFormat {
+			t.Fatalf("record %s has format %d", h.ID, h.Format)
+		}
+	}
+}
+
+func TestStoreKeepsNewerFormat(t *testing.T) {
+	st := testStore(t)
+	// A later unsent renamed the draft field; this build reads it as empty.
+	id := "20270101-120000-4242"
+	newer := fmt.Sprintf(`{"format": %d, "id": %q, "cwd": "/work", "text": "a draft this build cannot see"}`, recordFormat+1, id)
+	os.WriteFile(st.draftPath(id), []byte(newer), 0o600)
+	os.WriteFile(st.lockPath(id), nil, 0o600)
+	if got := st.orphans(); len(got) != 0 {
+		t.Fatalf("orphans %+v", got)
+	}
+	if _, err := os.Stat(st.draftPath(id)); err != nil {
+		t.Fatalf("a newer draft file was deleted as empty: %v", err)
+	}
+	// The same file at this build's format really is empty, and goes.
+	os.WriteFile(st.draftPath(id), []byte(strings.Replace(newer, fmt.Sprint(recordFormat+1), fmt.Sprint(recordFormat), 1)), 0o600)
+	st.orphans()
+	if _, err := os.Stat(st.draftPath(id)); !os.IsNotExist(err) {
+		t.Fatal("control: an empty current-format file was kept")
+	}
 }

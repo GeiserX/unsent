@@ -21,8 +21,15 @@ const (
 	versionsLimit      = 300
 )
 
+// recordFormat is the layout of a record file. Files written before the
+// field existed read as 0 and have the same layout as format 1. Never rename
+// or retype a field without bumping this and adding a migration test: a
+// renamed field would read back as an empty draft.
+const recordFormat = 1
+
 // record is one wrapped session and the draft its input box last held.
 type record struct {
+	Format  int       `json:"format"`
 	ID      string    `json:"id"`
 	Command []string  `json:"command"`
 	Cwd     string    `json:"cwd"`
@@ -42,6 +49,7 @@ type record struct {
 func newRecord(args []string, cwd string) *record {
 	now := time.Now()
 	return &record{
+		Format:  recordFormat,
 		ID:      fmt.Sprintf("%s-%d", now.Format("20060102-150405"), os.Getpid()),
 		Command: args,
 		Cwd:     cwd,
@@ -314,6 +322,11 @@ func (s *store) orphans() []*record {
 		}
 		var r record
 		if json.Unmarshal(data, &r) != nil {
+			continue
+		}
+		// A newer unsent wrote this file. Its draft may sit in a field this
+		// build does not know, so an empty Draft here proves nothing.
+		if r.Format > recordFormat {
 			continue
 		}
 		// The file name, not the content, says which files belong to it.
