@@ -77,7 +77,8 @@ func newRecord(args []string, cwd string) *record {
 }
 
 // store is the state directory: one file per live or unrecovered session in
-// drafts/, and every draft that left an input box in history/.
+// drafts/, drafts that were cleared or replaced in history/, and each
+// session's sent messages in sent/ (see sent.go).
 type store struct {
 	dir    string
 	warned bool
@@ -103,7 +104,7 @@ func openStore() (*store, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, sub := range []string{"drafts", "history"} {
+	for _, sub := range []string{"drafts", "history", "sent"} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), 0o700); err != nil {
 			return nil, err
 		}
@@ -274,6 +275,12 @@ func writeDurable(path string, r *record) error {
 	if err != nil {
 		return err
 	}
+	return writeFileDurable(path, data)
+}
+
+// writeFileDurable replaces path with data so that a crash or a power cut
+// leaves the old file or the new one, never half of one.
+func writeFileDurable(path string, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
 	if err != nil {
 		return err
@@ -293,11 +300,17 @@ func writeDurable(path string, r *record) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return err
 	}
-	if d, err := os.Open(filepath.Dir(path)); err == nil {
+	syncDir(filepath.Dir(path))
+	return nil
+}
+
+// syncDir flushes a folder's entries, so a new or renamed file in it
+// survives a power cut.
+func syncDir(dir string) {
+	if d, err := os.Open(dir); err == nil {
 		d.Sync()
 		d.Close()
 	}
-	return nil
 }
 
 // load reads every record in drafts/ (and history/ when withHistory is set),
@@ -365,7 +378,7 @@ func (s *store) orphans() []*record {
 // sweepTemp removes temporary files left by a crash in the middle of a
 // write. A live write finishes in milliseconds; an hour is plenty.
 func (s *store) sweepTemp() {
-	for _, sub := range []string{"drafts", "history"} {
+	for _, sub := range []string{"drafts", "history", "sent"} {
 		names, _ := filepath.Glob(filepath.Join(s.dir, sub, ".tmp-*"))
 		for _, n := range names {
 			if fi, err := os.Stat(n); err == nil && time.Since(fi.ModTime()) > time.Hour {

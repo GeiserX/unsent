@@ -35,7 +35,19 @@ Usage:
                              print draft N (default: this folder's newest)
   unsent restore [--agent <agent>] [N]
                              copy draft N to the clipboard and mark it restored
+  unsent log [--here] [--agent <agent>]
+                             list sessions with sent messages, newest first
+  unsent log <session> [--copy N]
+                             print a session's sent messages (session: a number
+                             from unsent log, or its id); --copy N copies
+                             message N to the clipboard
+  unsent forget --log <session>
+                             delete one session's sent log
   unsent version
+
+A message you send goes to its session's sent log, not to history.
+UNSENT_ON_SEND=delete keeps nothing of it; UNSENT_ON_SEND_CLAUDE=delete does
+that for one agent, and wins over UNSENT_ON_SEND.
 
 Put "alias claude='unsent claude'" in your shell profile to never think
 about it again. Use "unsent -- list" to run a program called list.
@@ -63,6 +75,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdShow(args[1:], stdout, stderr, false)
 	case "restore":
 		return cmdShow(args[1:], stdout, stderr, true)
+	case "log":
+		return cmdLog(args[1:], stdout, stderr)
+	case "forget":
+		return cmdForget(args[1:], stdout, stderr)
 	case "--as":
 		if len(args) < 3 {
 			fmt.Fprint(stderr, usage)
@@ -100,7 +116,7 @@ func buildVersion() string {
 }
 
 // candidates are the drafts the commands work on, newest first: drafts left
-// behind, then (with all) drafts that were cleared or sent.
+// behind, then (with all) drafts that were cleared or replaced.
 func candidates(st *store, all bool) []*record {
 	out := st.orphans()
 	if all {
@@ -127,10 +143,11 @@ func contains(rs []*record, r *record) bool {
 	return false
 }
 
-// options are the flags list, show and restore take.
+// options are the flags list, show, restore and log take.
 type options struct {
 	all, here bool
 	agent     string // "" for every agent
+	copy      int    // log --copy N; 0 when not given
 	rest      []string
 }
 
@@ -161,6 +178,16 @@ func parseOptions(args []string, allowed ...string) (options, error) {
 			}
 			i++
 			o.agent = agentName(args[i])
+		case "--copy":
+			n := 0
+			if i+1 < len(args) {
+				n, _ = strconv.Atoi(args[i+1])
+			}
+			if n < 1 {
+				return o, fmt.Errorf("--copy needs a message number")
+			}
+			i++
+			o.copy = n
 		}
 	}
 	return o, nil
@@ -294,6 +321,126 @@ func unplaced(r *record) int {
 		}
 	}
 	return n
+}
+
+// cmdLog lists the sessions with a sent log, or prints one session's
+// messages, or copies one of them.
+func cmdLog(args []string, stdout, stderr io.Writer) int {
+	o, err := parseOptions(args, "--here", "--agent", "--copy")
+	switch {
+	case err != nil:
+	case len(o.rest) > 1:
+		err = fmt.Errorf("unexpected argument %q", o.rest[1])
+	case o.copy > 0 && len(o.rest) == 0:
+		err = fmt.Errorf("--copy needs a session: unsent log <session> --copy N")
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 2
+	}
+	st, err := openStore()
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
+	}
+	st.pruneSent()
+	logs := st.sentLogs()
+	if len(o.rest) == 0 {
+		cwd, _ := os.Getwd()
+		// Filtered rows keep their numbers, the ones log <session> takes.
+		var shown []int
+		width := 0
+		for i, l := range logs {
+			if (o.agent == "" || l.Agent == o.agent) && (!o.here || samePath(l.Cwd, cwd)) {
+				shown = append(shown, i)
+				width = max(width, len(l.Agent))
+			}
+		}
+		if len(shown) == 0 {
+			fmt.Fprintln(stdout, "No sent messages.")
+			return 0
+		}
+		for _, i := range shown {
+			l := logs[i]
+			last := ""
+			if n := len(l.messages); n > 0 {
+				last, _, _ = strings.Cut(l.messages[n-1].Text, "\n")
+			}
+			fmt.Fprintf(stdout, "%3d  %-*s  %s  %-24s  %4d sent  %s\n", i+1, width, l.Agent, when(l.Started), shortPath(l.Cwd, 24), len(l.messages), preview(last, 50))
+		}
+		return 0
+	}
+	l := findSent(logs, o.rest[0])
+	if l == nil {
+		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", o.rest[0])
+		return 2
+	}
+	if o.copy > 0 {
+		if o.copy > len(l.messages) {
+			fmt.Fprintf(stderr, "unsent: that session has %d messages, not %d\n", len(l.messages), o.copy)
+			return 2
+		}
+		text := l.messages[o.copy-1].Text
+		if err := copyToClipboard(text); err != nil {
+			fmt.Fprintln(stdout, text)
+			fmt.Fprintf(stderr, "unsent: no clipboard (%v); printed the message instead\n", err)
+			return 0
+		}
+		fmt.Fprintf(stderr, "Copied message %d, %s, to the clipboard.\n", o.copy, lines(text))
+		return 0
+	}
+	fmt.Fprintf(stdout, "%s in %s, started %s, session %s\n", l.Agent, shortPath(l.Cwd, 60), when(l.Started), l.Session)
+	if l.Dropped > 0 {
+		fmt.Fprintf(stdout, "(%d earlier messages were dropped to keep the log under %d MB)\n", l.Dropped, sentMaxBytes>>20)
+	}
+	for i, m := range l.messages {
+		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", i+1, when(m.Time), m.Text)
+		for _, p := range m.Pastes {
+			fmt.Fprintf(stdout, "--- a paste that could not be placed in the message ---\n%s\n", p)
+		}
+	}
+	return 0
+}
+
+// findSent picks a sent log by its number in unsent log, or its session id.
+func findSent(logs []*sentLog, arg string) *sentLog {
+	if n, err := strconv.Atoi(arg); err == nil {
+		if n >= 1 && n <= len(logs) {
+			return logs[n-1]
+		}
+		return nil
+	}
+	for _, l := range logs {
+		if l.Session == arg {
+			return l
+		}
+	}
+	return nil
+}
+
+// cmdForget deletes one session's sent log.
+func cmdForget(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 2 || args[0] != "--log" {
+		fmt.Fprintln(stderr, "unsent: usage: unsent forget --log <session>")
+		return 2
+	}
+	st, err := openStore()
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
+	}
+	st.pruneSent()
+	l := findSent(st.sentLogs(), args[1])
+	if l == nil {
+		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", args[1])
+		return 2
+	}
+	if err := os.Remove(l.path); err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stderr, "Deleted the sent log of the %s session started %s (%d messages).\n", l.Agent, when(l.Started), len(l.messages))
+	return 0
 }
 
 // noticeOrphans tells the user, before the agent starts, that a draft this

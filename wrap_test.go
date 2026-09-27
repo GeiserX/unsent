@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -35,28 +36,9 @@ func fakeAgent() {
 	}
 	var draft []string
 	pastes := 0
-	var pasting bool
+	var pasting, esc bool
 	var paste strings.Builder
-	draw := func() {
-		var b strings.Builder
-		b.WriteString("\x1b[H\x1b[2J")
-		rule := strings.Repeat("─", cols)
-		b.WriteString(rule + "\r\n")
-		rows := wrapText(strings.Join(draft, ""), cols-4)
-		if len(draft) == 0 {
-			b.WriteString("❯ \x1b[2mTry \"something\"\x1b[m\r\n")
-		} else {
-			for i, r := range rows {
-				prefix := "  "
-				if i == 0 {
-					prefix = "❯ "
-				}
-				b.WriteString(prefix + r + "\r\n")
-			}
-		}
-		b.WriteString(rule + "\r\n")
-		os.Stdout.WriteString(b.String())
-	}
+	draw := func() { os.Stdout.WriteString(drawBox(cols, strings.Join(draft, ""))) }
 	draw()
 	buf := make([]byte, 4096)
 	for {
@@ -65,6 +47,8 @@ func fakeAgent() {
 			return
 		}
 		in := string(buf[:n])
+		wasEsc := esc
+		esc = false
 		for len(in) > 0 {
 			switch {
 			case pasting && strings.HasPrefix(in, "\x1b[201~"):
@@ -87,6 +71,15 @@ func fakeAgent() {
 			case strings.HasPrefix(in, "\x1b\r"):
 				draft = append(draft, "\n")
 				in = in[2:]
+			case strings.HasPrefix(in, "\x1b\x1b"): // Esc Esc clears the box
+				draft = nil
+				in = in[2:]
+			case in == "\x1b": // a lone Esc: a second one clears the box
+				if wasEsc {
+					draft = nil
+				}
+				esc = !wasEsc
+				in = ""
 			case in[0] == 4: // Ctrl+D quits
 				return
 			case in[0] == 5: // Ctrl+E quits with an error
@@ -101,6 +94,28 @@ func fakeAgent() {
 		}
 		draw()
 	}
+}
+
+// drawBox is the fake agent's screen with text in its box, drawn the way
+// Claude Code draws it: an empty box shows a dim hint.
+func drawBox(cols int, text string) string {
+	var b strings.Builder
+	b.WriteString("\x1b[H\x1b[2J")
+	rule := strings.Repeat("─", cols)
+	b.WriteString(rule + "\r\n")
+	if text == "" {
+		b.WriteString("❯\u00a0\x1b[2mTry \"something\"\x1b[m\r\n")
+	} else {
+		for i, r := range wrapText(text, cols-4) {
+			prefix := "  "
+			if i == 0 {
+				prefix = "❯\u00a0"
+			}
+			b.WriteString(prefix + r + "\r\n")
+		}
+	}
+	b.WriteString(rule + "\r\n")
+	return b.String()
 }
 
 // runWrapped runs wrap on the fake agent with keys typed through a pipe,
@@ -264,6 +279,62 @@ func TestWrapExpandsPastesAndArchivesClearedBox(t *testing.T) {
 	if !cleared {
 		t.Fatal("the cleared draft is not in history")
 	}
+}
+
+// Through the whole wrapper: a sent message goes to the session's sent log
+// with its paste expanded, and a draft cleared with Ctrl+C or with Esc
+// pressed twice goes to history.
+func TestWrapSentAndClearedDrafts(t *testing.T) {
+	body := strings.Repeat("pasted line\r", 5) + "last"
+	_, st := runWrapped(t, func(type_ func(string)) {
+		type_("see: \x1b[200~" + body + "\x1b[201~")
+		type_("\r")
+		type_("cleared with ctrl+c")
+		type_("\x03")
+		type_("cleared with esc esc")
+		type_("\x1b")
+		type_("\x1b")
+		type_("second message")
+		type_("\r")
+		type_("\x04")
+	})
+	logs := st.sentLogs()
+	if len(logs) != 1 || logs[0].Agent != "claude" {
+		t.Fatalf("%d sent logs", len(logs))
+	}
+	var sent []string
+	for _, m := range logs[0].messages {
+		sent = append(sent, m.Text)
+	}
+	if want := []string{"see: " + strings.Repeat("pasted line\n", 5) + "last", "second message"}; !slices.Equal(sent, want) {
+		t.Fatalf("sent %q, want %q", sent, want)
+	}
+	var history []string
+	for _, r := range st.load(true) {
+		history = append(history, r.Draft)
+	}
+	if want := []string{"cleared with esc esc", "cleared with ctrl+c"}; !slices.Equal(history, want) {
+		t.Fatalf("history %q, want %q", history, want)
+	}
+}
+
+// Under UNSENT_ON_SEND=delete no file in the state folder keeps a sent
+// message.
+func TestWrapOnSendDelete(t *testing.T) {
+	t.Setenv("UNSENT_ON_SEND", "delete")
+	_, st := runWrapped(t, func(type_ func(string)) {
+		type_("a private message")
+		type_("\r")
+		type_("\x04")
+	})
+	filepath.Walk(st.dir, func(path string, fi os.FileInfo, err error) error {
+		if err == nil && !fi.IsDir() {
+			if b, _ := os.ReadFile(path); strings.Contains(string(b), "private") {
+				t.Errorf("%s keeps the message", path)
+			}
+		}
+		return nil
+	})
 }
 
 func TestWrapSavesOnHangup(t *testing.T) {

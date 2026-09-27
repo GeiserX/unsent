@@ -54,11 +54,27 @@ After a crash, a closed window or a reboot:
 unsent list          # drafts left behind, newest first
 unsent restore       # copy the newest one to the clipboard, then paste it
 unsent show 2        # print draft 2
-unsent list --all    # also drafts you cleared or sent
+unsent list --all    # also drafts you cleared or replaced
 unsent list --here --agent claude   # only Claude Code's drafts from this folder
 ```
 
 Each draft remembers the agent and the folder it came from. The notice at start only offers a draft back to that agent in that folder, and counts the ones left in subfolders. `unsent restore --agent claude` copies that agent's newest draft from this folder, and a number from `unsent list` reaches any draft.
+
+## Sent messages
+
+Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. After you start a new session, the old one's messages are one command away:
+
+```sh
+unsent log                 # sessions with sent messages, newest first
+unsent log 1               # every message sent in session 1
+unsent log 1 --copy 3      # copy message 3 of it to the clipboard
+unsent log --here --agent claude   # only Claude Code's sessions in this folder
+unsent forget --log 1      # delete session 1's sent log
+```
+
+A send and a clear both empty the box, and the key you pressed tells them apart. A draft counts as sent only when Enter was the last key before the box emptied, with no Ctrl+C or Esc Esc next to it, and the box was on screen when you pressed it. When `unsent` can't be sure, it treats the draft as cleared and keeps it in history. A missed send costs one history entry, never text.
+
+To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_CLAUDE=delete` does the same for Claude Code alone, and wins over `UNSENT_ON_SEND`. Turning it off doesn't delete existing logs; `unsent forget --log` does.
 
 ## Works everywhere you type
 
@@ -76,7 +92,7 @@ Anything else runs through `unsent` unchanged; it just isn't saved yet.
 1. `unsent` starts the agent inside a pseudo-terminal and passes every byte through, untouched, in both directions.
 2. It keeps a hidden copy of the screen and, every 0.4 seconds, reads the text in the agent's input box off it.
 3. When the text changes, it writes it to disk: a temporary file, flushed with `fsync`, then renamed into place. A power cut leaves the previous save or the new one, never half a file.
-4. When the box empties because you sent or cleared it, the draft moves to history. When the agent exits with text still in the box, the draft stays for `unsent restore`.
+4. When you send the box, the message goes to the session's sent log. When you clear it, the draft moves to history. When the agent exits with text still in the box, the draft stays for `unsent restore`.
 
 **One promise.** `unsent` never throws away text you didn't delete. Text in view is read exactly. Text out of sight above or below the box is inferred, and an inference can be wrong, so while a draft is taller than the box every save that loses text first keeps the previous version. Whatever `unsent` gets wrong, a correct copy is in `unsent list --all`, marked "(earlier version)". Those copies are capped at 30 per session and deleted once the prompt is sent.
 
@@ -90,7 +106,7 @@ A few things make that more than a screenshot:
 
 ## Where your drafts live
 
-Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, sent or restored, plus the capped earlier versions. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
+Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
 
 ## Limits
 
@@ -100,6 +116,8 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - If a whole long draft lands in the box between two saves, only the part on screen is recovered. Typing never goes that fast.
 - In a draft taller than the box, a few edits can't be read off the screen for certain: for example, typing a word identical to the next word hidden below the box, or typing, deleting and scrolling at the edge of the box within one 0.4-second save. Then the live draft can come out slightly wrong. In simulation that's about 1 save in 100 with ordinary text, a little more with heavily repeated words or with Ctrl+W. Thanks to the promise above, the correct text is still in history.
 - A draft that changes wholesale, like a prompt recalled with the Up arrow, is saved from what's on screen, and the old draft goes to history.
+- The sent log holds the box as Claude Code last drew it before your Enter. A key typed so fast before Enter that Claude Code never drew it can be missing. Only plain Enter counts as a send for now: Ctrl+Enter, a remapped submit key, or Enter in a keyboard mode that encodes it differently reads as a clear, and the message goes to history instead.
+- Pressing Esc while Claude Code works on a message can put that message back in the box. The sent log still holds it, although Claude Code didn't answer it.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.
 
 ## Development

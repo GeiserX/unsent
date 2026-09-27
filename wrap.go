@@ -237,6 +237,11 @@ type session struct {
 	// is partly inferred, and every loss keeps a safety copy.
 	stitched bool
 	deletes  deleteLog
+	// keys holds the submit and clear keys typed since the last save;
+	// armed and cleared are what they say so far (see look).
+	keys    keyLog
+	armed   bool
+	cleared bool
 
 	rec    *record
 	store  *store
@@ -247,12 +252,14 @@ type session struct {
 }
 
 // input notes one chunk of keys on its way to the agent: the pastes in it,
-// and the delete keys. Pasted text can hold control bytes (Word pastes
-// \x0b for line breaks); only keys typed outside a paste count.
+// the delete keys, and the submit and clear keys. Pasted text can hold
+// control bytes (Word pastes \x0b for line breaks); only keys typed outside
+// a paste count.
 func (s *session) input(keys []byte) {
 	typed := s.pastes.feed(keys)
 	if s.prof != nil {
 		s.deletes.push(s.prof.keys.deletes(typed))
+		s.keys.push(s.prof.keys, typed)
 	}
 }
 
@@ -276,6 +283,14 @@ func (s *session) write(chunk []byte) {
 			s.broken = true
 		}
 	}()
+	// A submit key waiting for the agent's answer was typed into the screen
+	// as it stands now: keep it before this output changes it.
+	s.keys.answer(func() *screen {
+		if s.inFrame {
+			return nil
+		}
+		return snapshot(s.screen)
+	})
 	s.trackFrames(chunk)
 	s.screen.Write(chunk)
 	s.dirty = true
@@ -308,8 +323,9 @@ func (s *session) resize(cols, rows int) {
 // resizeQuiet is how long saves wait after a resize for the redraw.
 const resizeQuiet = 150 * time.Millisecond
 
-// save reads the input box off the shadow screen and writes the draft to
-// disk when it changed. A box that empties archives the draft it held.
+// save reads the input box off the shadow screen, after each screen a
+// submit key was typed into since the last save, and writes the draft to
+// disk when it changed (see look).
 func (s *session) save() {
 	if s.prof == nil {
 		return
@@ -328,6 +344,13 @@ func (s *session) save() {
 	}
 	s.dirty = false
 	scr := snapshot(s.screen)
+	inFrame := s.inFrame
+	events, answered := s.keys.take(func() *screen {
+		if inFrame {
+			return nil
+		}
+		return scr
+	})
 	s.mu.Unlock()
 
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
@@ -343,11 +366,45 @@ func (s *session) save() {
 			s.store.warn(fmt.Errorf("stopped saving after an internal error: %v", r))
 		}
 	}()
+	// Replay the keys in order. Each submit key comes with the screen it was
+	// typed into: that read shows the agent's answer to the keys before it,
+	// and the text the key sends, up to the last key the agent drew.
+	for _, e := range events {
+		switch e.kind {
+		case keyOther:
+			s.armed = false
+		case keyClear:
+			s.armed, s.cleared = false, true
+		case keySubmit:
+			s.armed = e.before != nil && s.look(e.before)
+		}
+	}
+	if answered {
+		// Until the agent draws something after a submit key, the screen is
+		// the one that key was typed into, already read above.
+		s.look(scr)
+	}
+}
+
+// look reads the box off one screen and writes the draft to disk when it
+// changed. It reports whether the box was on screen. A box that empties
+// right after a submit key (armed), with no clear key since, was sent: the
+// draft follows the on-send setting. Any other box that empties archives
+// the draft it held, so a send the keys cannot vouch for counts as a clear
+// and costs one history entry, never text.
+func (s *session) look(scr *screen) bool {
+	armed := s.armed
+	s.armed = false
 	v, ok := s.prof.read(scr)
 	if !ok {
 		// The box is not on screen (a menu, a permission prompt, an editor):
 		// keep the last draft we saw.
-		return
+		return false
+	}
+	sent := false
+	if v.empty {
+		sent = armed && !s.cleared
+		s.cleared = false
 	}
 	v.deleted, v.deletedAhead = s.deletes.recent()
 	before := s.stitch
@@ -356,12 +413,14 @@ func (s *session) save() {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
 	}
 	if draft == s.rec.Draft {
-		return
+		return true
 	}
 	s.stitched = s.stitched || v.capped
 	history, version := keepOld(s.rec.Draft, draft, s.stitched)
 	var err error
 	switch {
+	case history && sent:
+		err = s.sendOff()
 	case history:
 		err = s.store.archive(s.rec)
 	case version:
@@ -370,7 +429,7 @@ func (s *session) save() {
 	if err != nil {
 		// The old draft could not be kept: leave it in place rather than
 		// replace it. The next save tries again.
-		return
+		return true
 	}
 	if draft == "" {
 		s.pastes.reset()
@@ -384,6 +443,22 @@ func (s *session) save() {
 	if err := s.store.write(s.rec); err != nil {
 		s.store.warn(err)
 	}
+	return true
+}
+
+// sendOff follows the on-send setting for a draft that was sent: log
+// appends it to the session's sent log, delete keeps nothing. The agent
+// holds the text now. A sent log that cannot be written sends the draft to
+// history instead.
+func (s *session) sendOff() error {
+	if onSend(s.rec.agent()) == "delete" {
+		return nil
+	}
+	if err := s.store.logSent(s.rec); err != nil {
+		s.store.warn(err)
+		return s.store.archive(s.rec)
+	}
+	return nil
 }
 
 // finish runs when the agent exits. An empty box leaves nothing to recover,
@@ -509,9 +584,11 @@ func shrunk(old, draft string) int {
 
 // keyset is the keys that remove text in an agent's input box: one
 // character each, any amount, and (a subset of both) those that can remove
-// text after the cursor.
+// text after the cursor. submit are the keys that send the box, and clear
+// those that empty it without sending (see sent.go).
 type keyset struct {
 	one, many, ahead [][]byte
+	submit, clear    [][]byte
 }
 
 // deletes returns how many characters the keys in b can delete, and
@@ -534,12 +611,13 @@ func (ks keyset) deletes(b []byte) (chars int64, ahead bool) {
 }
 
 // keepOld decides what happens to the draft a save is about to replace.
-// It goes to history when the box empties (sent, or cleared by mistake)
-// or the text was replaced wholesale (a history recall, an external
-// editor). Otherwise, once the draft is stitched from a scrolling box, any
-// lost text keeps a safety copy: text in view is read exactly, but text
-// out of sight is inferred, and an inference can be wrong. That is the
-// promise: no text the user did not delete is ever lost.
+// It goes to history when the box empties (cleared by mistake, or sent
+// when the save cannot be sure it was; see session.look) or the text was
+// replaced wholesale (a history recall, an external editor). Otherwise,
+// once the draft is stitched from a scrolling box, any lost text keeps a
+// safety copy: text in view is read exactly, but text out of sight is
+// inferred, and an inference can be wrong. That is the promise: no text
+// the user did not delete is ever lost.
 func keepOld(old, draft string, stitched bool) (history, version bool) {
 	if strings.TrimSpace(old) == "" {
 		return false, false

@@ -16,11 +16,15 @@ var claude = profile{
 	placeholder: regexp.MustCompile(`\[Pasted text #\d+(?: \+(\d+) lines?)?\]`),
 	// Backspace, Ctrl+H and Delete remove one character; Ctrl+W, Ctrl+U,
 	// Ctrl+K and undo (Ctrl+_) any amount. Delete, Ctrl+K and undo can
-	// remove text after the cursor.
+	// remove text after the cursor. Enter sends the box (Ctrl+X Enter
+	// queues it, which also ends in Enter); Esc+Enter makes a new line.
+	// Ctrl+C and Esc Esc clear it.
 	keys: keyset{
-		one:   [][]byte{{0x7f}, {0x08}, []byte("\x1b[3~")},
-		many:  [][]byte{{0x17}, {0x15}, {0x0b}, {0x1f}},
-		ahead: [][]byte{[]byte("\x1b[3~"), {0x0b}, {0x1f}},
+		one:    [][]byte{{0x7f}, {0x08}, []byte("\x1b[3~")},
+		many:   [][]byte{{0x17}, {0x15}, {0x0b}, {0x1f}},
+		ahead:  [][]byte{[]byte("\x1b[3~"), {0x0b}, {0x1f}},
+		submit: [][]byte{{'\r'}},
+		clear:  [][]byte{{0x03}, []byte("\x1b\x1b")},
 	},
 }
 
