@@ -13,19 +13,22 @@ var claude = profile{
 	name:  "claude",
 	names: []string{"claude"},
 	read:  claudeBox,
-	// A paste of 4 or more lines, or over 800 characters, shows as
-	// "[Pasted text #2 +39 lines]", or "[Pasted text #2]" when it has no
-	// line break; the count is of line breaks. Anything shorter goes in as
-	// typed text, and a pasted image path becomes "[Image #N]", so neither
-	// fills a placeholder. "[Image #N]" and "[Audio #N]" hold no text and
-	// stay as they are.
-	placeholder: regexp.MustCompile(`\[Pasted text #\d+(?: \+(\d+) lines?)?\]`),
-	collapses: func(paste string) bool {
-		return strings.Count(paste, "\n") > 2 || len(utf16.Encode([]rune(paste))) > 800
+	// A paste shows as "[Pasted text #2 +39 lines]", or "[Pasted text #2]"
+	// when it has no line break; the count is of line breaks. Claude Code
+	// first turns each tab into 4 spaces, then collapses a paste over 800
+	// UTF-16 units, or with more than 2 line breaks, or than the window
+	// height minus 10 when that is less. Anything shorter goes in as typed
+	// text, and a pasted image path becomes "[Image #N]", so neither fills
+	// a placeholder. "[Image #N]" and "[Audio #N]" hold no text and stay
+	// as they are. N counts up across pastes, images and cut middles.
+	placeholder: regexp.MustCompile(`\[Pasted text #(\d+)(?: \+(\d+) lines?)?\]`),
+	collapses: func(paste string, rows int) bool {
+		paste = strings.ReplaceAll(paste, "\t", "    ")
+		return len(utf16.Encode([]rune(paste))) > 800 || strings.Count(paste, "\n") > max(0, min(rows-10, 2))
 	},
 	// A box over 10,000 characters keeps its first and last 500 and shows
 	// the middle as "[...Truncated text #N +M lines...]".
-	truncated: regexp.MustCompile(`\[\.\.\.Truncated text #\d+ \+(\d+) lines\.\.\.\]`),
+	truncated: regexp.MustCompile(`\[\.\.\.Truncated text #(\d+) \+(\d+) lines\.\.\.\]`),
 	// Backspace, Ctrl+H, Delete and Ctrl+D remove one character; Ctrl+W,
 	// Ctrl+U, Ctrl+K, Alt+Backspace, Alt+D and undo (Ctrl+_) any amount.
 	// Delete, Ctrl+D, Ctrl+K, Alt+D and undo can remove text after the

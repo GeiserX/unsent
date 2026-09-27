@@ -46,14 +46,15 @@ type profile struct {
 	names []string
 	read  extractor
 	// placeholder matches what the agent shows in place of a long paste;
-	// its first group, when it matches, is the paste's line count.
-	// collapses reports whether the agent shows a paste that way at all:
-	// one it took in as typed text never fills a placeholder.
+	// its first group is the placeholder's number, and its second, when it
+	// matches, the paste's line count. collapses reports whether the agent
+	// shows a paste that way at all, in a window rows high: one it took in
+	// as typed text never fills a placeholder.
 	placeholder *regexp.Regexp
-	collapses   func(paste string) bool
+	collapses   func(paste string, rows int) bool
 	// truncated matches what the agent shows in place of the middle of a
-	// draft too long to show whole; its first group is the middle's line
-	// count. Nil when the agent never does that.
+	// draft too long to show whole; its groups are the placeholder's number
+	// and the middle's line count. Nil when the agent never does that.
 	truncated *regexp.Regexp
 	keys      keyset
 	// verified is the agent version the reader was last checked against,

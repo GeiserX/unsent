@@ -71,7 +71,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		rec:    newRecord(args, cwd),
 		store:  st,
 		screen: vt.NewEmulator(cols, rows),
-		pastes: &pasteTracker{},
+		pastes: &pasteTracker{rows: rows},
 		prof:   profileFor(agent),
 	}
 	s.rec.Agent = agent
@@ -437,6 +437,7 @@ func (s *session) resize(cols, rows int) {
 	}
 	defer s.guard()
 	s.screen.Resize(cols, rows)
+	s.pastes.resize(rows)
 	s.dirty = true
 	s.quietUntil = time.Now().Add(resizeQuiet)
 }

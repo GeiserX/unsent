@@ -509,6 +509,18 @@ func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
 	}
 }
 
+// A resize reaches the paste tracker: in a window under 12 rows Claude Code
+// collapses a 3-line paste, so it fills a placeholder there.
+func TestSessionResizeReachesThePasteRule(t *testing.T) {
+	s := &session{screen: vt.NewEmulator(80, 40), pastes: &pasteTracker{rows: 40}, prof: &claude}
+	go io.Copy(io.Discard, s.screen)
+	s.resize(80, 11)
+	s.input([]byte("\x1b[200~one\ntwo\nthree\x1b[201~"))
+	if got := s.pastes.expand("[Pasted text #1 +2 lines]", "", &claude); got != "one\ntwo\nthree" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 // A reader that panics on one crafted screen stops saving for the rest of
 // the session, says so once, and keeps the last good draft.
 func TestSessionSurvivesAReaderPanic(t *testing.T) {

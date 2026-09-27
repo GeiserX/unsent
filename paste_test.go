@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -65,22 +66,49 @@ func TestPasteExpandSkipsPastesShownAsSomethingElse(t *testing.T) {
 	}
 }
 
+// Claude Code turns tabs into 4 spaces before it measures a paste, and
+// lets fewer line breaks through in a window under 12 rows.
 func TestClaudeCollapses(t *testing.T) {
 	for _, c := range []struct {
 		paste string
+		rows  int
 		want  bool
 	}{
-		{"a\nb\nc", false},
-		{"a\nb\nc\nd", true},
-		{strings.Repeat("x", 800), false},
-		{strings.Repeat("x", 801), true},
-		{strings.Repeat("é", 801), true},
-		{strings.Repeat("😀", 401), true}, // two UTF-16 units each
-		{strings.Repeat("😀", 400), false},
+		{"a\nb\nc", 40, false},
+		{"a\nb\nc\nd", 40, true},
+		{"a\nb\nc", 12, false},
+		{"a\nb\nc", 11, true},
+		{"a\nb", 11, false},
+		{"a\nb", 10, true},
+		{"a", 5, false},
+		{strings.Repeat("x", 800), 40, false},
+		{strings.Repeat("x", 801), 40, true},
+		{strings.Repeat("é", 801), 40, true},
+		{strings.Repeat("😀", 401), 40, true}, // two UTF-16 units each
+		{strings.Repeat("😀", 400), 40, false},
+		{strings.Repeat("cell\t", 150), 40, true}, // 750 characters, 1,200 with the tabs as spaces
+		{strings.Repeat("cell ", 150), 40, false},
 	} {
-		if got := claude.collapses(c.paste); got != c.want {
-			t.Errorf("collapses(%d bytes, %d breaks) = %v, want %v", len(c.paste), strings.Count(c.paste, "\n"), got, c.want)
+		if got := claude.collapses(c.paste, c.rows); got != c.want {
+			t.Errorf("collapses(%d bytes, %d breaks, %d rows) = %v, want %v", len(c.paste), strings.Count(c.paste, "\n"), c.rows, got, c.want)
 		}
+	}
+}
+
+// Whether a paste fills a placeholder depends on the window height when it
+// was pasted, not on the height now.
+func TestPasteExpandUsesTheHeightAtPasteTime(t *testing.T) {
+	var p pasteTracker
+	p.resize(11)
+	p.feed([]byte("\x1b[200~one\ntwo\nthree\x1b[201~"))
+	p.resize(40)
+	if got := p.expand("[Pasted text #1 +2 lines]", "", &claude); got != "one\ntwo\nthree" {
+		t.Fatalf("got %q", got)
+	}
+	p.reset()
+	p.feed([]byte("\x1b[200~one\ntwo\nthree\x1b[201~"))
+	if got := p.expand("[Pasted text #1 +2 lines]", "", &claude); got != "[Pasted text #1 +2 lines]" {
+		t.Fatalf("a paste Claude Code shows inline in 40 rows filled a placeholder: %q", got)
 	}
 }
 
@@ -89,7 +117,7 @@ func TestClaudeCollapses(t *testing.T) {
 // match it, and stays for the saves after.
 func TestPasteExpandPutsBackATruncatedMiddle(t *testing.T) {
 	var p pasteTracker
-	head, tail := "the start\n", "\nthe end"
+	head, tail := "the start\n", " and so the end"
 	mid := strings.Repeat("middle words ", 800) + "\nline two\nline three"
 	prev := head + mid + tail
 	ph := "[...Truncated text #4 +2 lines...]"
@@ -99,6 +127,14 @@ func TestPasteExpandPutsBackATruncatedMiddle(t *testing.T) {
 	if got := p.expand(head+ph+tail+" and more", prev, &claude); got != prev+" and more" {
 		t.Fatalf("an edit after the cut: got %q", got)
 	}
+	// Deleting the first word after the cut keeps the middle as it was:
+	// the words deleted are not taken into it.
+	if got := p.expand(head+ph+" so the end", prev, &claude); got != head+mid+" so the end" {
+		t.Fatalf("a delete after the cut: got %q", got)
+	}
+	if n := len(p.all()); n != 0 {
+		t.Fatalf("the middle was kept as %d pastes", n)
+	}
 	p.reset()
 	if got := p.expand(head+ph+tail, "", &claude); got != head+ph+tail {
 		t.Fatalf("a reset kept the middle: %q", got)
@@ -106,12 +142,85 @@ func TestPasteExpandPutsBackATruncatedMiddle(t *testing.T) {
 	// The middle is not put back from a draft that does not match it.
 	for _, old := range []string{
 		"other start\n" + mid + tail,          // the start differs
-		head + mid + "\nanother end",          // the end differs
+		head + mid + " and another end",       // the end differs
 		head + "one\ntwo\nthree\nfour" + tail, // another line count
 		head + ph + tail,                      // the placeholder itself
+		"the start\n and so the end",          // shorter than both sides
 	} {
 		if got := p.expand(head+ph+tail, old, &claude); got != head+ph+tail {
 			t.Fatalf("put back %q from %q", got, old)
 		}
+	}
+	// Both sides can overlap in a draft shorter than the two together.
+	cut := "aaa\n[...Truncated text #5 +0 lines...]\naaa"
+	if got := p.expand(cut, "aaa\naaa", &claude); got != cut {
+		t.Fatalf("put back %q from overlapping sides", got)
+	}
+}
+
+// After Ctrl+G the cut middle shows as [Pasted text #N +M lines], with the
+// number of the cut. It is filled from the cut, not from an earlier paste
+// with the same line count, whose start and end the box may not show.
+func TestPasteExpandFillsACutMiddleByNumber(t *testing.T) {
+	var p pasteTracker
+	var lines []string
+	for i := 0; i < 138; i++ {
+		lines = append(lines, fmt.Sprintf("line %03d %s", i, strings.Repeat("word ", 14)))
+	}
+	// No line break in the first or last 500 characters.
+	text := strings.Repeat("start ", 100) + strings.Join(lines, "\n") + strings.Repeat(" end", 150)
+	p.feed([]byte(pasteStart))
+	p.feed([]byte(text))
+	p.feed([]byte(pasteEnd))
+	if got := p.expand("[Pasted text #1 +137 lines]", "", &claude); got != text {
+		t.Fatalf("the paste: got %q", got)
+	}
+	// Pasting it again shows it whole, then Claude Code cuts it.
+	p.feed([]byte(string(pasteStart) + text + string(pasteEnd)))
+	if got := p.expand(text, text, &claude); got != text {
+		t.Fatalf("the paste again: got %q", got)
+	}
+	head, tail := text[:500], text[len(text)-500:]
+	if got := p.expand(head+"[...Truncated text #2 +137 lines...]"+tail, text, &claude); got != text {
+		t.Fatalf("the cut: got %d characters", len(got))
+	}
+	if got := p.expand(head+"[Pasted text #2 +137 lines]"+tail, text, &claude); got != text {
+		t.Fatalf("after the editor: got %d characters, want %d", len(got), len(text))
+	}
+}
+
+// Claude Code puts a paste back in the text when it cuts a middle holding
+// its placeholder, and leaves one in the last 500 characters as it is. A
+// placeholder keeps the paste it was first filled with, so the one left
+// is not filled with the one folded into the middle.
+func TestPasteExpandKeepsEachNumbersPaste(t *testing.T) {
+	var p pasteTracker
+	a, b := strings.Repeat("a", 2000), strings.Repeat("b", 900)
+	p.feed([]byte(string(pasteStart) + a + string(pasteEnd)))
+	p.feed([]byte(string(pasteStart) + b + string(pasteEnd)))
+	before, between := strings.Repeat("typed ", 100), strings.Repeat("words ", 1700)
+	prev := p.expand(before+"[Pasted text #1]"+between+"[Pasted text #2]", "", &claude)
+	if prev != before+a+between+b {
+		t.Fatalf("got %q", prev)
+	}
+	shown := before + a + between + "[Pasted text #2]"
+	cut := shown[:500] + "[...Truncated text #3 +0 lines...]" + shown[len(shown)-500:]
+	if got := p.expand(cut, prev, &claude); got != prev {
+		t.Fatalf("the cut: got %d characters, want %d", len(got), len(prev))
+	}
+}
+
+// A paste whose placeholder was deleted does not fill the placeholder of
+// a later paste with the same line count.
+func TestPasteExpandSkipsAnotherNumbersPaste(t *testing.T) {
+	var p pasteTracker
+	a, b := strings.Repeat("a", 2000), strings.Repeat("b", 900)
+	p.feed([]byte(string(pasteStart) + a + string(pasteEnd)))
+	if got := p.expand("[Pasted text #1]", "", &claude); got != a {
+		t.Fatalf("got %q", got)
+	}
+	p.feed([]byte(string(pasteStart) + b + string(pasteEnd)))
+	if got := p.expand("typed [Pasted text #2]", "typed", &claude); got != "typed "+b {
+		t.Fatalf("got %q", got)
 	}
 }
