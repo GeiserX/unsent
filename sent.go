@@ -199,6 +199,13 @@ func (l *keyLog) settle(scr func() *screen) {
 // (UNSENT_ON_SEND_CLAUDE) wins over UNSENT_ON_SEND. An unset or unknown
 // value falls through to the next; the default is log.
 func onSend(agent string) string {
+	v, _ := onSendFrom(agent)
+	return v
+}
+
+// onSendFrom is onSend and where it comes from: the variable that set it,
+// or "the default".
+func onSendFrom(agent string) (value, from string) {
 	name := strings.Map(func(r rune) rune {
 		switch {
 		case r >= 'a' && r <= 'z':
@@ -208,12 +215,12 @@ func onSend(agent string) string {
 		}
 		return '_'
 	}, agent)
-	for _, v := range []string{os.Getenv("UNSENT_ON_SEND_" + name), os.Getenv("UNSENT_ON_SEND")} {
-		if v = strings.ToLower(v); v == "log" || v == "delete" {
-			return v
+	for _, k := range []string{"UNSENT_ON_SEND_" + name, "UNSENT_ON_SEND"} {
+		if v := strings.ToLower(os.Getenv(k)); v == "log" || v == "delete" {
+			return v, k
 		}
 	}
-	return "log"
+	return "log", "the default"
 }
 
 // The sent log keeps every message sent in a session, in sent/<session>.jsonl:

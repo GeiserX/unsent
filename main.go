@@ -50,6 +50,9 @@ Usage:
   unsent setup --undo [zsh|bash]
                              remove that block (from every shell's rc file
                              when none is named); drafts stay
+  unsent status [zsh|bash]   which agents this shell runs through unsent,
+                             which profile each gets, what skips the wrapper,
+                             and the saving and on-send settings
   unsent capture <agent> [args...]
                              run the agent with every key and all its output
                              recorded into testdata/<agent>/<version>/ here, as
@@ -100,6 +103,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdCapture(args[1:], stderr)
 	case "setup":
 		return cmdSetup(args[1:], stdout, stderr)
+	case "status":
+		return cmdStatus(args[1:], stdout, stderr)
 	case "--as":
 		if len(args) < 3 {
 			fmt.Fprint(stderr, usage)
