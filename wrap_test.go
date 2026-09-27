@@ -711,7 +711,7 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 	}
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
-	agent := func(script string, args ...string) string {
+	agent := func(want int, script string, args ...string) string {
 		r, w, _ := os.Pipe()
 		old := os.Stderr
 		os.Stderr = w
@@ -719,8 +719,8 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 		os.Stderr = old
 		w.Close()
 		said, _ := io.ReadAll(r)
-		if code != 0 {
-			t.Fatalf("exit %d, stderr %q", code, said)
+		if code != want {
+			t.Fatalf("exit %d, want %d, stderr %q", code, want, said)
 		}
 		return string(said)
 	}
@@ -728,11 +728,40 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 	if !strings.HasPrefix(line, "unsent: recovered a draft from ") {
 		t.Fatalf("notice %q", line)
 	}
-	if said := agent(`printf '\033[?1049h'; printf '\033[?1049l'`); said != line+line {
+	if said := agent(0, `printf '\033[?1049h'; printf '\033[?1049l'`); said != line+line {
 		t.Fatalf("stderr %q, want the notice before and after", said)
 	}
-	if said := agent(`rm "$1"`, st.draftPath("left")); said != line {
+	// A crash is when the hidden notice matters most.
+	if said := agent(3, `exit 3`); said != line+line {
+		t.Fatalf("stderr %q, want the notice before and after a failed exit", said)
+	}
+	if said := agent(0, `rm "$1"`, st.draftPath("left")); said != line {
 		t.Fatalf("stderr %q, want the notice only before: the draft was restored meanwhile", said)
+	}
+}
+
+// When the agent exits with text in the box, the notice after exit counts
+// that draft too and names it first, because a plain restore takes it.
+func TestWrapNoticeOnExitNamesTheDraftRestoreTakes(t *testing.T) {
+	var cwd string
+	_, st, _, said := runWrappedOut(t, "claude", []string{"claude"}, func(type_ func(string)) {
+		// Seeded after start, so only the notice after exit can name it.
+		cwd, _ = os.Getwd()
+		cwd = realPath(cwd)
+		st, _ := openStore()
+		seedAs(t, st, "left", "claude", cwd, "one\ntwo\nthree", 5)
+		type_("hello")
+		type_("\x04")
+	})
+	if o := st.orphans(); len(o) != 2 || o[0].Draft != "hello" {
+		t.Fatalf("orphans %v, want this session's draft first", o)
+	}
+	want := orphanNotice(st, cwd, "claude")
+	if !strings.Contains(want, ", 1 line (and 1 more). Run `unsent restore` to copy it.") {
+		t.Fatalf("notice now %q, want this session's draft first and the seeded one counted", want)
+	}
+	if said != want {
+		t.Fatalf("stderr %q, want the notice a restore now matches: %q", said, want)
 	}
 }
 

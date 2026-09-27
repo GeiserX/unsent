@@ -219,7 +219,10 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			}
 			// The notice printed before the agent started is hidden too, on
 			// the alternate screen. Asked again, it leaves out a draft that
-			// was restored while the agent ran.
+			// was restored while the agent ran. The lock goes first: held, it
+			// hides the draft this session left in the box, which a plain
+			// restore picks once we exit.
+			st.release()
 			fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
