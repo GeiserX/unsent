@@ -16,7 +16,7 @@ import (
 // so no test reads or writes a real rc file, and puts a fake claude and a
 // fake unsent on PATH. The fakes print their arguments, one per line.
 type setupHome struct {
-	home, agentBin, unsentBin string
+	home, zdotdir, agentBin, unsentBin string
 }
 
 func newSetupHome(t *testing.T) setupHome {
@@ -27,7 +27,7 @@ func newSetupHome(t *testing.T) setupHome {
 	t.Setenv("UNSENT_HOME", filepath.Join(home, "state"))
 	t.Setenv("XDG_STATE_HOME", "")
 	t.Setenv("SHELL", "/bin/zsh")
-	h := setupHome{home: home, agentBin: filepath.Join(home, "agent-bin"), unsentBin: filepath.Join(home, "unsent-bin")}
+	h := setupHome{home: home, zdotdir: home, agentBin: filepath.Join(home, "agent-bin"), unsentBin: filepath.Join(home, "unsent-bin")}
 	writeScript(t, filepath.Join(h.agentBin, "claude"), `printf 'claude[%s]\n' "$@"`)
 	writeScript(t, filepath.Join(h.unsentBin, "unsent"), `printf 'unsent[%s]\n' "$@"`)
 	t.Setenv("PATH", h.agentBin+":"+h.unsentBin+":/usr/bin:/bin")
@@ -73,6 +73,18 @@ func mustSetup(t *testing.T, args ...string) string {
 		t.Fatalf("unsent setup %v: exit %d\n%s%s", args, code, out, errOut)
 	}
 	return out
+}
+
+func appendLine(t *testing.T, path, line string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func readFile(t *testing.T, path string) string {
@@ -124,7 +136,7 @@ func (h setupHome) interactive(t *testing.T, sh, path, script string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sh, "-i", "-c", script)
-	cmd.Env = []string{"HOME=" + h.home, "ZDOTDIR=" + h.home, "PATH=" + path, "TERM=dumb"}
+	cmd.Env = []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=dumb"}
 	cmd.Dir = h.home
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -169,12 +181,7 @@ func TestSetupInRealShells(t *testing.T) {
 				t.Fatal(err)
 			}
 			mustSetup(t, kind)
-			f, err := os.OpenFile(rc, os.O_APPEND|os.O_WRONLY, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			f.WriteString("UNSENT_TAIL=ran\n")
-			f.Close()
+			appendLine(t, rc, "UNSENT_TAIL=ran")
 
 			script := wherePath(sh, "claude") + "; claude hello 'two words'; echo \"tail=$UNSENT_TAIL\""
 			got := h.interactive(t, sh, path, script)
@@ -195,10 +202,29 @@ func TestSetupInRealShells(t *testing.T) {
 				t.Fatalf("without unsent on PATH:\ngot:\n%s\nwant:\n%s", got, want)
 			}
 
-			// With the agent not installed, no wrapper is defined.
-			got = h.interactive(t, sh, h.unsentBin+":/usr/bin:/bin", "typeset -f claude >/dev/null && echo wrapped || echo none")
-			if got != "none\n" {
-				t.Fatalf("without claude on PATH: got %q, want none", got)
+			// With the agent not installed, claude is not found, as without
+			// the block: unsent never runs.
+			got = h.interactive(t, sh, h.unsentBin+":/usr/bin:/bin", "claude hi; echo \"code=$?\"")
+			if got != "code=127\n" {
+				t.Fatalf("without claude on PATH: got %q, want code=127", got)
+			}
+		})
+	}
+}
+
+// TestSetupWrapsAnAgentPutOnPathAfterTheBlock checks an agent whose PATH
+// line comes after the block, the way an installer appends it, still runs
+// through unsent.
+func TestSetupWrapsAnAgentPutOnPathAfterTheBlock(t *testing.T) {
+	for _, sh := range testShells(t) {
+		t.Run(sh, func(t *testing.T) {
+			h := newSetupHome(t)
+			rc := h.rc(t, shellKind(sh))
+			mustSetup(t, shellKind(sh))
+			appendLine(t, rc, `export PATH="`+h.agentBin+`:$PATH"`)
+			got := h.interactive(t, sh, h.unsentBin+":/usr/bin:/bin", "claude x")
+			if want := "unsent[claude]\nunsent[x]\n"; got != want {
+				t.Fatalf("with PATH set after the block:\ngot:\n%s\nwant:\n%s", got, want)
 			}
 		})
 	}
@@ -249,13 +275,24 @@ func TestSetupShellChecksCanFail(t *testing.T) {
 				t.Fatalf("the name() form passed the alias check: %q", got)
 			}
 
-			guard := strings.Replace(block, " && ! ", " && : ", 1)
+			guard := strings.Replace(block, "  if ! ", "  if : ", 1)
 			if guard == block {
 				t.Fatal("the mutation found nothing to change")
 			}
 			os.WriteFile(rc, []byte("function claude { printf 'mine[%s]\\n' \"$@\"; }\n"+guard), 0o644)
 			if got := h.interactive(t, sh, path, "claude x"); got == "mine[x]\n" {
 				t.Fatalf("a block that replaces the user's function passed: %q", got)
+			}
+
+			// A block that checks PATH where it runs misses an agent whose
+			// PATH line comes after it.
+			early := strings.Replace(block, "  if ! ", "  if "+wherePath(sh, `"$_unsent_a"`)+" >/dev/null && ! ", 1)
+			if early == block {
+				t.Fatal("the mutation found nothing to change")
+			}
+			os.WriteFile(rc, []byte(early+`export PATH="`+h.agentBin+`:$PATH"`+"\n"), 0o644)
+			if got := h.interactive(t, sh, h.unsentBin+":/usr/bin:/bin", "claude x"); got == "unsent[claude]\nunsent[x]\n" {
+				t.Fatalf("a block that checks PATH where it runs passed: %q", got)
 			}
 		})
 	}
@@ -309,9 +346,7 @@ func TestSetupUndoKeepsTheUsersLines(t *testing.T) {
 	rc := h.rc(t, "zsh")
 	os.WriteFile(rc, []byte("before\n"), 0o644)
 	mustSetup(t, "zsh")
-	f, _ := os.OpenFile(rc, os.O_APPEND|os.O_WRONLY, 0)
-	f.WriteString("after\n")
-	f.Close()
+	appendLine(t, rc, "after")
 
 	// An older block, in the middle of the file, is rewritten where it is.
 	old := readFile(t, rc)
@@ -515,5 +550,69 @@ func TestSetupWarnsWhenBashLoginSkipsBashrc(t *testing.T) {
 	}
 	if out := mustSetup(t, "zsh"); strings.Contains(out, "bash_profile") {
 		t.Errorf("zsh setup warned about bash:\n%s", out)
+	}
+}
+
+// TestSetupFollowsZdotdir checks zsh setup writes to $ZDOTDIR/.zshrc, never
+// ~/.zshrc, reads $ZDOTDIR's startup files for warnings, and that a real
+// zsh with that ZDOTDIR runs claude through unsent.
+func TestSetupFollowsZdotdir(t *testing.T) {
+	h := newSetupHome(t)
+	h.zdotdir = filepath.Join(h.home, "zdot")
+	if err := os.MkdirAll(h.zdotdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ZDOTDIR", h.zdotdir)
+	os.WriteFile(filepath.Join(h.zdotdir, ".zprofile"), []byte("alias cz='env claude'\n"), 0o644)
+	out := mustSetup(t, "zsh")
+	if !strings.Contains(readFile(t, filepath.Join(h.zdotdir, ".zshrc")), rcBlockStart) {
+		t.Fatal("no block in $ZDOTDIR/.zshrc")
+	}
+	if _, err := os.Stat(filepath.Join(h.home, ".zshrc")); err == nil {
+		t.Fatal("setup wrote ~/.zshrc, which zsh does not read with ZDOTDIR set")
+	}
+	if !strings.Contains(out, "Wrote the unsent block to ~/zdot/.zshrc") || !strings.Contains(out, "~/zdot/.zprofile:1: alias cz starts claude through env") {
+		t.Errorf("setup output:\n%s", out)
+	}
+	for _, sh := range testShells(t) {
+		if shellKind(sh) != "zsh" {
+			continue
+		}
+		got := h.interactive(t, sh, h.agentBin+":"+h.unsentBin+":/usr/bin:/bin", "claude x")
+		if want := "unsent[claude]\nunsent[x]\n"; got != want {
+			t.Errorf("%s with ZDOTDIR=%s:\ngot:\n%s\nwant:\n%s", sh, h.zdotdir, got, want)
+		}
+	}
+	mustSetup(t, "--undo", "zsh")
+	if got := readFile(t, filepath.Join(h.zdotdir, ".zshrc")); got != "" {
+		t.Fatalf("undo left %q", got)
+	}
+}
+
+// TestBypassesSkipsOnlyTheBlock checks a line that warns outside the block
+// does not warn inside it.
+func TestBypassesSkipsOnlyTheBlock(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "rc")
+	os.WriteFile(f, []byte(rcBlockStart+"\nexec claude\n"+rcBlockEnd+"\nexec claude\n"), 0o644)
+	got := bypasses([]string{f}, []string{"claude"})
+	if len(got) != 1 || !strings.Contains(got[0], ":4: starts claude through exec") {
+		t.Fatalf("bypasses: %q, want one warning, for line 4", got)
+	}
+}
+
+// TestSetupWithTwoBlocks checks a file that already has two blocks, from a
+// dotfiles merge say, ends up with one, in the first one's place, and that
+// undo removes both.
+func TestSetupWithTwoBlocks(t *testing.T) {
+	block := setupBlock("zsh")
+	stale := strings.Replace(block, "for _unsent_a in claude;", "for _unsent_a in claude oldagent;", 1)
+	text := "a\n" + stale + "b\n" + stale + "c\n"
+	got, err := withBlock(text, block)
+	if want := "a\n" + block + "b\nc\n"; err != nil || got != want {
+		t.Fatalf("withBlock: %q, %v\nwant %q", got, err, want)
+	}
+	got, err = withoutBlocks(text)
+	if err != nil || got != "a\nb\nc\n" {
+		t.Fatalf("withoutBlocks: %q, %v", got, err)
 	}
 }

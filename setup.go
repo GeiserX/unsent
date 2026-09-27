@@ -14,11 +14,12 @@ import (
 )
 
 // unsent setup writes one marked block into the shell's rc file. At each
-// shell start the block wraps every agent this build has a profile for, and
-// finds on PATH, in a shell function that runs it through unsent. The list
-// is baked in, so an upgrade that adds a profile needs setup again, but the
-// PATH check runs in the shell, so an agent installed later is covered from
-// the next shell. Nothing starts a process when the shell starts.
+// shell start the block wraps every agent this build has a profile for in a
+// shell function that runs it through unsent. The list is baked in, so an
+// upgrade that adds a profile needs setup again, but the function looks the
+// agent up on PATH each time it is called, so an agent installed later is
+// covered from the next shell. Nothing starts a process when the shell
+// starts.
 //
 // The block defines each wrapper with `function name { }`, never
 // `name() { }`: under an existing `alias claude=...` the second form fails
@@ -87,18 +88,20 @@ func startupFiles(shell string) []string {
 }
 
 // setupBlock is the block for a shell, ending in a line break. Each wrapper
-// is defined only when the agent is a program on PATH and no function of
-// that name exists yet, and it falls back to the agent itself when unsent
-// is gone.
+// is defined when no function of that name exists yet. It looks the agent
+// up on PATH when it is called, not when the block runs, so an agent that a
+// line after the block puts on PATH still goes through unsent. With the
+// agent not installed, or unsent gone, the wrapper runs the command as the
+// shell would.
 func setupBlock(shell string) string {
-	found := `type -P "$_unsent_a" >/dev/null && ! declare -F "$_unsent_a" >/dev/null`
+	defined, look := `declare -F`, `type -P`
 	if shell == "zsh" {
-		found = `whence -p "$_unsent_a" >/dev/null && ! typeset -f "$_unsent_a" >/dev/null`
+		defined, look = `typeset -f`, `whence -p`
 	}
 	return rcBlockStart + " written by `unsent setup`; `unsent setup --undo` removes it\n" +
 		"for _unsent_a in " + strings.Join(agentCommands(), " ") + "; do\n" +
-		"  if " + found + "; then\n" +
-		`    eval "function $_unsent_a { if command -v unsent >/dev/null 2>&1; then unsent $_unsent_a \"\$@\"; else command $_unsent_a \"\$@\"; fi; }"` + "\n" +
+		"  if ! " + defined + ` "$_unsent_a" >/dev/null; then` + "\n" +
+		`    eval "function $_unsent_a { if command -v unsent >/dev/null 2>&1 && ` + look + ` $_unsent_a >/dev/null; then unsent $_unsent_a \"\$@\"; else command $_unsent_a \"\$@\"; fi; }"` + "\n" +
 		"  fi\n" +
 		"done\n" +
 		"unset _unsent_a\n" +
@@ -274,7 +277,7 @@ func cmdSetup(args []string, stdout, stderr io.Writer) int {
 		if p, err := exec.LookPath(a); err == nil {
 			fmt.Fprintf(stdout, "From the next shell, %s runs through unsent (%s).\n", a, tilde(p))
 		} else {
-			fmt.Fprintf(stdout, "%s is not on PATH now; the block wraps it from the first shell that finds it.\n", a)
+			fmt.Fprintf(stdout, "%s is not on PATH now; once it is, it runs through unsent from the next shell.\n", a)
 		}
 	}
 	warnings := bypasses(startupFiles(shell), agentCommands())
