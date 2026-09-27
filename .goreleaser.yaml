@@ -20,3 +20,27 @@ checksum:
 
 changelog:
   use: github
+
+# The Homebrew formula for GeiserX/homebrew-unsent. A formula, not a cask:
+# formula binaries are not quarantined, so they need no Apple signing.
+# `brews` is deprecated in goreleaser v2 but only removed on a major, and
+# release.yml pins `~> v2`.
+brews:
+  - name: unsent
+    repository:
+      owner: GeiserX
+      name: homebrew-unsent
+      # The workflow's own token cannot write to another repo.
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/GeiserX/unsent
+    description: AutoRecover for your AI agent prompts
+    license: GPL-3.0-only
+    # Without the tap token the formula is only written to dist/ and the
+    # release goes on. With it, prerelease tags (v0.3.0-rc1) still stay out
+    # of the tap.
+    skip_upload: '{{ if isEnvSet "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
+    install: |
+      bin.install "unsent"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/unsent version")

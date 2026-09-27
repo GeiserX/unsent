@@ -44,6 +44,15 @@ Usage:
   unsent forget --log <id>
                              delete one session's sent log (id: the session id
                              unsent log shows, never a number, which can move)
+  unsent setup [zsh|bash]    wrap every agent unsent can read in a shell
+                             function that runs it through unsent, with one
+                             marked block in your shell's rc file
+  unsent setup --undo [zsh|bash]
+                             remove that block (from every shell's rc file
+                             when none is named); drafts stay
+  unsent status [zsh|bash]   which agents this shell runs through unsent,
+                             which profile each gets, what skips the wrapper,
+                             and the saving and on-send settings
   unsent capture <agent> [args...]
                              run the agent with every key and all its output
                              recorded into testdata/<agent>/<version>/ here, as
@@ -59,8 +68,9 @@ UNSENT_OFF=1 runs the agent directly, as if unsent were not there.
 UNSENT_DEBUG_DIR=<folder> logs every key, all output and each save's view
 there, for debugging; the files hold everything typed.
 
-Put "alias claude='unsent claude'" in your shell profile to never think
-about it again. Use "unsent -- list" to run a program called list.
+Run "unsent setup" once to never think about it again; "command claude"
+skips the wrapper for one run. Use "unsent -- list" to run a program called
+list.
 `
 
 func main() {
@@ -91,6 +101,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdForget(args[1:], stdout, stderr)
 	case "capture":
 		return cmdCapture(args[1:], stderr)
+	case "setup":
+		return cmdSetup(args[1:], stdout, stderr)
+	case "status":
+		return cmdStatus(args[1:], stdout, stderr)
 	case "--as":
 		if len(args) < 3 {
 			fmt.Fprint(stderr, usage)

@@ -36,3 +36,24 @@ jobs:
           files: coverage-race.out,coverage-fuzz.out
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+  # `goreleaser check` exits 2 on the deprecated `brews` block and misses
+  # broken templates, so run the release itself in snapshot mode: it builds,
+  # archives and renders the formula templates, and publishes nothing. With
+  # no TAP_GITHUB_TOKEN here, a template mistake fails this job instead of a
+  # tag push, after the GitHub release already exists.
+  release-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean
+      - run: test -s dist/homebrew/Formula/unsent.rb

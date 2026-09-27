@@ -24,3 +24,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Write access to GeiserX/homebrew-unsent. When the secret is
+          # missing this is empty and goreleaser skips the tap push.
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
