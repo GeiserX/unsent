@@ -44,6 +44,11 @@ Usage:
   unsent forget --log <id>
                              delete one session's sent log (id: the session id
                              unsent log shows, never a number, which can move)
+  unsent capture <agent> [args...]
+                             run the agent with every key and all its output
+                             recorded into testdata/<agent>/<version>/ here, as
+                             a test fixture; $EDITOR only copies the file the
+                             agent hands it
   unsent version
 
 A message you send goes to its session's sent log, not to history.
@@ -51,6 +56,8 @@ UNSENT_ON_SEND=delete keeps nothing of it; UNSENT_ON_SEND_CLAUDE=delete does
 that for one agent, and wins over UNSENT_ON_SEND.
 
 UNSENT_OFF=1 runs the agent directly, as if unsent were not there.
+UNSENT_DEBUG_DIR=<folder> logs every key, all output and each save's view
+there, for debugging; the files hold everything typed.
 
 Put "alias claude='unsent claude'" in your shell profile to never think
 about it again. Use "unsent -- list" to run a program called list.
@@ -82,6 +89,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdLog(args[1:], stdout, stderr)
 	case "forget":
 		return cmdForget(args[1:], stdout, stderr)
+	case "capture":
+		return cmdCapture(args[1:], stderr)
 	case "--as":
 		if len(args) < 3 {
 			fmt.Fprint(stderr, usage)
@@ -95,7 +104,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
-		return wrap(agentFor(as, cmd[0]), cmd, os.Stdin, os.Stdout)
+		return wrap(agentFor(as, cmd[0]), cmd, os.Stdin, os.Stdout, nil)
 	case "--":
 		args = args[1:]
 		if len(args) == 0 {
@@ -103,7 +112,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 	}
-	return wrap(agentFor("", args[0]), args, os.Stdin, os.Stdout)
+	return wrap(agentFor("", args[0]), args, os.Stdin, os.Stdout, nil)
 }
 
 // buildVersion is the release version stamped in by the release build, or

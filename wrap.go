@@ -30,8 +30,10 @@ const saveInterval = 400 * time.Millisecond
 // wrap runs args[0] inside a pseudo-terminal, passes every byte between it
 // and the terminal (in, out) untouched and keeps the text in the agent's
 // input box saved on disk. agent names the agent (see agentFor); its
-// profile reads the box.
-func wrap(agent string, args []string, in, out *os.File) int {
+// profile reads the box. raw, when not nil, records the bytes both ways
+// (unsent capture); otherwise UNSENT_DEBUG_DIR can ask for that.
+func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
+	defer func() { raw.close() }()
 	bin, err := exec.LookPath(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
@@ -73,6 +75,10 @@ func wrap(agent string, args []string, in, out *os.File) int {
 		prof:   profileFor(agent),
 	}
 	s.rec.Agent = agent
+	if raw == nil {
+		raw = debugRaw(s.rec.ID, agent)
+	}
+	raw.resize(cols, rows)
 	if s.prof == nil {
 		s.off = fmt.Sprintf("unsent: no reader for %q yet, running it without saving drafts", agent)
 	} else if err := st.hold(s.rec); err != nil {
@@ -110,6 +116,7 @@ func wrap(agent string, args []string, in, out *os.File) int {
 			n, err := ptmx.Read(buf)
 			if n > 0 {
 				out.Write(buf[:n])
+				raw.record('o', buf[:n])
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
 				output <- chunk
@@ -125,6 +132,9 @@ func wrap(agent string, args []string, in, out *os.File) int {
 		buf := make([]byte, 32*1024)
 		for {
 			n, err := in.Read(buf)
+			// Logged before the agent gets them, so the record has each key
+			// ahead of the agent's answer. Ctrl+Z too, which the agent never gets.
+			raw.record('i', buf[:n])
 			// After a panic the paste tracker is no longer fed, and could
 			// be stuck inside a paste.
 			if n == 1 && buf[0] == ctrlZ && (s.broken.Load() || !s.pastes.inPaste()) {
@@ -160,6 +170,7 @@ func wrap(agent string, args []string, in, out *os.File) int {
 			c, r := termSize(in)
 			pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(c), Rows: uint16(r)})
 			s.resize(c, r)
+			raw.resize(c, r)
 		case sig := <-sigs:
 			// The window is closing or someone asked us to stop: save what
 			// is in the box first, then pass the signal on.
@@ -192,6 +203,7 @@ func wrap(agent string, args []string, in, out *os.File) int {
 			time.Sleep(50 * time.Millisecond)
 			pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(c), Rows: uint16(r)})
 			s.resize(c, r)
+			raw.resize(c, r)
 		case err := <-done:
 			// Let the last output reach the shadow screen before the final save.
 			time.Sleep(50 * time.Millisecond)

@@ -6,7 +6,7 @@
 
 | File | Job |
 | --- | --- |
-| `main.go` | CLI: `unsent <agent>`, `--as`, `list`, `show`, `restore`, `log`, `forget --log`, `version`; the recovery notice; drafts filtered by agent and folder (the resolved real path) |
+| `main.go` | CLI: `unsent <agent>`, `--as`, `list`, `show`, `restore`, `log`, `forget --log`, `capture`, `version`; the recovery notice; drafts filtered by agent and folder (the resolved real path) |
 | `wrap.go` | Pseudo-terminal passthrough, shadow screen, save loop, signals, Ctrl+Z suspend; `UNSENT_OFF`; a panic anywhere in reading or saving turns the session into plain passthrough (`session.guard`); the lines printed after the agent exits (`exitLines`: no reader, saving stopped, box never read) |
 | `screen.go` | Snapshot of the shadow screen (text, dim cells, cursor) |
 | `extract.go` | The `profile` type (one per agent: name, command names, box reader, paste placeholder, delete, submit and clear keys), `profileFor`, and `agentFor` (`--as`, then a base name a profile answers to, then `UNSENT_AGENT`, then the base name) |
@@ -14,6 +14,7 @@
 | `stitch.go` | Rebuilds drafts taller than the box: word-level edit-distance alignment of each view against the known text; un-wraps rows back into lines |
 | `paste.go` | Captures bracketed pastes and expands the profile's placeholders, such as `[Pasted text #N +M lines]` |
 | `store.go` | Durable writes, history, per-session lock files |
+| `capture.go` | The raw log (`rawLog`: keys and output in `script -r` format, window sizes beside it, files `0600`), written only under `UNSENT_DEBUG_DIR` or by `unsent capture`, which records a fixture bundle into `testdata/<agent>/<version>/` with an editor copy per Ctrl+G |
 | `sent.go` | Send detection (submit and clear keys in order, each submit and the first keys after it with the screen they were typed into), `UNSENT_ON_SEND`, the per-session sent logs in `sent/` and their limits |
 | `testdata/claude/<version>/` | Real Claude Code captures (raw bytes, keys with output, screens, editor copies) that `replay_test.go` replays through the reader and stitcher |
 
@@ -45,7 +46,7 @@ Re-measure these when a Claude Code release changes the prompt, and set the prof
 - Never add network access. Drafts stay on the machine.
 - Adding an agent means one profile file (`agent_<name>.go`, listed in `profiles`) plus tests built from real screen captures.
 - The promise: no text the user did not delete is ever lost. Text in view is exact; text out of sight is inferred. So once a draft has been stitched, `keepOld` keeps a safety copy (`store.keepVersion`, capped per session) before any save that loses text (`lostChars`). The delete-key count (`deleteLog`, each key spent once) only guides the stitcher; it never permits a loss. Any change must keep that true.
-- The stitcher's fuzz tests (`TestStitchFuzz*`) drive a simulated box through thousands of random edits, with delete keys fed exactly, through the real `deleteLog` on a simulated clock, and as Ctrl+W. With unique words they check the promise at every save; they also hold the exact-draft rate above three floors per mode: the same words, the same bytes with one allowed difference (a line break joined into a space at a full row), and identical with none. Check a stitcher change against real Claude Code too: set `UNSENT_DEBUG_DIR` and every save's view and result is logged to `views.jsonl` there, ready to replay.
+- The stitcher's fuzz tests (`TestStitchFuzz*`) drive a simulated box through thousands of random edits, with delete keys fed exactly, through the real `deleteLog` on a simulated clock, and as Ctrl+W. With unique words they check the promise at every save; they also hold the exact-draft rate above three floors per mode: the same words, the same bytes with one allowed difference (a line break joined into a space at a full row), and identical with none. Check a stitcher change against real Claude Code too: set `UNSENT_DEBUG_DIR` and every save's view and result is logged to `views.jsonl` there, and the session's raw keys and output to `raw-<id>.rec`, ready to replay. `unsent capture claude` records the same raw log as a fixture bundle, with an editor copy per Ctrl+G.
 - A box that empties goes to history unless a send is certain (`session.look`): a submit key was the last key typed before the box read empty (or the first keys after it were typed into an empty box), no clear key came with it, and the box was on screen when the key arrived. Doubt counts as a clear, because under `UNSENT_ON_SEND=delete` a clear taken for a send would lose text. Keep a test that goes red when the submit match is always true (`TestSendCtrlCTestCatchesAnAlwaysTrueSubmit`).
 - The screen alone cannot tell text deleted at the edge of the box from text pushed out of sight; the delete keys seen on input (the profile's `keys`, split into keys that delete before and after the cursor) decide. Keep that list in step with the agent's keybindings.
 

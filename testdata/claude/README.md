@@ -25,4 +25,4 @@ Three files differ from that:
 
 ## Adding one
 
-Keep each agent under 20 MB, trimmed or compressed. Check every file for real prompt text, names, paths and keys before committing. A new screen needs its expected draft in `claudeScreens`, or `TestReplayClaudeScreens` fails.
+`unsent capture claude` records a new `.rec` with its editor copies, named `capture-<time>`, into the folder of the running version; rename them for what they show. Keep each agent under 20 MB, trimmed or compressed. Check every file for real prompt text, names, paths and keys before committing. A new screen needs its expected draft in `claudeScreens`, or `TestReplayClaudeScreens` fails.

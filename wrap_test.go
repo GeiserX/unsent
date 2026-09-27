@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -95,6 +96,9 @@ func fakeAgent() {
 				return
 			case in[0] == 5: // Ctrl+E quits with an error
 				os.Exit(3)
+			case in[0] == 7: // Ctrl+G hands the draft to $VISUAL, then $EDITOR
+				editDraft(strings.Join(draft, ""))
+				in = in[1:]
 			case in[0] == '\r' || in[0] == 3: // send, or Ctrl+C: the box empties
 				draft = nil
 				in = in[1:]
@@ -105,6 +109,23 @@ func fakeAgent() {
 		}
 		draw()
 	}
+}
+
+// editDraft writes the fake agent's draft to a file and runs the editor on
+// it, as Claude Code's Ctrl+G does.
+func editDraft(draft string) {
+	f, err := os.CreateTemp("", "fake-prompt-*.md")
+	if err != nil {
+		return
+	}
+	defer os.Remove(f.Name())
+	f.WriteString(draft)
+	f.Close()
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	exec.Command(editor, f.Name()).Run()
 }
 
 // drawBox is the fake agent's screen with text in its box, drawn the way
@@ -405,10 +426,10 @@ func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 	}
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
-	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term); code != 7 {
+	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term, nil); code != 7 {
 		t.Fatalf("exit %d", code)
 	}
-	if code := wrap("no-such-agent-unsent-test", []string{"no-such-agent-unsent-test"}, term, term); code != 127 {
+	if code := wrap("no-such-agent-unsent-test", []string{"no-such-agent-unsent-test"}, term, term, nil); code != 127 {
 		t.Fatalf("exit %d", code)
 	}
 }
@@ -422,14 +443,14 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 	r, w, _ := os.Pipe()
 	defer r.Close()
 	defer w.Close()
-	if code := wrap("sh", []string{"sh", "-c", "true"}, r, w); code != 0 {
+	if code := wrap("sh", []string{"sh", "-c", "true"}, r, w, nil); code != 0 {
 		t.Fatalf("exit %d", code)
 	}
 	if len(ran) != 4 || !strings.HasSuffix(ran[0], "/sh") || ran[3] != "true" {
 		t.Fatalf("ran %q", ran)
 	}
 	execAgent = func(string, []string) error { return os.ErrPermission }
-	if code := wrap("sh", []string{"sh"}, r, w); code != 126 {
+	if code := wrap("sh", []string{"sh"}, r, w, nil); code != 126 {
 		t.Fatalf("exit %d on exec failure", code)
 	}
 }
@@ -662,7 +683,7 @@ func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
 	r, w, _ := os.Pipe()
 	old := os.Stderr
 	os.Stderr = w
-	code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term)
+	code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term, nil)
 	os.Stderr = old
 	w.Close()
 	said, _ := io.ReadAll(r)
@@ -687,12 +708,12 @@ func TestWrapOff(t *testing.T) {
 	execAgent = func(bin string, args []string) error { ran = args; return nil }
 	defer func() { execAgent = oldExec }()
 	t.Setenv("UNSENT_OFF", "1")
-	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term); code != 0 || len(ran) != 3 {
+	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term, nil); code != 0 || len(ran) != 3 {
 		t.Fatalf("exit %d, ran %q: UNSENT_OFF=1 did not hand over", code, ran)
 	}
 	ran = nil
 	t.Setenv("UNSENT_OFF", "0")
-	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term); code != 7 || ran != nil {
+	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term, nil); code != 7 || ran != nil {
 		t.Fatalf("exit %d, ran %q: UNSENT_OFF=0 switched unsent off", code, ran)
 	}
 }
