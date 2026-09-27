@@ -292,6 +292,10 @@ func TestStoreLoadsFileWithoutFormat(t *testing.T) {
 		len(got[0].Pastes) != 1 || got[0].Format != 0 {
 		t.Fatalf("orphans %+v", got)
 	}
+	// Written before records named their agent: it comes from the command.
+	if got[0].Agent != "" || got[0].agent() != "claude" {
+		t.Fatalf("agent %q, fallback %q", got[0].Agent, got[0].agent())
+	}
 	if _, err := os.Stat(st.draftPath(id)); err != nil {
 		t.Fatalf("old draft file removed: %v", err)
 	}
@@ -343,5 +347,42 @@ func TestStoreKeepsNewerFormat(t *testing.T) {
 	st.orphans()
 	if _, err := os.Stat(st.draftPath(id)); !os.IsNotExist(err) {
 		t.Fatal("control: an empty current-format file was kept")
+	}
+}
+
+func TestRecordAgent(t *testing.T) {
+	for _, c := range []struct {
+		r    record
+		want string
+	}{
+		{record{Agent: "claude", Command: []string{"npx"}}, "claude"},
+		{record{Command: []string{"/opt/homebrew/bin/claude", "--resume"}}, "claude"},
+		{record{Command: []string{"npx", "@anthropic-ai/claude-code"}}, "npx"},
+		{record{}, ""},
+	} {
+		if got := c.r.agent(); got != c.want {
+			t.Fatalf("agent of %+v = %q, want %q", c.r, got, c.want)
+		}
+	}
+}
+
+func TestAgentFor(t *testing.T) {
+	t.Setenv("UNSENT_AGENT", "")
+	if got := agentFor("", "/usr/local/bin/claude"); got != "claude" {
+		t.Fatalf("base name: %q", got)
+	}
+	if got := agentFor("", "npx"); got != "npx" {
+		t.Fatalf("unknown command: %q", got)
+	}
+	t.Setenv("UNSENT_AGENT", "claude")
+	if got := agentFor("", "node"); got != "claude" {
+		t.Fatalf("UNSENT_AGENT: %q", got)
+	}
+	// --as wins over the variable.
+	if got := agentFor("codex", "node"); got != "codex" {
+		t.Fatalf("--as: %q", got)
+	}
+	if p := profileFor(agentFor("", "node")); p != &claude {
+		t.Fatal("UNSENT_AGENT did not pick the profile")
 	}
 }

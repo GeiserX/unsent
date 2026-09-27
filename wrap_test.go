@@ -107,6 +107,13 @@ func fakeAgent() {
 // and returns its exit code and the store it wrote to.
 func runWrapped(t *testing.T, script func(type_ func(string))) (int, *store) {
 	t.Helper()
+	return runWrappedAs(t, "claude", "claude", script)
+}
+
+// runWrappedAs is runWrapped with the fake agent installed as command and
+// wrapped as agent.
+func runWrappedAs(t *testing.T, agent, command string, script func(type_ func(string))) (int, *store) {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("UNSENT_HOME", home)
 	t.Setenv("UNSENT_FAKE_AGENT", "1")
@@ -115,7 +122,7 @@ func runWrapped(t *testing.T, script func(type_ func(string))) (int, *store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+	if err := os.Symlink(self, filepath.Join(bin, command)); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -151,7 +158,7 @@ func runWrapped(t *testing.T, script func(type_ func(string))) (int, *store) {
 	defer func() { user.Close(); term.Close() }()
 
 	code := make(chan int, 1)
-	go func() { code <- wrap([]string{"claude"}, term, term) }()
+	go func() { code <- wrap(agent, []string{command}, term, term) }()
 	select {
 	case <-ready:
 	case <-time.After(10 * time.Second):
@@ -183,6 +190,36 @@ func TestWrapSavesDraftLeftInTheBox(t *testing.T) {
 	rs := st.orphans()
 	if len(rs) != 1 || rs[0].Draft != "hello\nworld" || rs[0].Ended.IsZero() {
 		t.Fatalf("orphans %+v", rs)
+	}
+	if rs[0].Agent != "claude" {
+		t.Fatalf("agent %q, want claude", rs[0].Agent)
+	}
+}
+
+// --as picks the profile for a command whose name does not say which agent
+// it starts, and the draft is recorded under that agent. The folder is
+// recorded as its real path, not the symlink the agent was started from.
+func TestWrapAsNamesTheAgent(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(link)
+	code, st := runWrappedAs(t, agentFor("claude", "renamed-agent"), "renamed-agent", func(type_ func(string)) {
+		type_("typed into a renamed binary")
+		type_("\x04")
+	})
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	rs := st.orphans()
+	if len(rs) != 1 || rs[0].Draft != "typed into a renamed binary" {
+		t.Fatalf("orphans %+v: the profile named by --as did not read the box", rs)
+	}
+	want, _ := filepath.EvalSymlinks(real)
+	if rs[0].Agent != "claude" || rs[0].Command[0] != "renamed-agent" || rs[0].Cwd != want {
+		t.Fatalf("agent %q, command %q, cwd %q (want %q)", rs[0].Agent, rs[0].Command, rs[0].Cwd, want)
 	}
 }
 
@@ -250,10 +287,10 @@ func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 	}
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
-	if code := wrap([]string{"sh", "-c", "exit 7"}, term, term); code != 7 {
+	if code := wrap("sh", []string{"sh", "-c", "exit 7"}, term, term); code != 7 {
 		t.Fatalf("exit %d", code)
 	}
-	if code := wrap([]string{"no-such-agent-unsent-test"}, term, term); code != 127 {
+	if code := wrap("no-such-agent-unsent-test", []string{"no-such-agent-unsent-test"}, term, term); code != 127 {
 		t.Fatalf("exit %d", code)
 	}
 }
@@ -267,14 +304,14 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 	r, w, _ := os.Pipe()
 	defer r.Close()
 	defer w.Close()
-	if code := wrap([]string{"sh", "-c", "true"}, r, w); code != 0 {
+	if code := wrap("sh", []string{"sh", "-c", "true"}, r, w); code != 0 {
 		t.Fatalf("exit %d", code)
 	}
 	if len(ran) != 4 || !strings.HasSuffix(ran[0], "/sh") || ran[3] != "true" {
 		t.Fatalf("ran %q", ran)
 	}
 	execAgent = func(string, []string) error { return os.ErrPermission }
-	if code := wrap([]string{"sh"}, r, w); code != 126 {
+	if code := wrap("sh", []string{"sh"}, r, w); code != 126 {
 		t.Fatalf("exit %d on exec failure", code)
 	}
 }

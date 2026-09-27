@@ -26,8 +26,9 @@ const saveInterval = 400 * time.Millisecond
 
 // wrap runs args[0] inside a pseudo-terminal, passes every byte between it
 // and the terminal (in, out) untouched and keeps the text in the agent's
-// input box saved on disk.
-func wrap(args []string, in, out *os.File) int {
+// input box saved on disk. agent names the agent (see agentFor); its
+// profile reads the box.
+func wrap(agent string, args []string, in, out *os.File) int {
 	bin, err := exec.LookPath(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
@@ -49,7 +50,8 @@ func wrap(args []string, in, out *os.File) int {
 		return 1
 	}
 	cwd, _ := os.Getwd()
-	noticeOrphans(st, cwd)
+	cwd = realPath(cwd)
+	noticeOrphans(st, cwd, agent)
 
 	cmd := exec.Command(bin, args[1:]...)
 	cols, rows := termSize(in)
@@ -70,10 +72,11 @@ func wrap(args []string, in, out *os.File) int {
 		store:  st,
 		screen: vt.NewEmulator(cols, rows),
 		pastes: &pasteTracker{},
-		prof:   profileFor(args[0]),
+		prof:   profileFor(agent),
 	}
+	s.rec.Agent = agent
 	if s.prof == nil {
-		fmt.Fprintf(os.Stderr, "unsent: no reader for %q yet, running it without saving drafts\n", args[0])
+		fmt.Fprintf(os.Stderr, "unsent: no reader for %q yet, running it without saving drafts\n", agent)
 	}
 	if s.prof != nil {
 		if err := st.hold(s.rec); err != nil {

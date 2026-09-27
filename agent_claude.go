@@ -8,6 +8,7 @@ import (
 
 // claude is Claude Code's profile.
 var claude = profile{
+	name:  "claude",
 	names: []string{"claude"},
 	read:  claudeBox,
 	// A long paste shows as "[Pasted text #2 +39 lines]", or

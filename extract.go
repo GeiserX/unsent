@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -39,6 +40,8 @@ type extractor func(s *screen) (v view, ok bool)
 // start it, how to read its box, and which of its keys the save loop must
 // know about. Adding an agent means adding a profile, in a file of its own.
 type profile struct {
+	// name is the agent's name in records and filters.
+	name string
 	// names are the command base names that start the agent.
 	names []string
 	read  extractor
@@ -53,12 +56,34 @@ var profiles = []*profile{&claude}
 
 // profileFor returns the profile of the agent a command starts, or nil.
 func profileFor(command string) *profile {
+	base := filepath.Base(command)
 	for _, p := range profiles {
-		if slices.Contains(p.names, filepath.Base(command)) {
+		if p.name == base || slices.Contains(p.names, base) {
 			return p
 		}
 	}
 	return nil
+}
+
+// agentFor names the agent a command starts: as (from --as), else
+// UNSENT_AGENT, else the command's base name. The first two are for
+// commands whose name does not say it: npx, node cli.js, a renamed binary.
+func agentFor(as, command string) string {
+	for _, name := range []string{as, os.Getenv("UNSENT_AGENT"), filepath.Base(command)} {
+		if name != "" {
+			return agentName(name)
+		}
+	}
+	return ""
+}
+
+// agentName is the name records and filters use: a name a profile answers
+// to becomes the profile's name.
+func agentName(name string) string {
+	if p := profileFor(name); p != nil {
+		return p.name
+	}
+	return name
 }
 
 // hasMarker reports whether a row starts with marker and a space, or is

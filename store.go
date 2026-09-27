@@ -29,9 +29,14 @@ const recordFormat = 1
 
 // record is one wrapped session and the draft its input box last held.
 type record struct {
-	Format  int       `json:"format"`
-	ID      string    `json:"id"`
-	Command []string  `json:"command"`
+	Format  int      `json:"format"`
+	ID      string   `json:"id"`
+	Command []string `json:"command"`
+	// Agent names the agent the draft came from (see agentFor), so it is
+	// only offered back to that agent.
+	Agent string `json:"agent"`
+	// Cwd is the folder the agent ran in, as a resolved real path. Files
+	// written before that may hold a path through a symlink.
 	Cwd     string    `json:"cwd"`
 	PID     int       `json:"pid"`
 	Started time.Time `json:"started"`
@@ -44,6 +49,18 @@ type record struct {
 	// Version marks a safety copy: an earlier version of a live draft, kept
 	// because a later save lost text out of sight.
 	Version bool `json:"version,omitempty"`
+}
+
+// agent is the agent the draft came from. Files written before records named
+// it fall back to the base name of the command.
+func (r *record) agent() string {
+	if r.Agent != "" {
+		return r.Agent
+	}
+	if len(r.Command) == 0 {
+		return ""
+	}
+	return agentName(filepath.Base(r.Command[0]))
 }
 
 func newRecord(args []string, cwd string) *record {

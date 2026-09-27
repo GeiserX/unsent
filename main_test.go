@@ -107,19 +107,177 @@ func TestCLIRestoreWithoutClipboard(t *testing.T) {
 	}
 }
 
-func TestNoticeOrphans(t *testing.T) {
-	st := seed(t, "one", "two")
+// notice returns what noticeOrphans prints.
+func notice(st *store, cwd, agent string) string {
 	r, w, _ := os.Pipe()
 	old := os.Stderr
 	os.Stderr = w
-	noticeOrphans(st, "/work")
-	noticeOrphans(st, "/elsewhere")
+	noticeOrphans(st, cwd, agent)
 	w.Close()
 	os.Stderr = old
 	var b bytes.Buffer
 	b.ReadFrom(r)
-	if got := b.String(); strings.Count(got, "\n") != 1 || !strings.Contains(got, "(and 1 more)") {
+	return b.String()
+}
+
+func TestNoticeOrphans(t *testing.T) {
+	st := seed(t, "one", "two")
+	if got := notice(st, "/work", "claude"); strings.Count(got, "\n") != 1 || !strings.Contains(got, "(and 1 more). Run `unsent restore` to copy it.\n") {
 		t.Fatalf("notice %q", got)
+	}
+	if got := notice(st, "/elsewhere", "claude"); got != "" {
+		t.Fatalf("notice in another folder %q", got)
+	}
+}
+
+// seedAs writes a draft left behind by agent in folder, minutes old.
+func seedAs(t *testing.T, st *store, id, agent, folder, draft string, minutes int) {
+	t.Helper()
+	r := newRecord([]string{"/usr/local/bin/" + agent}, folder)
+	r.ID, r.Agent, r.Draft, r.Ended = id, agent, draft, time.Now()
+	r.Updated = time.Now().Add(-time.Duration(minutes) * time.Minute)
+	if err := st.write(r); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A draft is only offered back to the agent it came from, and only in the
+// folder it was saved in; one left in a subfolder is counted.
+func TestNoticeFiltersByFolderAndAgent(t *testing.T) {
+	st := testStore(t)
+	work := t.TempDir()
+	for _, d := range []string{"sub/deeper", "../" + filepath.Base(work) + "-sibling"} {
+		if err := os.MkdirAll(filepath.Join(work, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seedAs(t, st, "a", "codex", work, "codex, newest here", 0)
+	seedAs(t, st, "b", "claude", work, "claude here", 1)
+	seedAs(t, st, "c", "claude", filepath.Join(work, "sub"), "claude in a subfolder", 2)
+	seedAs(t, st, "d", "claude", filepath.Join(work, "sub", "deeper"), "claude deeper", 3)
+	seedAs(t, st, "e", "codex", filepath.Join(work, "sub"), "codex in a subfolder", 4)
+	seedAs(t, st, "f", "claude", work+"-sibling", "a folder that only shares the prefix", 5)
+
+	got := notice(st, work, "claude")
+	if !strings.Contains(got, "1 line.") || strings.Contains(got, "more)") {
+		t.Fatalf("claude notice %q: offered another agent's draft", got)
+	}
+	// A plain restore would take the newer codex draft, so the notice names the agent.
+	if !strings.Contains(got, "Run `unsent restore --agent claude` to copy it. 2 drafts wait in subfolders: `unsent list`.") {
+		t.Fatalf("claude notice %q", got)
+	}
+	got = notice(st, work, "codex")
+	if !strings.Contains(got, "Run `unsent restore` to copy it. 1 draft waits in a subfolder: `unsent list`.") {
+		t.Fatalf("codex notice %q", got)
+	}
+	if got := notice(st, filepath.Join(work, "sub"), "claude"); !strings.Contains(got, "1 draft waits in a subfolder") || !strings.Contains(got, "recovered a draft") {
+		t.Fatalf("notice in the subfolder %q", got)
+	}
+	// Only subfolder drafts: counted, not offered.
+	if got := notice(st, filepath.Dir(work), "codex"); got != "unsent: 2 drafts wait in subfolders of this folder: `unsent list`.\n" {
+		t.Fatalf("notice above %q", got)
+	}
+	if got := notice(st, work, "gemini"); got != "" {
+		t.Fatalf("an agent with no drafts got a notice %q", got)
+	}
+	// The folder is compared by its real path: a symlink to it is the same folder.
+	link := filepath.Join(t.TempDir(), "link")
+	os.Symlink(work, link)
+	if got := notice(st, link, "claude"); !strings.Contains(got, "recovered a draft") {
+		t.Fatalf("notice through a symlink %q", got)
+	}
+}
+
+func TestCLIListFiltersByAgentAndFolder(t *testing.T) {
+	st := testStore(t)
+	here := t.TempDir()
+	t.Chdir(here)
+	seedAs(t, st, "a", "codex", here, "codex draft here", 0)
+	seedAs(t, st, "b", "claude", "/elsewhere", "claude draft elsewhere", 1)
+	seedAs(t, st, "c", "claude", here, "claude draft here", 2)
+
+	_, out, _ := runCLI("list")
+	if !strings.Contains(out, "  1  codex   ") || !strings.Contains(out, "  2  claude  ") || strings.Count(out, "\n") != 3 {
+		t.Fatalf("list:\n%s", out)
+	}
+	// Filtered rows keep the numbers show and restore take.
+	_, out, _ = runCLI("list", "--agent", "claude")
+	if strings.Contains(out, "codex") || !strings.Contains(out, "  2  claude") || !strings.Contains(out, "  3  claude") {
+		t.Fatalf("list --agent claude:\n%s", out)
+	}
+	_, out, _ = runCLI("list", "--here", "--agent", "claude")
+	if strings.Count(out, "\n") != 1 || !strings.Contains(out, "  3  claude") {
+		t.Fatalf("list --here --agent claude:\n%s", out)
+	}
+	if _, out, _ = runCLI("list", "--agent", "gemini"); !strings.Contains(out, "No drafts") {
+		t.Fatalf("list --agent gemini:\n%s", out)
+	}
+	for _, bad := range [][]string{{"list", "--agent"}, {"list", "--bogus"}, {"list", "extra"}, {"show", "--here"}} {
+		if code, _, _ := runCLI(bad...); code != 2 {
+			t.Fatalf("%q exit %d, want 2", bad, code)
+		}
+	}
+}
+
+func TestCLIRestoreFiltersByAgent(t *testing.T) {
+	st := testStore(t)
+	here := t.TempDir()
+	t.Chdir(here)
+	seedAs(t, st, "a", "claude", "/elsewhere", "claude, newest, elsewhere", 0)
+	seedAs(t, st, "b", "codex", here, "codex draft here", 1)
+	seedAs(t, st, "c", "claude", here, "claude draft here", 2)
+	seedAs(t, st, "d", "gemini", "/elsewhere", "gemini elsewhere", 3)
+
+	if _, out, _ := runCLI("show"); out != "codex draft here\n" {
+		t.Fatalf("show %q", out)
+	}
+	if _, out, _ := runCLI("show", "--agent", "claude"); out != "claude draft here\n" {
+		t.Fatalf("show --agent claude %q", out)
+	}
+	// Nothing from gemini here: its newest draft anywhere.
+	if _, out, _ := runCLI("show", "--agent", "gemini"); out != "gemini elsewhere\n" {
+		t.Fatalf("show --agent gemini %q", out)
+	}
+	if code, _, errOut := runCLI("show", "--agent", "aider"); code != 1 || !strings.Contains(errOut, "no drafts from aider") {
+		t.Fatalf("show --agent aider %d %q", code, errOut)
+	}
+	// A number reaches any draft, whatever the agent filter says.
+	if _, out, _ := runCLI("show", "--agent", "claude", "2"); out != "codex draft here\n" {
+		t.Fatalf("show 2 %q", out)
+	}
+}
+
+func TestCLIAsNeedsANameAndACommand(t *testing.T) {
+	for _, args := range [][]string{{"--as"}, {"--as", "claude"}, {"--as", "claude", "--"}, {"--as", "", "sh"}} {
+		if code, _, e := runCLI(args...); code != 2 || !strings.Contains(e, "Usage") {
+			t.Fatalf("%q exit %d", args, code)
+		}
+	}
+	var ran []string
+	old := execAgent
+	execAgent = func(bin string, args []string) error { ran = args; return nil }
+	defer func() { execAgent = old }()
+	// Output is not a terminal under go test, so the wrapper hands over at once.
+	if code, _, _ := runCLI("--as", "claude", "--", "sh", "-c", "true"); code != 0 || strings.Join(ran, " ") != "sh -c true" {
+		t.Fatalf("exit %d, ran %q", code, ran)
+	}
+}
+
+func TestBelow(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{
+		{"/w/sub", "/w", true},
+		{"/w/sub/deeper", "/w", true},
+		{"/w", "/w", false},
+		{"/w-sibling", "/w", false},
+		{"/", "/w", false},
+		{"/other/w", "/w", false},
+	} {
+		if got := below(c.a, c.b); got != c.want {
+			t.Fatalf("below(%q, %q) = %v", c.a, c.b, got)
+		}
 	}
 }
 

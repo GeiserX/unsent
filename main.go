@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,10 +23,18 @@ const usage = `unsent: AutoRecover for AI agent prompts.
 
 Usage:
   unsent <agent> [args...]   run the agent with its input box saved as you type
-  unsent list [--all]        list drafts left behind (--all adds cleared ones
-                             and earlier versions)
-  unsent show [N]            print draft N (default: this folder's newest)
-  unsent restore [N]         copy draft N to the clipboard and mark it restored
+  unsent --as <agent> <command> [args...]
+                             the same, for a command whose name does not say
+                             which agent it starts (npx, node cli.js, a renamed
+                             binary); UNSENT_AGENT=<agent> does the same
+  unsent list [--all] [--here] [--agent <agent>]
+                             list drafts left behind (--all adds cleared ones
+                             and earlier versions; --here keeps this folder's,
+                             --agent one agent's)
+  unsent show [--agent <agent>] [N]
+                             print draft N (default: this folder's newest)
+  unsent restore [--agent <agent>] [N]
+                             copy draft N to the clipboard and mark it restored
   unsent version
 
 Put "alias claude='unsent claude'" in your shell profile to never think
@@ -54,6 +63,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdShow(args[1:], stdout, stderr, false)
 	case "restore":
 		return cmdShow(args[1:], stdout, stderr, true)
+	case "--as":
+		if len(args) < 3 {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		as, cmd := args[1], args[2:]
+		if cmd[0] == "--" {
+			cmd = cmd[1:]
+		}
+		if as == "" || len(cmd) == 0 {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		return wrap(agentFor(as, cmd[0]), cmd, os.Stdin, os.Stdout)
 	case "--":
 		args = args[1:]
 		if len(args) == 0 {
@@ -61,7 +84,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 	}
-	return wrap(args, os.Stdin, os.Stdout)
+	return wrap(agentFor("", args[0]), args, os.Stdin, os.Stdout)
 }
 
 // buildVersion is the release version stamped in by the release build, or
@@ -104,29 +127,96 @@ func contains(rs []*record, r *record) bool {
 	return false
 }
 
+// options are the flags list, show and restore take.
+type options struct {
+	all, here bool
+	agent     string // "" for every agent
+	rest      []string
+}
+
+// parseOptions reads the flags in allowed out of args; the rest are
+// arguments.
+func parseOptions(args []string, allowed ...string) (options, error) {
+	var o options
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") || a == "-" {
+			o.rest = append(o.rest, a)
+			continue
+		}
+		if a == "-a" {
+			a = "--all"
+		}
+		if !slices.Contains(allowed, a) {
+			return o, fmt.Errorf("unknown option %q", args[i])
+		}
+		switch a {
+		case "--all":
+			o.all = true
+		case "--here":
+			o.here = true
+		case "--agent":
+			if i+1 >= len(args) || args[i+1] == "" {
+				return o, fmt.Errorf("--agent needs an agent name")
+			}
+			i++
+			o.agent = agentName(args[i])
+		}
+	}
+	return o, nil
+}
+
+// keeps reports whether a record passes the agent and --here filters.
+func (o options) keeps(r *record, cwd string) bool {
+	return (o.agent == "" || r.agent() == o.agent) && (!o.here || samePath(r.Cwd, cwd))
+}
+
 func cmdList(args []string, stdout, stderr io.Writer) int {
+	o, err := parseOptions(args, "--all", "--here", "--agent")
+	if err == nil && len(o.rest) > 0 {
+		err = fmt.Errorf("unexpected argument %q", o.rest[0])
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 2
+	}
 	st, err := openStore()
 	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 1
 	}
-	all := len(args) > 0 && (args[0] == "--all" || args[0] == "-a")
-	rs := candidates(st, all)
-	if len(rs) == 0 {
+	cwd, _ := os.Getwd()
+	// Filtered rows keep their numbers, the ones show and restore take.
+	var shown []int
+	width := 0
+	rs := candidates(st, o.all)
+	for i, r := range rs {
+		if o.keeps(r, cwd) {
+			shown = append(shown, i)
+			width = max(width, len(r.agent()))
+		}
+	}
+	if len(shown) == 0 {
 		fmt.Fprintln(stdout, "No drafts to recover.")
 		return 0
 	}
-	for i, r := range rs {
+	for _, i := range shown {
+		r := rs[i]
 		mark := ""
 		if r.Version {
 			mark = "(earlier version) "
 		}
-		fmt.Fprintf(stdout, "%3d  %s  %-24s  %s%s\n", i+1, when(r.Updated), shortPath(r.Cwd, 24), mark, preview(r.Draft, 60-len(mark)))
+		fmt.Fprintf(stdout, "%3d  %-*s  %s  %-24s  %s%s\n", i+1, width, r.agent(), when(r.Updated), shortPath(r.Cwd, 24), mark, preview(r.Draft, 60-len(mark)))
 	}
 	return 0
 }
 
 func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
+	o, err := parseOptions(args, "--agent")
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 2
+	}
 	st, err := openStore()
 	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
@@ -137,22 +227,33 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 		fmt.Fprintln(stderr, "unsent: no drafts to recover")
 		return 1
 	}
-	n := 1
-	if len(args) > 0 {
-		n, err = strconv.Atoi(args[0])
+	n := 0
+	if len(o.rest) > 0 {
+		// A number reaches any draft, whatever its agent or folder.
+		n, err = strconv.Atoi(o.rest[0])
 		if err != nil || n < 1 || n > len(rs) {
-			fmt.Fprintf(stderr, "unsent: no draft %q; see unsent list --all\n", args[0])
+			fmt.Fprintf(stderr, "unsent: no draft %q; see unsent list --all\n", o.rest[0])
 			return 2
 		}
-	}
-	if len(args) == 0 {
-		// The recovery notice promised this folder's draft: prefer it.
+	} else {
+		// The recovery notice promised this folder's draft: prefer it, from
+		// the agent asked for.
 		cwd, _ := os.Getwd()
 		for i, r := range rs {
+			if !o.keeps(r, cwd) {
+				continue
+			}
+			if n == 0 {
+				n = i + 1
+			}
 			if isDraftFile(st, r) && samePath(r.Cwd, cwd) {
 				n = i + 1
 				break
 			}
+		}
+		if n == 0 {
+			fmt.Fprintf(stderr, "unsent: no drafts from %s to recover\n", o.agent)
+			return 1
 		}
 	}
 	r := rs[n-1]
@@ -195,16 +296,37 @@ func unplaced(r *record) int {
 	return n
 }
 
-// noticeOrphans tells the user, before the agent starts, that a draft from
-// this folder is waiting, the way a word processor offers recovered files.
-func noticeOrphans(st *store, cwd string) {
+// noticeOrphans tells the user, before the agent starts, that a draft this
+// agent left in this folder is waiting, the way a word processor offers
+// recovered files. A draft is only offered back to the agent it came from,
+// and one left in a subfolder is counted, not offered.
+func noticeOrphans(st *store, cwd, agent string) {
 	var here []*record
+	var first *record // this folder's newest, of any agent: what a plain restore picks
+	sub := 0
 	for _, r := range st.orphans() {
-		if samePath(r.Cwd, cwd) {
+		if samePath(r.Cwd, cwd) && first == nil {
+			first = r
+		}
+		switch {
+		case r.agent() != agent:
+		case samePath(r.Cwd, cwd):
 			here = append(here, r)
+		case below(r.Cwd, cwd):
+			sub++
 		}
 	}
+	subs := ""
+	switch {
+	case sub == 1:
+		subs = "1 draft waits in a subfolder"
+	case sub > 1:
+		subs = fmt.Sprintf("%d drafts wait in subfolders", sub)
+	}
 	if len(here) == 0 {
+		if subs != "" {
+			fmt.Fprintf(os.Stderr, "unsent: %s of this folder: `unsent list`.\n", subs)
+		}
 		return
 	}
 	r := here[0]
@@ -212,20 +334,36 @@ func noticeOrphans(st *store, cwd string) {
 	if len(here) > 1 {
 		more = fmt.Sprintf(" (and %d more)", len(here)-1)
 	}
-	fmt.Fprintf(os.Stderr, "unsent: recovered a draft from %s, %s%s. Run `unsent restore` to copy it.\n",
-		when(r.Updated), lines(r.Draft), more)
+	restore := "unsent restore"
+	if first != r {
+		// Another agent's draft here is newer, and a plain restore takes it.
+		restore += " --agent " + agent
+	}
+	if subs != "" {
+		subs = " " + subs + ": `unsent list`."
+	}
+	fmt.Fprintf(os.Stderr, "unsent: recovered a draft from %s, %s%s. Run `%s` to copy it.%s\n",
+		when(r.Updated), lines(r.Draft), more, restore, subs)
 }
 
-// samePath compares two folders after resolving symlinks, so /tmp and
-// /private/tmp on macOS count as one.
+// realPath is a folder's resolved real path, so /tmp and /private/tmp on
+// macOS are one folder. A path that cannot be resolved stays as it is.
+func realPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
+}
+
+// samePath compares two folders by their real paths.
 func samePath(a, b string) bool {
-	if ra, err := filepath.EvalSymlinks(a); err == nil {
-		a = ra
-	}
-	if rb, err := filepath.EvalSymlinks(b); err == nil {
-		b = rb
-	}
-	return a == b
+	return realPath(a) == realPath(b)
+}
+
+// below reports whether folder a is inside folder b, at any depth.
+func below(a, b string) bool {
+	rel, err := filepath.Rel(realPath(b), realPath(a))
+	return err == nil && rel != "." && filepath.IsLocal(rel)
 }
 
 func copyToClipboard(text string) error {

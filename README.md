@@ -46,6 +46,8 @@ Everything else stays the same. Same terminal, same keys, same arguments, so `un
 alias claude='unsent claude'
 ```
 
+When the agent starts through a command that doesn't carry its name, such as `npx` or a renamed binary, name the agent: `unsent --as claude npx @anthropic-ai/claude-code`, or set `UNSENT_AGENT=claude`.
+
 After a crash, a closed window or a reboot:
 
 ```sh
@@ -53,7 +55,10 @@ unsent list          # drafts left behind, newest first
 unsent restore       # copy the newest one to the clipboard, then paste it
 unsent show 2        # print draft 2
 unsent list --all    # also drafts you cleared or sent
+unsent list --here --agent claude   # only Claude Code's drafts from this folder
 ```
+
+Each draft remembers the agent and the folder it came from. The notice at start only offers a draft back to that agent in that folder, and counts the ones left in subfolders. `unsent restore --agent claude` copies that agent's newest draft from this folder, and a number from `unsent list` reaches any draft.
 
 ## Works everywhere you type
 
