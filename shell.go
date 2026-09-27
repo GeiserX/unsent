@@ -78,7 +78,12 @@ import (
 // hooks list them into a file beside the log and delete it; if that fails,
 // HUP is left alone as well. A subshell
 // inherits TRAPHUP, and $$ there is still the parent's pid, so the trap
-// hangs up ${sysparams[pid]}, the process it runs in.
+// hangs up ${sysparams[pid]}, the process it runs in. It turns local_traps
+// off before it removes itself: a hangup that comes while a function under
+// emulate -L runs, _unsent_put during a keystroke's redraw for one, runs
+// the trap inside that function, and zsh puts a trap removed there back
+// when the trap returns, so the trap's own kill -HUP would run it again,
+// one h record each time, and the shell would never exit.
 const zshHooks = `# The command line, saved as you type it, for unsent list and restore.
 if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     zmodload zsh/system zsh/datetime zsh/parameter 2>/dev/null &&
@@ -175,6 +180,7 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
         _unsent_hup_next "$@"
         return
       fi
+      setopt local_options no_local_traps
       unfunction TRAPHUP
       kill -HUP ${sysparams[pid]}
     }

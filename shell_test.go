@@ -134,14 +134,19 @@ func startZsh(t *testing.T, hooks string, unsentHome bool, env ...string) *zshSe
 	if err := os.WriteFile(hookFile, []byte(hooks), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	env = append([]string{"HOME=" + home, "ZDOTDIR=" + home, "PATH=" + agentBin + ":/usr/bin:/bin", "TERM=xterm"}, env...)
+	env = append([]string{"HOME=" + home, "ZDOTDIR=" + home, "PATH=" + agentBin + ":/usr/bin:/bin", "TERM=xterm", "PS1=" + zshPrompt}, env...)
 	dir := filepath.Join(home, ".local", "state", "unsent", "shell")
 	if unsentHome {
 		env = append(env, "UNSENT_HOME="+filepath.Join(home, "state"))
 		dir = filepath.Join(home, "state", "shell")
 	}
 	s := openZsh(t, exec.Command(sh, "-f", "-i"), env, home, dir)
-	s.send("PS1='" + zshPrompt[:1] + "''" + zshPrompt[1:] + "'; source " + hookFile + "\r")
+	// Keys typed before the line editor runs are typeahead: the terminal
+	// echoes them itself, and zsh on macOS can lose a line of it.
+	s.prompt(0, zshStart)
+	n := s.outLen()
+	s.send("source " + hookFile + "\r")
+	s.prompt(n, zshStart)
 	s.mark("ready")
 	return s
 }
@@ -190,35 +195,180 @@ func (s *zshSession) send(keys string) {
 // redraw at all, because zsh skips a redraw while input is pending.
 func (s *zshSession) echo(keys, want string) {
 	s.t.Helper()
-	s.mu.Lock()
-	n := s.out.Len()
-	s.mu.Unlock()
+	n := s.outLen()
 	s.send(keys)
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		s.mu.Lock()
-		out := s.out.String()[n:]
-		s.mu.Unlock()
-		if strings.Contains(out, want) {
-			return
+	s.until(zshStall, func() bool { return strings.Contains(s.shown(n), want) }, func() string {
+		return fmt.Sprintf("waited for %q on the terminal; got %q\nthe log ends %v", want, s.shown(n), s.tail())
+	})
+}
+
+// zshPrompt is the test shell's prompt, set from the environment, so no
+// echo of a typed line shows it. setup_test.go sets it with a line that
+// quotes it in two parts.
+const zshPrompt = "<zsh-ready> "
+
+// zleOn is what zle prints after a prompt once the line-init hook has run:
+// the switch to bracketed paste. The prompt itself shows before the hook.
+const zleOn = "\x1b[?2004h"
+
+// outLen is how much the terminal has shown so far.
+func (s *zshSession) outLen() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.out.Len()
+}
+
+// shown is what the terminal has shown after from.
+func (s *zshSession) shown(from int) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.out.String()[from:]
+}
+
+// zshStall is how long a wait lets the shell go without showing anything
+// new on the terminal or changing its logs. A loaded shared runner can
+// take a second over each key, so a wait bounded in total fails a shell
+// that is slow but moving; one that shows and writes nothing for this long
+// is stuck, and the wait fails at once with what it saw.
+const zshStall = 20 * time.Second
+
+// zshCap bounds any one wait however steadily the shell moves, so a shell
+// that loops, writing a record after record, fails its test long before
+// the test binary's timeout.
+const zshCap = 3 * time.Minute
+
+// progress sums what the terminal has shown and the sizes of the logs, so
+// it changes whenever the shell draws or writes.
+func (s *zshSession) progress() int64 {
+	n := int64(s.outLen())
+	m, _ := filepath.Glob(filepath.Join(s.dir, "zsh-*"))
+	for _, f := range m {
+		if fi, err := os.Stat(f); err == nil {
+			n += fi.Size() + 1
 		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("waited for %q on the terminal; got %q", want, out)
+	}
+	return n
+}
+
+// await polls ok every 10 ms until it holds, and fails once the shell has
+// gone stall without progress, or after zshCap in all.
+func (s *zshSession) await(stall time.Duration, ok func() bool) error {
+	start := time.Now()
+	last, moved := s.progress(), start
+	for !ok() {
+		now := time.Now()
+		if p := s.progress(); p != last {
+			last, moved = p, now
 		}
-		time.Sleep(20 * time.Millisecond)
+		if now.Sub(moved) > stall {
+			return fmt.Errorf("the shell showed and wrote nothing for %v", stall)
+		}
+		if now.Sub(start) > zshCap {
+			return fmt.Errorf("still waiting after %v", zshCap)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return nil
+}
+
+// until is await that fails the test with failure's text.
+func (s *zshSession) until(stall time.Duration, ok func() bool, failure func() string) {
+	s.t.Helper()
+	if err := s.await(stall, ok); err != nil {
+		s.t.Fatalf("%v; %s", err, failure())
 	}
 }
 
-// zshPrompt is the test shell's prompt. The line that sets it quotes it
-// in two parts, so its echo does not show it.
-const zshPrompt = "<zsh-ready> "
+// prompted says whether the terminal, after from, shows a prompt whose
+// line-init hook has run, and has shown no newer prompt since.
+func (s *zshSession) prompted(from int) bool {
+	out := s.shown(from)
+	i := strings.LastIndex(out, zshPrompt)
+	return i >= 0 && strings.Contains(out[i:], zleOn)
+}
 
-// clear presses Ctrl+C and waits for the new prompt. The terminal drops
-// input still queued when Ctrl+C arrives, as the Linux one does, so keys
-// sent before the prompt shows may never reach the shell.
+// zshStart is how long a new shell may show nothing before its first
+// prompts: it loads its modules first, and on a loaded Mac the malware
+// scanner holds each one up.
+const zshStart = time.Minute
+
+// prompt waits for a prompt after from whose line-init hook has run,
+// letting the shell go stall without progress.
+func (s *zshSession) prompt(from int, stall time.Duration) {
+	s.t.Helper()
+	s.until(stall, func() bool { return s.prompted(from) }, func() string {
+		return fmt.Sprintf("waited for a prompt past its line-init hook; the terminal shows %q\nthe log ends %v", s.shown(from), s.tail())
+	})
+}
+
+// run types a command, runs it with Enter and waits for the next prompt's
+// line-init hook. The terminal echoes keys typed while a command runs, so
+// seeing them there says nothing about the line editor.
+func (s *zshSession) run(line string) {
+	s.t.Helper()
+	n := s.outLen()
+	s.send(line + "\r")
+	s.prompt(n, zshStall)
+}
+
+// clear presses Ctrl+C and waits for the new prompt, on the terminal or as
+// an i record. The terminal drops input still queued when Ctrl+C arrives,
+// as the Linux one does, so keys sent before the prompt shows may never
+// reach the shell. And zsh acts on a Ctrl+C that comes while the line
+// editor is busy, drawing or running a hook, only when the next key
+// arrives, which it then drops. So each half second without a prompt
+// sends a Backspace: dropped behind a pending Ctrl+C, and at a fresh empty
+// prompt it deletes nothing and the hooks write nothing.
 func (s *zshSession) clear() {
 	s.t.Helper()
-	s.echo("\x03", zshPrompt)
+	n := s.outLen()
+	count := func() int {
+		c := 0
+		for _, r := range s.records() {
+			if r.kind == "i" {
+				c++
+			}
+		}
+		return c
+	}
+	i := count()
+	s.send("\x03")
+	nudge := time.Now().Add(500 * time.Millisecond)
+	s.until(zshStall, func() bool {
+		if strings.Contains(s.shown(n), zshPrompt) || count() > i {
+			return true
+		}
+		if time.Now().After(nudge) {
+			s.send("\x7f")
+			nudge = time.Now().Add(500 * time.Millisecond)
+		}
+		return false
+	}, func() string {
+		return fmt.Sprintf("no prompt after Ctrl+C; the terminal shows %q\nthe log ends %v", s.shown(n), s.tail())
+	})
+}
+
+// tail is the end of the live log, for a failure message.
+func (s *zshSession) tail() []zrec {
+	r := s.records()
+	return r[max(0, len(r)-8):]
+}
+
+// exits waits for the shell to exit after a signal, or fails with what the
+// log and the terminal show. Its bound is in total, not on progress: a
+// shell that goes on writing after its hangup, one h record after
+// another, is the failure this catches.
+func (s *zshSession) exits(what string) {
+	s.t.Helper()
+	select {
+	case err := <-s.ended:
+		s.ended <- err
+	case <-time.After(30 * time.Second):
+		s.mu.Lock()
+		out := s.out.String()
+		s.mu.Unlock()
+		s.t.Fatalf("zsh did not exit on %s; %d records, the log ends %v\nterminal: %q", what, len(s.records()), s.tail(), out[max(0, len(out)-400):])
+	}
 }
 
 // logs are the shell's log files.
@@ -263,22 +413,14 @@ func (s *zshSession) index(r []zrec, from int, kind, text string) int {
 	return -1
 }
 
+// waitFor waits for the live log's records to satisfy ok and returns them.
 func (s *zshSession) waitFor(what string, ok func([]zrec) bool) []zrec {
 	s.t.Helper()
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		r := s.records()
-		if ok(r) {
-			return r
-		}
-		if time.Now().After(deadline) {
-			s.mu.Lock()
-			out := s.out.String()
-			s.mu.Unlock()
-			s.t.Fatalf("waited for %s; the log holds %v\nterminal: %q", what, r, out)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	var r []zrec
+	s.until(zshStall, func() bool { r = s.records(); return ok(r) }, func() string {
+		return fmt.Sprintf("waited for %s; the log holds %v\nterminal: %q", what, r, s.shown(0))
+	})
+	return r
 }
 
 // line types text at the prompt and waits for its redraw record.
@@ -355,12 +497,8 @@ func scenarioSubshellHup(s *zshSession) error {
 	if err := syscall.Kill(pid, syscall.SIGHUP); err != nil {
 		return fmt.Errorf("hang up the subshell %d: %v", pid, err)
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for syscall.Kill(pid, 0) == nil {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("the subshell %d did not exit on SIGHUP", pid)
-		}
-		time.Sleep(20 * time.Millisecond)
+	if err := s.await(zshStall, func() bool { return syscall.Kill(pid, 0) != nil }); err != nil {
+		return fmt.Errorf("the subshell %d did not exit on SIGHUP: %v", pid, err)
 	}
 	return s.takes("after the subshell", "after the subshell")
 }
@@ -373,17 +511,22 @@ func (s *zshSession) takes(keys, want string) error {
 	if _, err := s.pty.WriteString(keys); err != nil {
 		return fmt.Errorf("the shell took no keys: %v", err)
 	}
-	deadline := time.Now().Add(15 * time.Second)
-	for s.index(s.records(), from, "b", want) < 0 {
+	var ended error
+	err := s.await(zshStall, func() bool {
 		select {
 		case err := <-s.ended:
 			s.ended <- err
-			return fmt.Errorf("the shell ended (%v) before it saved %q", err, want)
-		case <-time.After(20 * time.Millisecond):
+			ended = fmt.Errorf("the shell ended (%v) before it saved %q", err, want)
+			return true
+		default:
 		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("the shell saved no %q", want)
-		}
+		return s.index(s.records(), from, "b", want) >= 0
+	})
+	if ended != nil {
+		return ended
+	}
+	if err != nil {
+		return fmt.Errorf("the shell saved no %q: %v", want, err)
 	}
 	return nil
 }
@@ -530,11 +673,7 @@ func TestZshHooksRecordTheLine(t *testing.T) {
 	// The window closes: TRAPHUP writes the line, and the shell exits.
 	s.line("typed then hup")
 	syscall.Kill(pid, syscall.SIGHUP)
-	select {
-	case <-s.ended:
-	case <-time.After(10 * time.Second):
-		t.Fatal("zsh did not exit on SIGHUP")
-	}
+	s.exits("SIGHUP")
 	r = s.records()
 	if last := r[len(r)-1]; last != (zrec{"h", "typed then hup"}) {
 		t.Fatalf("last record %v, want h \"typed then hup\"", last)
@@ -550,7 +689,7 @@ func TestZshHooksSurviveKill9(t *testing.T) {
 	s := startZsh(t, zshHooks, true)
 	s.line("typed then killed")
 	s.cmd.Process.Kill()
-	<-s.ended
+	s.exits("kill -9")
 	r := s.records()
 	if last := r[len(r)-1]; last != (zrec{"b", "typed then killed"}) {
 		t.Fatalf("last record %v", last)
@@ -578,13 +717,7 @@ func TestZshHooksRotate(t *testing.T) {
 		}
 		return false
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for !movedAside() {
-		if time.Now().After(deadline) {
-			t.Fatalf("no .done log holds the line: %v", s.logs())
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	s.until(zshStall, movedAside, func() string { return fmt.Sprintf("no .done log holds the line: %v", s.logs()) })
 	if n := len(s.logs()); n < 2 {
 		t.Fatalf("logs %v", s.logs())
 	}
@@ -626,19 +759,84 @@ func TestZshHooksKeepTheUsersHupTrap(t *testing.T) {
 	s.line("typed before hup")
 	syscall.Kill(s.cmd.Process.Pid, syscall.SIGHUP)
 	s.waitFor("h", func(r []zrec) bool { return s.index(r, 0, "h", "typed before hup") >= 0 })
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		if b, err := os.ReadFile(filepath.Join(s.home, "user-hup")); err == nil && string(b) == "mine\n" {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the user's TRAPHUP did not run")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	s.until(zshStall, func() bool {
+		b, err := os.ReadFile(filepath.Join(s.home, "user-hup"))
+		return err == nil && string(b) == "mine\n"
+	}, func() string { return "the user's TRAPHUP did not run" })
 	// The user's trap returned 0, so the shell stays, the line with it.
 	s.send(" still")
 	s.waitFor("the line going on", func(r []zrec) bool { return s.index(r, 0, "b", "typed before hup still") >= 0 })
+}
+
+// scenarioHupInADeepHook hangs up the shell while a line-pre-redraw hook
+// of the user's runs under emulate -L, nested deeper than where the hooks
+// set TRAPHUP, as the hooks' own _unsent_put is during every redraw. zsh
+// puts back a trap removed in a function that has local_traps when that
+// function returns, so a TRAPHUP that removes itself and hangs up again
+// runs again, one h record each time, forever. The shell must exit with
+// one h record.
+func scenarioHupInADeepHook(t *testing.T, hooks string) error {
+	s := startZsh(t, hooks+`zmodload zsh/zselect
+function _deep {
+  emulate -L zsh
+  [[ -e $HOME/arm ]] || return 0
+  zf_rm $HOME/arm
+  () { () { () { () { print -rn -- $BUFFER >$HOME/in-hook.t; zf_mv $HOME/in-hook.t $HOME/in-hook; zselect -t 3000 } } } }
+}
+add-zle-hook-widget line-pre-redraw _deep
+`, true)
+	arm, in := filepath.Join(s.home, "arm"), filepath.Join(s.home, "in-hook")
+	s.line("typed then hup")
+	if err := os.WriteFile(arm, nil, 0o644); err != nil {
+		return err
+	}
+	s.send("!")
+	if err := s.await(zshStall, func() bool { return exists(in) }); err != nil {
+		return fmt.Errorf("the deep hook never ran (%v); the log ends %v", err, s.tail())
+	}
+	if err := syscall.Kill(s.cmd.Process.Pid, syscall.SIGHUP); err != nil {
+		return err
+	}
+	hups := func() []zrec {
+		return slices.DeleteFunc(s.records(), func(r zrec) bool { return r.kind != "h" })
+	}
+	for deadline := time.Now().Add(30 * time.Second); ; {
+		select {
+		case err := <-s.ended:
+			s.ended <- err
+			// The hook may arm in the redraw before the ! key, whose
+			// record the test saw; the h record holds the line it saw.
+			line, err := os.ReadFile(in)
+			if err != nil {
+				return err
+			}
+			if h := hups(); !slices.Equal(h, []zrec{{"h", string(line)}}) {
+				return fmt.Errorf("the shell exited with h records %v, want one of the line", h)
+			}
+			return nil
+		case <-time.After(10 * time.Millisecond):
+		}
+		if h := hups(); len(h) > 1 || time.Now().After(deadline) {
+			s.cmd.Process.Kill()
+			return fmt.Errorf("the shell did not exit on SIGHUP; %d h records, the log ends %v", len(h), s.tail())
+		}
+	}
+}
+
+// TestZshHooksExitOnAHupInADeepHook runs scenarioHupInADeepHook, and again
+// with a TRAPHUP that removes itself under the caller's local_traps, where
+// the shell loops and the check must go red.
+func TestZshHooksExitOnAHupInADeepHook(t *testing.T) {
+	if err := scenarioHupInADeepHook(t, zshHooks); err != nil {
+		t.Fatal(err)
+	}
+	looping := strings.Replace(zshHooks, "      setopt local_options no_local_traps\n", "", 1)
+	if looping == zshHooks {
+		t.Fatal("the mutation found nothing to change")
+	}
+	if err := scenarioHupInADeepHook(t, looping); err == nil {
+		t.Fatal("the check passed with a TRAPHUP that zsh puts back when it returns")
+	}
 }
 
 // TestZshHooksUnderUserOptions runs the Ctrl+C and vared checks with
@@ -716,8 +914,7 @@ func TestZshHooksLeaveAListHupTrap(t *testing.T) {
 // so the next write fails. The log must move aside as .done and the next
 // prompt must open a fresh log that starts with v and saves again.
 func scenarioFailedWrite(s *zshSession) error {
-	s.send("exec {_unsent_fd}>&-\r")
-	s.echo("x", "x") // the next prompt's line-init has run
+	s.run("exec {_unsent_fd}>&-")
 	done, _ := filepath.Glob(filepath.Join(s.dir, "zsh-*.done"))
 	if len(done) != 1 {
 		return fmt.Errorf("after a failed write the logs are %v, want one .done", s.logs())
@@ -783,16 +980,14 @@ func TestZshHooksReopenAGoneLog(t *testing.T) {
 // create nothing and save nothing. Pointed back at a folder of the
 // shell's own user, they save again.
 func scenarioForeignFolder(s *zshSession, foreign string) error {
-	s.send("UNSENT_HOME=" + foreign + "; exec {_unsent_fd}>&-\r")
-	s.echo("x", "x")
+	s.run("UNSENT_HOME=" + foreign + "; exec {_unsent_fd}>&-")
 	s.clear()
 	s.echo("not saved", "not saved")
 	if _, err := os.Lstat(foreign); !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("the hooks wrote into %s, a folder of another user (%v)", foreign, err)
 	}
 	s.clear()
-	s.send("UNSENT_HOME=$HOME/mine\r")
-	s.echo("q", "q") // not "y": the prompt holds one, which can show before line-init runs
+	s.run("UNSENT_HOME=$HOME/mine")
 	mine, _ := filepath.Glob(filepath.Join(s.home, "mine", "shell", "zsh-*.log"))
 	if len(mine) != 1 {
 		return fmt.Errorf("no log under the shell's own folder: %v", mine)
@@ -845,12 +1040,10 @@ func utf8Locale(t *testing.T) string {
 // and checks its record comes back exactly: the header counts bytes, not
 // characters, even where zsh counts characters.
 func scenarioMultibyte(s *zshSession) error {
-	s.send("print -r ${#${:-é}} >len\r")
-	s.echo("x", "x")
+	s.run("print -r ${#${:-é}} >len")
 	if n := strings.TrimSpace(readFile(s.t, filepath.Join(s.home, "len"))); n != "1" {
 		return fmt.Errorf("zsh counted %s characters in é; the locale did not take", n)
 	}
-	s.clear()
 	const text = "echo héllo ñ"
 	s.echo(text, "ñ")
 	m, _ := filepath.Glob(filepath.Join(s.dir, "zsh-*.log"))
@@ -898,11 +1091,7 @@ func TestZshHooksLoadedTwice(t *testing.T) {
 	if err := syscall.Kill(s.cmd.Process.Pid, syscall.SIGHUP); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case <-s.ended:
-	case <-time.After(10 * time.Second):
-		t.Fatal("zsh did not exit on SIGHUP")
-	}
+	s.exits("SIGHUP")
 	if len(s.logs()) != 1 {
 		t.Fatalf("logs %v, want one", s.logs())
 	}

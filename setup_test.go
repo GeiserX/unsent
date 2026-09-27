@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -629,6 +630,12 @@ func (h setupHome) rcZsh(t *testing.T, sh, path string) *zshSession {
 	state := filepath.Join(h.home, "state")
 	env := []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=xterm", "UNSENT_HOME=" + state, "skip_global_compinit=1"}
 	s := openZsh(t, exec.Command(sh, "-i"), env, h.home, filepath.Join(state, "shell"))
+	// Whatever prompt the rc files set, zle turns bracketed paste on once
+	// it runs; a line typed before that is typeahead, which zsh on macOS
+	// can lose.
+	s.until(zshStart, func() bool { return strings.Contains(s.shown(0), zleOn) }, func() string {
+		return fmt.Sprintf("the line editor never started; the terminal shows %q", s.shown(0))
+	})
 	s.echo("PS1='"+zshPrompt[:1]+"''"+zshPrompt[1:]+"'\r", zshPrompt)
 	return s
 }
@@ -637,11 +644,7 @@ func (h setupHome) rcZsh(t *testing.T, sh, path string) *zshSession {
 func (s *zshSession) hangUp() {
 	s.t.Helper()
 	syscall.Kill(s.cmd.Process.Pid, syscall.SIGHUP)
-	select {
-	case <-s.ended:
-	case <-time.After(15 * time.Second):
-		s.t.Fatal("zsh did not end on SIGHUP")
-	}
+	s.exits("SIGHUP")
 }
 
 // liveLogs are the logs a shell writes in the scratch state folder.

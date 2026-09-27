@@ -664,7 +664,7 @@ func scenarioZshToStore(t *testing.T, hooks string, end func(*zshSession)) error
 	s.clear()
 	s.line("left at the prompt")
 	end(s)
-	<-s.ended
+	s.exits("the end of the scenario")
 	code, out, errOut := runCLI("list", "--all", "--agent", "zsh")
 	var errs []error
 	if code != 0 {

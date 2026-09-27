@@ -94,6 +94,7 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
         _unsent_hup_next "$@"
         return
       fi
+      setopt local_options no_local_traps
       unfunction TRAPHUP
       kill -HUP ${sysparams[pid]}
     }
