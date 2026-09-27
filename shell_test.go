@@ -823,27 +823,39 @@ add-zle-hook-widget line-pre-redraw _deep
 	}
 }
 
-// TestZshHooksExitOnAHupInADeepHook runs scenarioHupInADeepHook, and again
-// with a TRAPHUP that removes itself under the caller's local_traps, where
-// the shell loops and the check must go red.
+// TestZshHooksExitOnAHupInADeepHook runs scenarioHupInADeepHook with the
+// hooks alone and after a user's TRAPHUP that exits the way CLAUDE.md
+// says the default does, which the hooks' trap calls. Each runs again
+// with a TRAPHUP that removes itself under the caller's local_traps,
+// where the shell loops and the check must go red for that reason.
 func TestZshHooksExitOnAHupInADeepHook(t *testing.T) {
-	if err := scenarioHupInADeepHook(t, zshHooks); err != nil {
-		t.Fatal(err)
-	}
-	looping := strings.Replace(zshHooks, "      setopt local_options no_local_traps\n", "", 1)
-	if looping == zshHooks {
-		t.Fatal("the mutation found nothing to change")
-	}
-	if err := scenarioHupInADeepHook(t, looping); err == nil {
-		t.Fatal("the check passed with a TRAPHUP that zsh puts back when it returns")
+	const userTrap = "function TRAPHUP { unfunction TRAPHUP; kill -HUP $$ }\n"
+	for _, c := range []struct{ name, hooks string }{
+		{"hooks", zshHooks},
+		{"user trap", userTrap + zshHooks},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if err := scenarioHupInADeepHook(t, c.hooks); err != nil {
+				t.Fatal(err)
+			}
+			looping := strings.Replace(c.hooks, "      setopt local_options no_local_traps\n", "", 1)
+			if looping == c.hooks {
+				t.Fatal("the mutation found nothing to change")
+			}
+			err := scenarioHupInADeepHook(t, looping)
+			if err == nil || !strings.Contains(err.Error(), "did not exit on SIGHUP") {
+				t.Fatalf("the check did not fail on a TRAPHUP that zsh puts back when it returns: %v", err)
+			}
+		})
 	}
 }
 
 // TestZshHooksUnderUserOptions runs the Ctrl+C and vared checks with
 // options a user's rc file may set before the block. zsh's own
-// add-zle-hook-widget fails under sh_glob unless loaded as zsh.
+// add-zle-hook-widget fails under sh_glob unless loaded as zsh, and
+// $commands misses an unhashed unsent under no_hash_list_all.
 func TestZshHooksUnderUserOptions(t *testing.T) {
-	s := startZsh(t, "setopt no_unset ksh_arrays sh_word_split sh_glob\n"+zshHooks, true)
+	s := startZsh(t, "setopt no_unset ksh_arrays sh_word_split sh_glob no_hash_list_all\n"+zshHooks, true)
 	if err := scenarioCtrlC(s); err != nil {
 		t.Fatal(err)
 	}

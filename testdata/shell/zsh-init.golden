@@ -11,7 +11,7 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     local d p n
     if (( _unsent_fd == -1 )); then
       _unsent_fd=-2
-      (( ${+commands[unsent]} )) || return 1
+      whence -p unsent >/dev/null || return 1
       d=${UNSENT_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/unsent}
       p=$d/shell
       while [[ ! -e $p ]]; do p=${p:h}; done
@@ -89,12 +89,12 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
       functions -c TRAPHUP _unsent_hup_next 2>/dev/null || return 0
     fi
     function TRAPHUP {
+      setopt local_options no_local_traps
       zle && _unsent_line h
       if (( ${+functions[_unsent_hup_next]} )); then
         _unsent_hup_next "$@"
         return
       fi
-      setopt local_options no_local_traps
       unfunction TRAPHUP
       kill -HUP ${sysparams[pid]}
     }

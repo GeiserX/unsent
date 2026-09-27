@@ -65,7 +65,9 @@ import (
 // sudo -s does on macOS, saves nothing there and creates nothing. A shell
 // with no unsent on its PATH at a prompt saves nothing either, as the
 // wrappers fall back then, so uninstalling unsent without undoing setup
-// leaves no log that nothing will import.
+// leaves no log that nothing will import. The check is whence -p, not
+// $commands, which under a user's no_hash_list_all misses a command zsh
+// has not hashed yet.
 //
 // The hooks' functions run under emulate -L zsh, and add-zle-hook-widget
 // is loaded under zsh emulation, because its own dispatcher fails under a
@@ -79,11 +81,13 @@ import (
 // HUP is left alone as well. A subshell
 // inherits TRAPHUP, and $$ there is still the parent's pid, so the trap
 // hangs up ${sysparams[pid]}, the process it runs in. It turns local_traps
-// off before it removes itself: a hangup that comes while a function under
-// emulate -L runs, _unsent_put during a keystroke's redraw for one, runs
-// the trap inside that function, and zsh puts a trap removed there back
-// when the trap returns, so the trap's own kill -HUP would run it again,
-// one h record each time, and the shell would never exit.
+// off first, for its own unfunction and for the user's TRAPHUP it calls: a
+// hangup that comes while a function under emulate -L runs, _unsent_put
+// during a keystroke's redraw for one, runs the trap inside that function,
+// and zsh puts a trap removed there back when the trap returns, so a kill
+// -HUP after the removal, the trap's own or a user's that removes itself
+// and hangs up again, would run it again, one h record each time, and the
+// shell would never exit.
 const zshHooks = `# The command line, saved as you type it, for unsent list and restore.
 if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     zmodload zsh/system zsh/datetime zsh/parameter 2>/dev/null &&
@@ -97,7 +101,7 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     local d p n
     if (( _unsent_fd == -1 )); then
       _unsent_fd=-2
-      (( ${+commands[unsent]} )) || return 1
+      whence -p unsent >/dev/null || return 1
       d=${UNSENT_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/unsent}
       p=$d/shell
       while [[ ! -e $p ]]; do p=${p:h}; done
@@ -175,12 +179,12 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
       functions -c TRAPHUP _unsent_hup_next 2>/dev/null || return 0
     fi
     function TRAPHUP {
+      setopt local_options no_local_traps
       zle && _unsent_line h
       if (( ${+functions[_unsent_hup_next]} )); then
         _unsent_hup_next "$@"
         return
       fi
-      setopt local_options no_local_traps
       unfunction TRAPHUP
       kill -HUP ${sysparams[pid]}
     }
