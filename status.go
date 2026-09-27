@@ -19,7 +19,8 @@ import (
 // shell itself: it starts that shell as a login, interactive shell with this
 // environment, so it reads the same startup files a new terminal would
 // (terminals on macOS and tmux start login shells), and has it say what
-// each agent name resolves to. It never starts an agent. Aliases and
+// each agent name resolves to, and in zsh whether the command-line hooks
+// loaded. It never starts an agent. Aliases and
 // launchers that skip the wrapper come from the same text scan setup warns
 // with; status only reports them.
 
@@ -36,11 +37,15 @@ const probeMark = "@@unsent-status"
 
 // probeScript prints, for each agent name, what the shell runs for it: the
 // kind (alias, function, file, builtin, or nothing), the file on PATH, the
-// alias, the function's body; then where unsent is on PATH.
+// alias, the function's body; for zsh, whether the command-line hooks
+// loaded, which sets _unsent_fd whether the setup block or an
+// eval "$(unsent init zsh)" line ran them; then where unsent is on PATH.
+// The hooks open no log here: a shell run with -c never shows a prompt.
 func probeScript(shell string, agents []string) string {
-	kind, path, fn := `type -t "$_unsent_a"`, `type -P "$_unsent_a"`, `declare -f "$_unsent_a"`
+	kind, path, fn, hooks := `type -t "$_unsent_a"`, `type -P "$_unsent_a"`, `declare -f "$_unsent_a"`, ""
 	if shell == "zsh" {
 		kind, path, fn = `whence -w "$_unsent_a"`, `whence -p "$_unsent_a"`, `typeset -f "$_unsent_a"`
+		hooks = `printf '@@hooks %s\n' "${+_unsent_fd}"` + "\n"
 	}
 	return "printf '\\n%s\\n' '" + probeMark + "'\n" +
 		"for _unsent_a in " + strings.Join(agents, " ") + "; do\n" +
@@ -52,6 +57,7 @@ func probeScript(shell string, agents []string) string {
 		`    printf '@@body %s\n' "$_unsent_a"; ` + fn + "; printf '\\n@@end\\n'\n" +
 		"  fi\n" +
 		"done\n" +
+		hooks +
 		`printf '@@unsent %s\n' "$(command -v unsent 2>/dev/null)"` + "\n"
 }
 
@@ -60,10 +66,11 @@ type resolved struct {
 	kind, path, alias, body string
 }
 
-// probe is the probe shell's answer: each agent's resolution, and where
-// unsent is on its PATH.
+// probe is the probe shell's answer: each agent's resolution, whether the
+// zsh command-line hooks loaded, and where unsent is on its PATH.
 type probe struct {
 	agents map[string]resolved
+	hooks  bool
 	unsent string
 }
 
@@ -105,9 +112,13 @@ func parseProbe(out string) (probe, bool) {
 	lines := strings.Split(out[i+len(probeMark)+1:], "\n")
 	for j := 0; j < len(lines); j++ {
 		tag, rest, _ := strings.Cut(lines[j], " ")
-		if tag == "@@unsent" {
+		switch tag {
+		case "@@unsent":
 			p.unsent = rest
 			return p, true
+		case "@@hooks":
+			p.hooks = rest == "1"
+			continue
 		}
 		name, value, _ := strings.Cut(rest, " ")
 		r := p.agents[name]
@@ -281,6 +292,7 @@ func cmdStatus(args []string, stdout, stderr io.Writer) int {
 			warnings = append(warnings, w)
 		}
 	}
+	fmt.Fprintf(&b, "command line: %s\n", commandLine(shell, p, perr))
 	for _, w := range warnings {
 		fmt.Fprintf(&b, "bypass: %s\n", w)
 	}
@@ -302,6 +314,24 @@ func cmdStatus(args []string, stdout, stderr io.Writer) int {
 		v, from := onSendFrom(name)
 		fmt.Fprintf(&b, "on send, %s: %s (%s)\n", name, v, from)
 	}
+	if shell == "zsh" {
+		v, from := onSendFrom(shell)
+		fmt.Fprintf(&b, "on send, %s: %s (%s)\n", shell, v, from)
+	}
 	stdout.Write(b.Bytes())
 	return 0
+}
+
+// commandLine says whether the shell saves its command line: in zsh, when
+// the hooks loaded in the shell status asked.
+func commandLine(shell string, p probe, perr error) string {
+	switch {
+	case shell != "zsh":
+		return "not saved; unsent saves only zsh's so far"
+	case perr != nil:
+		return fmt.Sprintf("unknown, could not ask the shell: %v", perr)
+	case !p.hooks:
+		return "not saved, the hooks do not load in this shell; run unsent setup zsh"
+	}
+	return "saved as you type; a line left unrun shows in unsent list"
 }

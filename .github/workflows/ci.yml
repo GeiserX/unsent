@@ -21,6 +21,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # The shell tests run the hooks in a real zsh; the Linux runner has none.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - run: go vet ./...
       # The race detector slows the stitcher's fuzz several times over, so
       # the race run skips it and a second run holds the full fuzz. Each

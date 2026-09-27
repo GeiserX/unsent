@@ -15,14 +15,15 @@ import (
 )
 
 // runStatus runs `unsent status` for one real shell binary, asking it with
-// an empty environment but for HOME, ZDOTDIR, TERM and path, as env -i
-// does, so no real rc file or agent is reached.
+// an empty environment but for HOME, ZDOTDIR, UNSENT_HOME, TERM and path,
+// as env -i does, so no real rc file or agent is reached, and a log the
+// hooks opened would land where liveLogs looks.
 func (h setupHome) runStatus(t *testing.T, sh, path string) string {
 	t.Helper()
 	orig := statusEnv
 	t.Cleanup(func() { statusEnv = orig })
 	statusEnv = func() []string {
-		return []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=dumb"}
+		return []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "UNSENT_HOME=" + filepath.Join(h.home, "state"), "PATH=" + path, "TERM=dumb"}
 	}
 	t.Setenv("SHELL", sh)
 	var o, e bytes.Buffer
@@ -106,6 +107,13 @@ func TestStatusInRealShells(t *testing.T) {
 			if got := statusLine(t, out, "claude profile"); got != "claude, reader last verified on version "+claude.verified {
 				t.Errorf("profile: %q", got)
 			}
+			notSaved := "not saved; unsent saves only zsh's so far"
+			if kind == "zsh" {
+				notSaved = "not saved, the hooks do not load in this shell; run unsent setup zsh"
+			}
+			if got := statusLine(t, out, "command line"); got != notSaved {
+				t.Errorf("command line before setup: %q", got)
+			}
 
 			// An alias of its own name and no block yet.
 			os.WriteFile(rc, []byte("alias claude='claude --flag'\n"), 0o644)
@@ -123,6 +131,16 @@ func TestStatusInRealShells(t *testing.T) {
 			}
 			if got := statusLine(t, out, "claude"); got != "goes through unsent (the claude function), runs ~/agent-bin/claude" {
 				t.Errorf("claude after setup, under an alias of its own name: %q", got)
+			}
+			saved := notSaved
+			if kind == "zsh" {
+				saved = "saved as you type; a line left unrun shows in unsent list"
+			}
+			if got := statusLine(t, out, "command line"); got != saved {
+				t.Errorf("command line after setup: %q", got)
+			}
+			if l := h.liveLogs(t); len(l) > 0 {
+				t.Errorf("asking the shell opened a log: %v", l)
 			}
 
 			// unsent missing from the shell's PATH: the wrapper falls back.
@@ -398,9 +416,50 @@ func TestStatusWhenTheShellCannotAnswer(t *testing.T) {
 	if got := statusLine(t, out, "claude"); !strings.HasPrefix(got, "unknown, could not ask the shell: "+fake) {
 		t.Errorf("claude: %q", got)
 	}
+	if got := statusLine(t, out, "command line"); !strings.HasPrefix(got, "unknown, could not ask the shell: "+fake) {
+		t.Errorf("command line: %q", got)
+	}
 	// The facts that need no shell are still there.
 	statusLine(t, out, "claude profile")
 	statusLine(t, out, "saving")
+	statusLine(t, out, "on send, zsh")
+}
+
+// TestStatusShellOnSend checks the on-send line for zsh's command lines
+// follows UNSENT_ON_SEND_ZSH, then UNSENT_ON_SEND, then the shells'
+// default, and that the command line in an rc file kept by hand, with
+// eval "$(unsent init zsh)", counts as saved. bash, which saves no line,
+// gets no on-send line for one.
+func TestStatusShellOnSend(t *testing.T) {
+	sh := testZsh(t)
+	h := newSetupHome(t)
+	path := h.agentBin + ":" + h.unsentBin + ":/usr/bin:/bin"
+	for _, c := range []struct{ all, zsh, want string }{
+		{"", "", "delete (the default)"},
+		{"log", "", "log (UNSENT_ON_SEND)"},
+		{"log", "delete", "delete (UNSENT_ON_SEND_ZSH)"},
+		{"", "LOG", "log (UNSENT_ON_SEND_ZSH)"},
+	} {
+		t.Setenv("UNSENT_ON_SEND", c.all)
+		t.Setenv("UNSENT_ON_SEND_ZSH", c.zsh)
+		if got := statusLine(t, h.runStatus(t, sh, path), "on send, zsh"); got != c.want {
+			t.Errorf("%+v: on send, zsh %q", c, got)
+		}
+	}
+	// The fake unsent on PATH prints the hooks, as unsent init zsh does.
+	writeScript(t, filepath.Join(h.unsentBin, "unsent"), "cat <<'UNSENT_HOOKS'\n"+zshHooks+"UNSENT_HOOKS")
+	os.WriteFile(h.rc(t, "zsh"), []byte(`eval "$(unsent init zsh)"`+"\n"), 0o644)
+	if got := statusLine(t, h.runStatus(t, sh, path), "command line"); got != "saved as you type; a line left unrun shows in unsent list" {
+		t.Errorf("command line with eval \"$(unsent init zsh)\": %q", got)
+	}
+	for _, b := range testShells(t) {
+		if shellKind(b) == "bash" {
+			if out := h.runStatus(t, b, path); strings.Contains(out, "on send, zsh") {
+				t.Errorf("status bash names zsh's on-send setting:\n%s", out)
+			}
+			break
+		}
+	}
 }
 
 func TestStatusArguments(t *testing.T) {

@@ -1,0 +1,107 @@
+# The command line, saved as you type it, for unsent list and restore.
+if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
+    zmodload zsh/system zsh/datetime zsh/parameter 2>/dev/null &&
+    zmodload -F zsh/files b:zf_mkdir b:zf_mv b:zf_rm 2>/dev/null &&
+    emulate zsh -c 'autoload -Uz add-zle-hook-widget'; then
+  typeset -gi _unsent_fd=-1 _unsent_size=0 _unsent_n=0 _unsent_trapped=0
+  typeset -g _unsent_log= _unsent_last=
+  function _unsent_put {
+    emulate -L zsh
+    setopt no_multibyte
+    local d p n
+    if (( _unsent_fd == -1 )); then
+      _unsent_fd=-2
+      whence -p unsent >/dev/null || return 1
+      d=${UNSENT_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/unsent}
+      p=$d/shell
+      while [[ ! -e $p ]]; do p=${p:h}; done
+      [[ -O $p ]] || return 1
+      zf_mkdir -p -m 700 $d $d/shell 2>/dev/null
+      _unsent_log=$d/shell/zsh-${HOST//[^A-Za-z0-9.-]/_}-$$-${EPOCHREALTIME//[^0-9]/}.log
+      sysopen -a -m 600 -o create,excl,nofollow,sync,cloexec -u n $_unsent_log 2>/dev/null || return 1
+      _unsent_fd=$n _unsent_size=0
+      _unsent_put v 1 || return 1
+      (( _unsent_trapped )) || _unsent_trap
+    fi
+    (( _unsent_fd >= 0 )) || return 1
+    if syswrite -c n -o $_unsent_fd "$1 $EPOCHSECONDS ${#2}"$'\n'"$2"$'\n'; then
+      (( _unsent_size += n ))
+    else
+      _unsent_shut -2
+      return 1
+    fi
+  }
+  function _unsent_shut {
+    zf_mv $_unsent_log ${_unsent_log%.log}.done 2>/dev/null
+    { exec {_unsent_fd}>&- } 2>/dev/null
+    _unsent_fd=$1
+  }
+  function _unsent_line {
+    local -i xg=0 ig=0
+    [[ -o extended_glob ]] && xg=1
+    emulate -L zsh
+    (( xg )) && setopt extended_glob
+    [[ $CONTEXT == start || $CONTEXT == cont ]] || return 0
+    [[ $1 != s ]] && (( HISTNO != HISTCMD )) && [[ $BUFFER == "${history[$HISTNO]}" ]] && return 0
+    local t=$PREBUFFER$BUFFER k=
+    if [[ -n $t && -n $HISTORY_IGNORE ]]; then
+      { { [[ $t == ${~HISTORY_IGNORE} ]] && ig=1 } 2>/dev/null } always { TRY_BLOCK_ERROR=0 }
+    fi
+    if [[ $t == ' '* ]] || (( ig )); then
+      if (( _unsent_n )); then
+        [[ $t == *"${_unsent_last[1,${#_unsent_last}/2]}"* ]] || k=new
+        _unsent_put f "$k"
+      fi
+      _unsent_n=0 _unsent_last=' '
+      return 0
+    fi
+    [[ $1 == b && $t == "$_unsent_last" ]] && return 0
+    _unsent_last=$t
+    _unsent_put $1 "$t" && (( ++_unsent_n ))
+    return 0
+  }
+  function _unsent_init {
+    emulate -L zsh
+    if [[ $CONTEXT == cont ]]; then
+      _unsent_put c ''
+    elif [[ $CONTEXT == start ]]; then
+      if (( _unsent_fd >= 0 )) && [[ ! -e $_unsent_log ]]; then
+        _unsent_shut -1
+      elif (( _unsent_fd >= 0 && _unsent_size > 262144 )); then
+        _unsent_shut -1
+      elif (( _unsent_fd == -2 )); then
+        _unsent_fd=-1
+      fi
+      _unsent_n=0 _unsent_last=
+      _unsent_put i "$PWD"
+    fi
+    return 0
+  }
+  function _unsent_trap {
+    emulate -L zsh
+    setopt no_local_traps
+    local f=${_unsent_log%.log}.trap l
+    _unsent_trapped=1
+    { trap >|$f && l=$(<$f) } 2>/dev/null || l=$'\ntrap -- ? HUP'
+    zf_rm -f $f 2>/dev/null
+    (( ${#${(M)${(f)l}:#trap -- * HUP}} )) && return 0
+    if (( ${+functions[TRAPHUP]} )); then
+      functions -c TRAPHUP _unsent_hup_next 2>/dev/null || return 0
+    fi
+    function TRAPHUP {
+      setopt local_options no_local_traps
+      zle && _unsent_line h
+      if (( ${+functions[_unsent_hup_next]} )); then
+        _unsent_hup_next "$@"
+        return
+      fi
+      unfunction TRAPHUP
+      kill -HUP ${sysparams[pid]}
+    }
+  }
+  function _unsent_redraw { _unsent_line b }
+  function _unsent_finish { _unsent_line s }
+  add-zle-hook-widget line-init _unsent_init
+  add-zle-hook-widget line-pre-redraw _unsent_redraw
+  add-zle-hook-widget line-finish _unsent_finish
+fi

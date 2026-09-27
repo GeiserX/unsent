@@ -92,11 +92,12 @@ func startupFiles(shell string) []string {
 // up on PATH when it is called, not when the block runs, so an agent that a
 // line after the block puts on PATH still goes through unsent. With the
 // agent not installed, or unsent gone, the wrapper runs the command as the
-// shell would.
+// shell would. The zsh block also holds the command-line hooks
+// (zshHooks).
 func setupBlock(shell string) string {
-	defined, look := `declare -F`, `type -P`
+	defined, look, hooks := `declare -F`, `type -P`, ""
 	if shell == "zsh" {
-		defined, look = `typeset -f`, `whence -p`
+		defined, look, hooks = `typeset -f`, `whence -p`, zshHooks
 	}
 	return rcBlockStart + " written by `unsent setup`; `unsent setup --undo` removes it\n" +
 		"for _unsent_a in " + strings.Join(agentCommands(), " ") + "; do\n" +
@@ -105,6 +106,7 @@ func setupBlock(shell string) string {
 		"  fi\n" +
 		"done\n" +
 		"unset _unsent_a\n" +
+		hooks +
 		rcBlockEnd + "\n"
 }
 
@@ -280,6 +282,9 @@ func cmdSetup(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "%s is not on PATH now; once it is, it runs through unsent from the next shell.\n", a)
 		}
 	}
+	if shell == "zsh" {
+		fmt.Fprintln(stdout, "From the next shell, zsh saves the command line as you type it: a line a closed window took shows in unsent list, one Ctrl+C cleared in unsent list --all.")
+	}
 	warnings := bypasses(startupFiles(shell), agentCommands())
 	if shell == "bash" {
 		if w := loginWarning(); w != "" {
@@ -337,6 +342,9 @@ func setupUndo(shell string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "Removed the unsent block from %s. New shells start the agents directly; in this one, `unset -f %s` does it now.\n",
 			tilde(rc), strings.Join(agentCommands(), " "))
+		if sh == "zsh" {
+			fmt.Fprintln(stdout, "New zsh shells stop saving the command line; one already open saves until it ends.")
+		}
 	}
 	if len(none) > 0 {
 		fmt.Fprintf(stdout, "No unsent block in %s.\n", strings.Join(none, " or "))
