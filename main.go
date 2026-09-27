@@ -51,10 +51,13 @@ Usage:
                              remove that block (from every shell's rc file
                              when none is named); drafts stay
   unsent init zsh            print the hooks that save zsh's command line as
-                             you type it; unsent setup zsh already writes them
+                             you type it, for an rc file you keep by hand:
+                             eval "$(unsent init zsh)"; unsent setup zsh
+                             already writes them
   unsent status [zsh|bash]   which agents this shell runs through unsent,
                              which profile each gets, what skips the wrapper,
-                             and the saving and on-send settings
+                             whether the command line is saved, and the
+                             saving and on-send settings
   unsent capture <agent> [args...]
                              run the agent with every key and all its output
                              recorded into testdata/<agent>/<version>/ here, as

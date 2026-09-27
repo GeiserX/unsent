@@ -282,6 +282,9 @@ func cmdSetup(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "%s is not on PATH now; once it is, it runs through unsent from the next shell.\n", a)
 		}
 	}
+	if shell == "zsh" {
+		fmt.Fprintln(stdout, "From the next shell, zsh saves the command line as you type it: a line a closed window took shows in unsent list, one Ctrl+C cleared in unsent list --all.")
+	}
 	warnings := bypasses(startupFiles(shell), agentCommands())
 	if shell == "bash" {
 		if w := loginWarning(); w != "" {
@@ -339,6 +342,9 @@ func setupUndo(shell string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "Removed the unsent block from %s. New shells start the agents directly; in this one, `unset -f %s` does it now.\n",
 			tilde(rc), strings.Join(agentCommands(), " "))
+		if sh == "zsh" {
+			fmt.Fprintln(stdout, "New zsh shells stop saving the command line; one already open saves until it ends.")
+		}
 	}
 	if len(none) > 0 {
 		fmt.Fprintf(stdout, "No unsent block in %s.\n", strings.Join(none, " or "))

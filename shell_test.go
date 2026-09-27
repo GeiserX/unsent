@@ -138,7 +138,16 @@ func startZsh(t *testing.T, hooks string, unsentHome bool, env ...string) *zshSe
 		env = append(env, "UNSENT_HOME="+filepath.Join(home, "state"))
 		dir = filepath.Join(home, "state", "shell")
 	}
-	cmd := exec.Command(sh, "-f", "-i")
+	s := openZsh(t, exec.Command(sh, "-f", "-i"), env, home, dir)
+	s.send("PS1='" + zshPrompt[:1] + "''" + zshPrompt[1:] + "'; source " + hookFile + "\r")
+	s.mark("ready")
+	return s
+}
+
+// openZsh starts cmd, a zsh, on a pseudo-terminal with env, in home, its
+// logs going to dir.
+func openZsh(t *testing.T, cmd *exec.Cmd, env []string, home, dir string) *zshSession {
+	t.Helper()
 	cmd.Env = env
 	cmd.Dir = home
 	p, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: 100, Rows: 30})
@@ -163,8 +172,6 @@ func startZsh(t *testing.T, hooks string, unsentHome bool, env ...string) *zshSe
 		cmd.Process.Kill()
 		p.Close()
 	})
-	s.send("PS1='" + zshPrompt[:1] + "''" + zshPrompt[1:] + "'; source " + hookFile + "\r")
-	s.mark("ready")
 	return s
 }
 

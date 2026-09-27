@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -614,5 +615,140 @@ func TestSetupWithTwoBlocks(t *testing.T) {
 	got, err = withoutBlocks(text)
 	if err != nil || got != "a\nb\nc\n" {
 		t.Fatalf("withoutBlocks: %q, %v", got, err)
+	}
+}
+
+// rcZsh starts a real zsh on a pseudo-terminal the way a terminal starts
+// one, reading the scratch rc file (no -f), under an empty environment but
+// for HOME, ZDOTDIR, UNSENT_HOME, TERM and path, and waits for its prompt.
+func (h setupHome) rcZsh(t *testing.T, sh, path string) *zshSession {
+	t.Helper()
+	state := filepath.Join(h.home, "state")
+	env := []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=xterm", "UNSENT_HOME=" + state}
+	s := openZsh(t, exec.Command(sh, "-i"), env, h.home, filepath.Join(state, "shell"))
+	s.echo("PS1='"+zshPrompt[:1]+"''"+zshPrompt[1:]+"'\r", zshPrompt)
+	return s
+}
+
+// hangUp closes the shell's window, as a terminal does, and waits for it.
+func (s *zshSession) hangUp() {
+	s.t.Helper()
+	syscall.Kill(s.cmd.Process.Pid, syscall.SIGHUP)
+	select {
+	case <-s.ended:
+	case <-time.After(15 * time.Second):
+		s.t.Fatal("zsh did not end on SIGHUP")
+	}
+}
+
+// liveLogs are the logs a shell writes in the scratch state folder.
+func (h setupHome) liveLogs(t *testing.T) []string {
+	t.Helper()
+	m, err := filepath.Glob(filepath.Join(h.home, "state", "shell", "zsh-*.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+// zshLines is what unsent list shows of the shell lines.
+func zshLines(t *testing.T) string {
+	t.Helper()
+	code, out, errOut := runCLI("list", "--agent", "zsh")
+	if code != 0 {
+		t.Fatalf("unsent list: exit %d: %s", code, errOut)
+	}
+	return out
+}
+
+// TestSetupSavesTheZshCommandLine runs a real zsh as a terminal starts it,
+// reading the rc file setup wrote: a line left at the prompt when the
+// window closes shows in unsent list. After undo the rc file is what it
+// was and a new shell writes no log, which shows the first check can fail.
+// An rc file kept by hand with eval "$(unsent init zsh)" saves the same way.
+func TestSetupSavesTheZshCommandLine(t *testing.T) {
+	for _, sh := range testShells(t) {
+		if shellKind(sh) != "zsh" {
+			continue
+		}
+		t.Run(sh, func(t *testing.T) {
+			t.Log(shellVersion(sh))
+			h := newSetupHome(t)
+			rc := h.rc(t, "zsh")
+			path := h.agentBin + ":" + h.unsentBin + ":/usr/bin:/bin"
+			const mine = "export A=1\n"
+			os.WriteFile(rc, []byte(mine), 0o644)
+			if out := mustSetup(t, "zsh"); !strings.Contains(out, "zsh saves the command line as you type it") {
+				t.Errorf("setup does not say the command line is saved:\n%s", out)
+			}
+
+			s := h.rcZsh(t, sh, path)
+			s.line("typed where setup ran")
+			s.hangUp()
+			if out := zshLines(t); !strings.Contains(out, "typed where setup ran") {
+				t.Fatalf("the line typed in a shell with the block is not in unsent list:\n%s", out)
+			}
+
+			out := mustSetup(t, "--undo", "zsh")
+			if !strings.Contains(out, "New zsh shells stop saving the command line") {
+				t.Errorf("undo does not say the command line stops being saved:\n%s", out)
+			}
+			if got := readFile(t, rc); got != mine {
+				t.Fatalf("undo left %q, want %q", got, mine)
+			}
+			s = h.rcZsh(t, sh, path)
+			s.echo("typed after undo", "typed after undo")
+			s.clear()
+			if l := h.liveLogs(t); len(l) > 0 {
+				t.Fatalf("a shell started after undo writes a log: %v", l)
+			}
+			s.hangUp()
+			if out := zshLines(t); strings.Contains(out, "typed after undo") {
+				t.Fatalf("a line typed after undo reached unsent list:\n%s", out)
+			}
+
+			// By hand: the rc file runs unsent init zsh, here the test
+			// binary as unsent.
+			self, err := os.Executable()
+			if err != nil {
+				t.Fatal(err)
+			}
+			bin := filepath.Join(h.home, "real-unsent")
+			writeScript(t, filepath.Join(bin, "unsent"), "UNSENT_TEST_RUN=1 exec '"+self+"' \"$@\"")
+			os.WriteFile(rc, []byte(mine+`eval "$(unsent init zsh)"`+"\n"), 0o644)
+			s = h.rcZsh(t, sh, h.agentBin+":"+bin+":/usr/bin:/bin")
+			s.line("typed where init ran")
+			s.hangUp()
+			if out := zshLines(t); !strings.Contains(out, "typed where init ran") {
+				t.Fatalf("the line typed in a shell that evals unsent init zsh is not in unsent list:\n%s", out)
+			}
+		})
+	}
+}
+
+// TestSetupAddsTheHooksToAnOlderBlock checks a block written before the
+// hooks existed is rewritten in place with them, and that undo still gives
+// back the user's lines byte for byte.
+func TestSetupAddsTheHooksToAnOlderBlock(t *testing.T) {
+	h := newSetupHome(t)
+	rc := h.rc(t, "zsh")
+	block := setupBlock("zsh")
+	older := strings.Replace(block, zshHooks, "", 1)
+	if older == block {
+		t.Fatal("the zsh block holds no hooks")
+	}
+	os.WriteFile(rc, []byte("before\n"+older+"after"), 0o644)
+	if out := mustSetup(t, "zsh"); !strings.Contains(out, "Rewrote the unsent block") {
+		t.Errorf("setup output: %s", out)
+	}
+	if got, want := readFile(t, rc), "before\n"+block+"after"; got != want {
+		t.Fatalf("setup left:\n%q\nwant\n%q", got, want)
+	}
+	if out := mustSetup(t, "zsh"); !strings.Contains(out, "is up to date") {
+		t.Errorf("a second setup: %s", out)
+	}
+	mustSetup(t, "--undo", "zsh")
+	if got := readFile(t, rc); got != "before\nafter" {
+		t.Fatalf("undo left %q", got)
 	}
 }
