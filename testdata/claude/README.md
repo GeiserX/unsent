@@ -16,6 +16,8 @@ Real output of Claude Code, replayed by `replay_test.go` through the shadow scre
 Claude Code ran in a private tmux server at 120x40 with a scratch `CLAUDE_CONFIG_DIR`, a scratch `HOME` and a dummy `ANTHROPIC_API_KEY`, so nothing reached a model. `tall-wrapped.bin` and `long-word.bin` were recorded with `script -q -F`, from start-up to the repaint after the editor returned.
 The `.rec` files were recorded with `script -q -r -t 0` the same way, and their editor script kept one numbered copy per Ctrl+G.
 
+`word-deletes.rec` and `placeholders.rec` were recorded with `unsent capture claude` in the same setup. `placeholders.rec` pastes the path of a 4x4 PNG that existed only for the capture.
+
 `sends.rec` was recorded the same way with `CLAUDE_CODE_MAX_RETRIES=0`, so each send fails at once with a 401 on the dummy key and Claude Code is idle again for the next key.
 
 Three files differ from that:

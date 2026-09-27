@@ -693,3 +693,31 @@ func TestCLIForgetLog(t *testing.T) {
 		}
 	}
 }
+
+// Claude Code cuts the middle out of a box over 10,000 characters. A save
+// puts it back from the draft before when the two sides match, and keeps it
+// through later edits; when they do not match, the box is saved as shown
+// and the whole draft before goes to history.
+func TestSessionTruncatedMiddle(t *testing.T) {
+	head, tail := "the start of it\n", "\nthe end of it"
+	full := head + strings.Repeat("middle words ", 800) + "\nline two\nline three" + tail
+	ph := "[...Truncated text #2 +2 lines...]"
+	for _, c := range []struct {
+		shown, want []string
+		history     []string
+	}{
+		{[]string{head + ph + tail, head + ph + tail + " more"}, []string{full, full + " more"}, nil},
+		{[]string{"a new start\n" + ph + tail}, []string{"a new start\n" + ph + tail}, []string{full}},
+	} {
+		s := newSendSession(t, &claude)
+		s.rec.Draft = full // stitched from the box before the cut
+		for i, shown := range c.shown {
+			s.draw(shown)
+			s.save()
+			if s.rec.Draft != c.want[i] {
+				t.Errorf("draft %.60q, want %.60q", s.rec.Draft, c.want[i])
+			}
+		}
+		s.expect(nil, c.history)
+	}
+}

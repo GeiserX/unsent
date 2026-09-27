@@ -12,7 +12,7 @@
 | `extract.go` | The `profile` type (one per agent: name, command names, box reader, paste placeholder, delete, submit and clear keys), `profileFor`, and `agentFor` (`--as`, then a base name a profile answers to, then `UNSENT_AGENT`, then the base name) |
 | `agent_claude.go` | Claude Code's profile and its box reader (`claudeBox`) |
 | `stitch.go` | Rebuilds drafts taller than the box: word-level edit-distance alignment of each view against the known text; un-wraps rows back into lines |
-| `paste.go` | Captures bracketed pastes and expands the profile's placeholders, such as `[Pasted text #N +M lines]` |
+| `paste.go` | Captures bracketed pastes and expands the profile's placeholders, such as `[Pasted text #N +M lines]`; puts back the middle of a long draft the agent cut out of the box |
 | `store.go` | Durable writes, history, per-session lock files |
 | `capture.go` | The raw log (`rawLog`: keys and output in `script -r` format, window sizes beside it, files `0600`), written only under `UNSENT_DEBUG_DIR` or by `unsent capture`, which records a fixture bundle into `testdata/<agent>/<version>/` with an editor copy per Ctrl+G |
 | `sent.go` | Send detection (submit and clear keys in order, each submit and the first keys after it with the screen they were typed into), `UNSENT_ON_SEND`, the per-session sent logs in `sent/` and their limits |
@@ -21,14 +21,16 @@
 ## Facts about Claude Code's box (measured on 2.1.282)
 
 - Drawn between two full-width `─` rules; the first row starts with `❯` plus a no-break space (U+00A0), shell mode with `!`.
-- An empty box shows a dim (SGR 2) hint. Dim text is how an empty box is told apart from a draft.
+- An empty box shows the marker, then Claude Code's own cursor, a reverse-video space. A configured install also shows a dim (SGR 2) `Try "…"` hint there; a clean config shows none. Nothing but spaces or dim text after the marker is how an empty box is told apart from a draft.
 - Rows wrap at window width minus 4 columns; a word longer than that breaks at exactly that width, or one column short when a wide character would cross the edge, and it can start mid-row after other words.
 - The box stops growing at `rows/2 - 5` rows and then scrolls; the `❯` marks the first visible row, not the first row of the draft.
 - The real terminal cursor sits at the insertion point.
-- Up moves the cursor row by row until it reaches the middle row of a scrolled box; each Up after that scrolls the box one row and the cursor stays mid-box. A row typed mid-box pushes the top row out of sight. So with text out of sight above, the arrow keys never bring the cursor to the top row.
+- Up moves the cursor row by row until it reaches the middle row of a scrolled box; each Up after that scrolls the box one row and the cursor stays mid-box, until the first row of the draft is in view. Down does the same the other way. Ctrl+Home, Ctrl+End and Alt+> do not move it; none of the keys tried made the box jump. A row typed mid-box pushes the top row out of sight. So with text out of sight above, the arrow keys never bring the cursor to the top row.
 - Ctrl+K deletes to the end of the screen row, not the end of the line: on a wrapped line it joins what follows.
-- Some redraws are wrapped in synchronized-output marks (`ESC[?2026h` … `ESC[?2026l`); one measured session had 6 matched pairs, not one per keystroke. The screen is never read inside a pair.
-- A paste shows as `[Pasted text #N +M lines]`, or `[Pasted text #N]` with no line break (a 12,000-character one-line paste measured). A 3-line paste shows inline; 6 lines and more become the placeholder.
+- Ctrl+D deletes the character after the cursor, Alt+D (`ESC d`) the word after it and Alt+Backspace (`ESC 0x7f`) the word before it. Punctuation ends a word: `alpha-19` is two words.
+- Every redraw after a key is wrapped in synchronized-output marks (`ESC[?2026h` … `ESC[?2026l`), one pair per keystroke; the first paint at startup is not. The screen is never read inside a pair.
+- A paste of 4 or more lines, or over 800 characters, shows as `[Pasted text #N +M lines]`, where M counts line breaks, or `[Pasted text #N]` with no line break. Shorter pastes, such as 3 lines or 800 characters, go in as typed text. A pasted path to an image file shows as `[Image #N]`. N counts up across pastes and images for as long as Claude Code runs. `[Audio #N]` is in Claude Code's placeholder pattern but was not seen.
+- A box over 10,000 characters keeps its first and last 500 and shows the middle as `[...Truncated text #N +M lines...]`. Measured by pasting a 12,000-character text twice: the second paste expands it to the whole text, and Claude Code then cuts it. After Ctrl+G and back, the same middle shows as `[Pasted text #N +M lines]`, same N and M.
 - Right after it starts, Claude Code takes several seconds before Esc+Enter makes a new line; keys typed earlier run lines together. Scripted real-app tests wait about 9 s after the box appears.
 - Claude Code runs on the terminal's alternate screen (`ESC[?1049h` at startup), so anything printed before it, such as unsent's recovery notice, is hidden until it exits.
 - Ground truth for a real-app test: Ctrl+G hands the draft to `$EDITOR`. Point `EDITOR` at a script that copies its file argument and exits, and the copy is exactly what Claude Code holds; compare the saved draft to it byte for byte.

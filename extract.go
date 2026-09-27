@@ -24,10 +24,10 @@ type view struct {
 	// empty is true when the box holds no draft (only a dim hint, or nothing).
 	empty bool
 	// deleted is how many characters the delete keys pressed since the
-	// last view can have removed (unlimited after Ctrl+W, Ctrl+U, Ctrl+K
-	// or undo), and deletedAhead whether one removes text after the cursor
-	// (Delete, Ctrl+K, undo). The screen alone cannot tell text deleted at
-	// the edge of the box from text moved out of sight.
+	// last view can have removed (unlimited after a key that deletes a
+	// word or more, such as Ctrl+W), and deletedAhead whether one removes
+	// text after the cursor (such as Delete). The screen alone cannot tell
+	// text deleted at the edge of the box from text moved out of sight.
 	deleted      int
 	deletedAhead bool
 }
@@ -47,8 +47,15 @@ type profile struct {
 	read  extractor
 	// placeholder matches what the agent shows in place of a long paste;
 	// its first group, when it matches, is the paste's line count.
+	// collapses reports whether the agent shows a paste that way at all:
+	// one it took in as typed text never fills a placeholder.
 	placeholder *regexp.Regexp
-	keys        keyset
+	collapses   func(paste string) bool
+	// truncated matches what the agent shows in place of the middle of a
+	// draft too long to show whole; its first group is the middle's line
+	// count. Nil when the agent never does that.
+	truncated *regexp.Regexp
+	keys      keyset
 	// verified is the agent version the reader was last checked against,
 	// and version the arguments that make the agent print its own: when
 	// the reader never finds the box, the user learns both.

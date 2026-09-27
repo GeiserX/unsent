@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +21,9 @@ type pasteTracker struct {
 	cur     []byte
 	in      bool
 	pending []byte // a marker split across two reads
+	// cuts holds the text behind each placeholder the agent put in place
+	// of the middle of a long draft (see expand).
+	cuts map[string]string
 }
 
 // feed takes keystrokes as they arrive, and returns the bytes that were
@@ -87,6 +89,7 @@ func (p *pasteTracker) inPaste() bool {
 func (p *pasteTracker) reset() {
 	p.mu.Lock()
 	p.pastes = nil
+	p.cuts = nil
 	p.mu.Unlock()
 }
 
@@ -98,26 +101,66 @@ func (p *pasteTracker) all() []string {
 
 // expand puts the pasted text back where the agent shows a placeholder
 // (see profile.placeholder). Placeholders are matched to pastes in order,
-// by line count. One that matches no paste stays as it is.
-func (p *pasteTracker) expand(draft string, placeholder *regexp.Regexp) string {
+// by line count, among the pastes the agent shows as a placeholder at all.
+// One that matches no paste stays as it is.
+//
+// A placeholder for the middle of a long draft (profile.truncated) stands
+// for text the agent cut out of the box, typed or pasted. When prev, the
+// draft saved before, reads the same as the new one on both sides of the
+// placeholder, the middle is what prev holds between them: it is put back,
+// and kept for the saves after. Otherwise the placeholder stays, and prev,
+// which no longer looks like the draft, goes to history (see keepOld).
+func (p *pasteTracker) expand(draft, prev string, prof *profile) string {
 	pastes := p.all()
 	used := make([]bool, len(pastes))
-	return placeholder.ReplaceAllStringFunc(draft, func(ph string) string {
-		m := placeholder.FindStringSubmatch(ph)
-		want := 0
-		if m[1] != "" {
-			want, _ = strconv.Atoi(m[1])
+	out := draft
+	if prof.placeholder != nil {
+		out = prof.placeholder.ReplaceAllStringFunc(draft, func(ph string) string {
+			m := prof.placeholder.FindStringSubmatch(ph)
+			want := 0
+			if m[1] != "" {
+				want, _ = strconv.Atoi(m[1])
+			}
+			for i, text := range pastes {
+				if used[i] || strings.Contains(draft, text) || (prof.collapses != nil && !prof.collapses(text)) {
+					// Already matched, or a paste the agent took in as typed
+					// text, or turned into something else, such as an image.
+					continue
+				}
+				nl := strings.Count(strings.TrimRight(text, "\n"), "\n")
+				if nl == want || strings.Count(text, "\n") == want {
+					used[i] = true
+					return text
+				}
+			}
+			return ph
+		})
+	}
+	if prof.truncated == nil {
+		return out
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if at := prof.truncated.FindAllStringSubmatchIndex(out, -1); len(at) == 1 {
+		ph, head, tail := out[at[0][0]:at[0][1]], out[:at[0][0]], out[at[0][1]:]
+		want, _ := strconv.Atoi(out[at[0][2]:at[0][3]])
+		if _, ok := p.cuts[ph]; !ok && len(prev) > len(head)+len(tail) &&
+			strings.HasPrefix(prev, head) && strings.HasSuffix(prev, tail) {
+			mid := prev[len(head) : len(prev)-len(tail)]
+			if strings.Count(mid, "\n") == want && !prof.truncated.MatchString(mid) {
+				if p.cuts == nil {
+					p.cuts = map[string]string{}
+				}
+				p.cuts[ph] = mid
+				// The middle can come back as a paste placeholder: Claude
+				// Code shows it as one after an editor round trip.
+				p.pastes = append(p.pastes, mid)
+			}
 		}
-		for i, text := range pastes {
-			if used[i] || strings.Contains(draft, text) {
-				// Already matched, or a short paste the agent typed in as is.
-				continue
-			}
-			nl := strings.Count(strings.TrimRight(text, "\n"), "\n")
-			if nl == want || strings.Count(text, "\n") == want {
-				used[i] = true
-				return text
-			}
+	}
+	return prof.truncated.ReplaceAllStringFunc(out, func(ph string) string {
+		if mid, ok := p.cuts[ph]; ok {
+			return mid
 		}
 		return ph
 	})

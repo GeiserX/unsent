@@ -859,7 +859,12 @@ func TestDeleteKeys(t *testing.T) {
 		{"\x15", unlimited, false},
 		{"\x0b", unlimited, true},
 		{"\x1f", unlimited, true},
+		{"\x04", 1, true}, // Ctrl+D, the character after the cursor
+		{"\x04\x04\x7f", 3, true},
+		{"\x1b\x7f", unlimited, false}, // Alt+Backspace, the word before
+		{"\x1bd", unlimited, true},     // Alt+D, the word after
 		{"hello \x1b[A\r", 0, false},
+		{"\x1b[D d", 0, false},
 	}
 	for _, c := range cases {
 		if chars, ahead := claude.keys.deletes([]byte(c.keys)); chars != c.chars || ahead != c.ahead {

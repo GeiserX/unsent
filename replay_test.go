@@ -140,9 +140,17 @@ func eachChunk(t *testing.T, data []byte, fn func(at time.Time, dir byte, chunk 
 //     scrolled onto the marker row, with text out of sight above;
 //   - wide-run: runs of wide characters longer than a row, one after a
 //     single narrow character (the row ends a cell short) and one after a
-//     word (the row is full).
+//     word (the row is full);
+//   - word-deletes: last rows emptied as in trailing-rows, with other keys,
+//     each in one burst: Ctrl+D across the last row with text, Alt+D
+//     across the row above it, Alt+Backspace across the row above that;
+//   - placeholders: a pasted image path, which shows as [Image #1], then a
+//     long paste; a long paste pasted twice, which shows the whole text
+//     and then cuts its middle out as [...Truncated text #4 +137 lines...];
+//     after the editor returns, that middle shows as [Pasted text #4 +137
+//     lines].
 func TestReplayClaudeKeysAndOutput(t *testing.T) {
-	for _, name := range []string{"deletes", "bursts", "trailing-rows", "blank-lines", "wide-run"} {
+	for _, name := range []string{"deletes", "bursts", "trailing-rows", "blank-lines", "wide-run", "word-deletes", "placeholders"} {
 		t.Run(name, func(t *testing.T) { replayRecord(t, name) })
 	}
 }

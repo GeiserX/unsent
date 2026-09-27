@@ -2,6 +2,8 @@ package main
 
 import (
 	"regexp"
+	"strings"
+	"unicode/utf16"
 
 	"github.com/mattn/go-runewidth"
 )
@@ -11,18 +13,28 @@ var claude = profile{
 	name:  "claude",
 	names: []string{"claude"},
 	read:  claudeBox,
-	// A long paste shows as "[Pasted text #2 +39 lines]", or
-	// "[Pasted text #2]" when it has no line break.
+	// A paste of 4 or more lines, or over 800 characters, shows as
+	// "[Pasted text #2 +39 lines]", or "[Pasted text #2]" when it has no
+	// line break; the count is of line breaks. Anything shorter goes in as
+	// typed text, and a pasted image path becomes "[Image #N]", so neither
+	// fills a placeholder. "[Image #N]" and "[Audio #N]" hold no text and
+	// stay as they are.
 	placeholder: regexp.MustCompile(`\[Pasted text #\d+(?: \+(\d+) lines?)?\]`),
-	// Backspace, Ctrl+H and Delete remove one character; Ctrl+W, Ctrl+U,
-	// Ctrl+K and undo (Ctrl+_) any amount. Delete, Ctrl+K and undo can
-	// remove text after the cursor. Enter sends the box (Ctrl+X Enter
-	// queues it, which also ends in Enter); Esc+Enter makes a new line.
-	// Ctrl+C and Esc Esc clear it.
+	collapses: func(paste string) bool {
+		return strings.Count(paste, "\n") > 2 || len(utf16.Encode([]rune(paste))) > 800
+	},
+	// A box over 10,000 characters keeps its first and last 500 and shows
+	// the middle as "[...Truncated text #N +M lines...]".
+	truncated: regexp.MustCompile(`\[\.\.\.Truncated text #\d+ \+(\d+) lines\.\.\.\]`),
+	// Backspace, Ctrl+H, Delete and Ctrl+D remove one character; Ctrl+W,
+	// Ctrl+U, Ctrl+K, Alt+Backspace, Alt+D and undo (Ctrl+_) any amount.
+	// Delete, Ctrl+D, Ctrl+K, Alt+D and undo can remove text after the
+	// cursor. Enter sends the box (Ctrl+X Enter queues it, which also ends
+	// in Enter); Esc+Enter makes a new line. Ctrl+C and Esc Esc clear it.
 	keys: keyset{
-		one:    [][]byte{{0x7f}, {0x08}, []byte("\x1b[3~")},
-		many:   [][]byte{{0x17}, {0x15}, {0x0b}, {0x1f}},
-		ahead:  [][]byte{[]byte("\x1b[3~"), {0x0b}, {0x1f}},
+		one:    [][]byte{{0x7f}, {0x08}, []byte("\x1b[3~"), {0x04}},
+		many:   [][]byte{{0x17}, {0x15}, {0x0b}, {0x1f}, {0x1b, 0x7f}, []byte("\x1bd")},
+		ahead:  [][]byte{[]byte("\x1b[3~"), {0x04}, {0x0b}, {0x1f}, []byte("\x1bd")},
 		submit: [][]byte{{'\r'}},
 		clear:  [][]byte{{0x03}, []byte("\x1b\x1b")},
 	},
