@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -228,6 +229,15 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
 	os.Stdin, os.Stdout, os.Stderr = term, term, errW
 	defer func() { os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr }()
+	// saved holds when the last timed save to end began.
+	var saved atomic.Int64
+	oldSave := timedSave
+	timedSave = func(s *session) {
+		began := time.Now()
+		oldSave(s)
+		saved.Store(began.UnixNano())
+	}
+	defer func() { timedSave = oldSave }()
 	exit := make(chan int, 1)
 	go func() { exit <- run(argv, io.Discard, io.Discard) }()
 	select {
@@ -235,9 +245,29 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 	case <-time.After(10 * time.Second):
 		t.Fatal("the fake agent never drew its box")
 	}
+	// Each key waits for the agent to draw its answer, then for a timed
+	// save that began at least 100 ms after the drawing reached the
+	// terminal, by when the wrapper has it on its shadow screen too. A key
+	// the agent draws nothing for, such as Ctrl+Z, waits three save
+	// intervals.
 	script(func(s string) {
+		mu.Lock()
+		before := len(shown)
+		mu.Unlock()
 		user.WriteString(s)
-		time.Sleep(3 * saveInterval)
+		var drawn time.Time
+		for start := time.Now(); len(exit) == 0; time.Sleep(5 * time.Millisecond) {
+			mu.Lock()
+			grew := len(shown) > before
+			mu.Unlock()
+			if drawn.IsZero() && grew {
+				drawn = time.Now()
+			}
+			if !drawn.IsZero() && saved.Load() > drawn.Add(100*time.Millisecond).UnixNano() ||
+				drawn.IsZero() && time.Since(start) > 3*saveInterval {
+				return
+			}
+		}
 	})
 	select {
 	case code = <-exit:

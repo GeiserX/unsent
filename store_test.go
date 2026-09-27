@@ -65,21 +65,45 @@ func TestStoreCleansDeadEmptySessions(t *testing.T) {
 	}
 }
 
+// seedFiles writes n plain files named by name(i) into dir, holding data,
+// each i minutes older than the one before: a full history in moments,
+// where writing each through the store would cost a durable write apiece.
+func seedFiles(t *testing.T, dir string, n int, data []byte, name func(int) string) {
+	t.Helper()
+	for i := range n {
+		path := filepath.Join(dir, name(i))
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		old := time.Now().Add(-time.Duration(n-i) * time.Minute)
+		os.Chtimes(path, old, old)
+	}
+}
+
 func TestStoreArchiveAndPrune(t *testing.T) {
 	st := testStore(t)
 	r := newRecord([]string{"claude"}, "/work")
 	st.archive(r) // empty: nothing to keep
+	old, _ := json.Marshal(&record{Draft: "old"})
+	seed := func(i int) string { return fmt.Sprintf("20000101-000000.%06d-1.json", i) }
+	seedFiles(t, filepath.Join(st.dir, "history"), historyLimit+3, old, seed)
 	r.Draft = "draft"
-	for i := 0; i < historyLimit+5; i++ {
-		r.PID = i // distinct names within the same millisecond
+	for pid := range 2 {
+		r.PID = pid // distinct names within the same microsecond
 		st.archive(r)
 	}
 	names, _ := filepath.Glob(filepath.Join(st.dir, "history", "*.json"))
 	if len(names) != historyLimit {
 		t.Fatalf("history holds %d, want %d", len(names), historyLimit)
 	}
-	if got := st.load(true); len(got) != historyLimit {
-		t.Fatalf("load %d", len(got))
+	for i, want := range map[int]bool{0: false, 4: false, 5: true, historyLimit + 2: true} {
+		if got := exists(filepath.Join(st.dir, "history", seed(i))); got != want {
+			t.Errorf("archive %d kept %v, want %v", i, got, want)
+		}
+	}
+	got := st.load(true)
+	if len(got) != historyLimit || got[0].Draft != "draft" || got[1].Draft != "draft" {
+		t.Fatalf("load %d, newest %q", len(got), got[0].Draft)
 	}
 }
 
@@ -209,16 +233,24 @@ func TestStoreVersionsAreCappedAndDropped(t *testing.T) {
 
 func TestStoreVersionsGlobalCap(t *testing.T) {
 	st := testStore(t)
-	for i := 0; i < versionsLimit+3; i++ {
-		r := newRecord([]string{"claude"}, "/w")
-		r.ID, r.Draft = fmt.Sprintf("s%03d", i), "draft"
-		if err := st.keepVersion(r); err != nil {
-			t.Fatal(err)
-		}
+	seed := func(i int) string { return fmt.Sprintf("v-s%03d-20000101-000000.000000.json", i) }
+	seedFiles(t, filepath.Join(st.dir, "history"), versionsLimit+2, []byte(`{"draft":"old","version":true}`), seed)
+	r := newRecord([]string{"claude"}, "/w")
+	r.ID, r.Draft = "new", "draft"
+	if err := st.keepVersion(r); err != nil {
+		t.Fatal(err)
 	}
 	names, _ := filepath.Glob(filepath.Join(st.dir, "history", "v-*.json"))
 	if len(names) != versionsLimit {
 		t.Fatalf("%d versions kept, want %d", len(names), versionsLimit)
+	}
+	for i, want := range map[int]bool{0: false, 2: false, 3: true, versionsLimit + 1: true} {
+		if got := exists(filepath.Join(st.dir, "history", seed(i))); got != want {
+			t.Errorf("version %d kept %v, want %v", i, got, want)
+		}
+	}
+	if kept, _ := filepath.Glob(filepath.Join(st.dir, "history", "v-new-*.json")); len(kept) != 1 {
+		t.Fatal("the newest version was trimmed")
 	}
 }
 

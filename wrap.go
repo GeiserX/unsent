@@ -180,7 +180,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			// act on the signal.
 			cmd.Process.Signal(syscall.SIGCONT)
 		case <-tick.C:
-			s.save()
+			timedSave(s)
 		case <-suspend:
 			// The agent runs in its own terminal session, where the kernel
 			// drops a suspend signal: it would print "suspended" and hang.
@@ -243,6 +243,10 @@ const ctrlZ = 0x1a
 var stopSelf = func() {
 	syscall.Kill(os.Getpid(), syscall.SIGTSTP)
 }
+
+// timedSave is the save each tick runs. Tests hook it to type the next key
+// only once a save has read the screen the last key drew.
+var timedSave = (*session).save
 
 // execAgent replaces the wrapper with the agent.
 var execAgent = func(bin string, args []string) error {
