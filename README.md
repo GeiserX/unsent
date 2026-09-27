@@ -29,7 +29,9 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 With Homebrew on macOS or Linux, available once the tap is live with v0.3:
 
 ```sh
-brew tap GeiserX/unsent && brew trust GeiserX/unsent && brew install unsent
+brew tap GeiserX/unsent
+brew trust --formula GeiserX/unsent/unsent   # newer Homebrew asks once per third-party formula
+brew install unsent
 ```
 
 With Go:

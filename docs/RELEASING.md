@@ -26,7 +26,7 @@ A tag with a suffix, such as `v0.3.0-rc1`, is a prerelease.
 The formula is `Formula/unsent.rb` in [GeiserX/homebrew-unsent](https://github.com/GeiserX/homebrew-unsent). goreleaser generates it from the `brews` block. It downloads the release tarball for the machine and installs the `unsent` binary. Its test checks that `unsent version` prints the formula's version. Users install with:
 
 ```sh
-brew trust GeiserX/unsent   # Homebrew 7 asks once per third-party tap
+brew trust --formula GeiserX/unsent/unsent   # newer Homebrew asks once per third-party formula
 brew install GeiserX/unsent/unsent
 ```
 
