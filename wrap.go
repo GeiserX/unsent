@@ -117,9 +117,7 @@ func wrap(args []string, in, out *os.File) int {
 				continue
 			}
 			if n > 0 {
-				// Pasted text can hold control bytes (Word pastes \x0b for
-				// line breaks); only keys typed outside a paste count.
-				s.deletes.add(s.pastes.feed(buf[:n]))
+				s.input(buf[:n])
 				ptmx.Write(buf[:n])
 			}
 			if err != nil {
@@ -242,6 +240,13 @@ type session struct {
 	pastes *pasteTracker
 	stitch stitcher
 	read   extractor
+}
+
+// input notes one chunk of keys on its way to the agent: the pastes in it,
+// and the delete keys. Pasted text can hold control bytes (Word pastes
+// \x0b for line breaks); only keys typed outside a paste count.
+func (s *session) input(keys []byte) {
+	s.deletes.add(s.pastes.feed(keys))
 }
 
 func (s *session) feedScreen(output <-chan []byte) {

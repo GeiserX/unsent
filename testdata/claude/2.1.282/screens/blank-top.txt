@@ -1,0 +1,40 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.282[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus 5.5 (1M context) · API Usage Billing[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/private/tmp/unsent-rev.76eI/work[39m
+
+[38;5;220m⚠[39m [38;5;220mRemote managed settings failed to load (authentication rejected (401)) · no remote policy applied[38;5;246m · /status for [39m
+  [38;5;246mdetails[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m❯ 
+  para two line 01
+  para two line 02
+  para two line 03
+  para two line 04
+  para two line 05
+  para two line 06
+  para two line 07
+  para two line 08
+  para two line 09
+  para two line 10
+  para two line 11
+  para two line 12
+  para two line 13
+  para two line 14[7m [0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;246m⏸ manual mode on[39m

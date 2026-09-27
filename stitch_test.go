@@ -672,6 +672,11 @@ func TestUnwrap(t *testing.T) {
 		{"full row then hand newline joins (known limit)", []string{"aaaa bbbb", "cccc"}, 10, "aaaa bbbb cccc"},
 		{"next word fits exactly: a hand newline", []string{"aaaa", "bbbbb"}, 10, "aaaa\nbbbbb"},
 		{"next word one column too wide: a wrap", []string{"aaaa", "bbbbbb"}, 10, "aaaa bbbbbb"},
+		{"two long words wrapped at a space", []string{"aa bbbbbb", "cccccc"}, 10, "aa bbbbbb cccccc"},
+		{"wide character that did not fit leaves the row a cell short", []string{"x漢漢漢漢", "字字字"}, 10, "x漢漢漢漢字字字"},
+		{"wide run longer than a row starts after a word", []string{"ab 漢漢漢", "字字字字"}, 9, "ab 漢漢漢字字字字"},
+		{"wide words wrapped at a space", []string{"ab 漢漢", "字字"}, 8, "ab 漢漢 字字"},
+		{"a cell short before a narrow character is a wrap", []string{"x漢漢漢漢", "abc"}, 10, "x漢漢漢漢 abc"},
 		{"no rows", nil, 10, ""},
 	}
 	for _, c := range cases {

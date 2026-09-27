@@ -5,13 +5,16 @@ Real output of Claude Code, replayed by `replay_test.go` through the shadow scre
 ## What each file is
 
 - `*.bin`: the raw bytes Claude Code wrote to its terminal. The test saves after every synchronized-output frame (`ESC[?2026l`) and checks the drafts saved.
+- `*.rec`: the keys sent and the bytes Claude Code wrote, in the order they happened, as `script -r` records them (each chunk has a 24-byte header: length, seconds, microseconds, direction; `script -p` plays one back). The test feeds keys through the session's input path, so the delete keys reach the stitcher, and saves after every output frame.
 - `*.editor.txt`: the file Claude Code handed to `$EDITOR` on Ctrl+G, which is exactly the draft it held. This is the ground truth.
+- `*.editor-N.txt`: the same for a `.rec`, one per Ctrl+G in it. At the Nth Ctrl+G the saved draft must match the Nth copy.
 - `*.keys.json`: the tmux keys sent to make the capture, in order (`type` is literal text, `keys` are tmux key names, `wait` is seconds).
 - `screens/*.txt`: one screen copied with `tmux capture-pane -p -e`, colours included (`scrolled.txt` without them).
 
 ## How they were made
 
 Claude Code ran in a private tmux server at 120x40 with a scratch `CLAUDE_CONFIG_DIR`, a scratch `HOME` and a dummy `ANTHROPIC_API_KEY`, so nothing reached a model. `tall-wrapped.bin` and `long-word.bin` were recorded with `script -q -F`, from start-up to the repaint after the editor returned.
+The `.rec` files were recorded with `script -q -r -t 0` the same way, and their editor script kept one numbered copy per Ctrl+G.
 
 Three files differ from that:
 

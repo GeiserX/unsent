@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/vt"
 )
@@ -48,6 +51,90 @@ func replayBytes(t *testing.T, cols, rows int, data []byte) []string {
 		}
 	}
 	return drafts
+}
+
+// replayRecord feeds a session recorded with `script -r` (keys in and
+// output out, in the order they happened) through a session: keys go
+// through its input path, output through the shadow screen, and a save
+// runs after every output frame. At each Ctrl+G the draft saved must be
+// the next editor copy, name.editor-N.txt.
+func replayRecord(t *testing.T, name string) {
+	t.Helper()
+	data := readFixture(t, "2.1.282/"+name+".rec")
+	s := &session{
+		screen: vt.NewEmulator(120, 40),
+		rec:    newRecord([]string{"claude"}, "/w"),
+		store:  testStore(t),
+		pastes: &pasteTracker{},
+		read:   claudeBox,
+	}
+	go io.Copy(io.Discard, s.screen)
+	var now time.Time
+	s.deletes.now = func() time.Time { return now }
+	save := func() {
+		if s.save(); s.broken {
+			t.Fatal("the session stopped saving")
+		}
+	}
+	checked := 0
+	for len(data) > 0 {
+		// Each chunk: its length, seconds, microseconds and direction.
+		if len(data) < 24 {
+			t.Fatal("truncated record")
+		}
+		n := binary.LittleEndian.Uint64(data)
+		now = time.Unix(int64(binary.LittleEndian.Uint64(data[8:])), int64(binary.LittleEndian.Uint32(data[16:]))*1000)
+		dir, chunk := data[20], data[24:24+n]
+		data = data[24+n:]
+		switch dir {
+		case 'i':
+			if string(chunk) == "\x07" {
+				checked++
+				want := string(readFixture(t, fmt.Sprintf("2.1.282/%s.editor-%d.txt", name, checked)))
+				if s.rec.Draft != want {
+					t.Fatalf("at Ctrl+G %d the draft differs from Claude Code's:\n got %q\nwant %q", checked, s.rec.Draft, want)
+				}
+			}
+			s.input(chunk)
+		case 'o':
+			for len(chunk) > 0 {
+				k := len(chunk)
+				if i := bytes.Index(chunk, frameEnd); i >= 0 {
+					k = i + len(frameEnd)
+				}
+				s.write(chunk[:k])
+				chunk = chunk[k:]
+				if !s.inFrame {
+					save()
+				}
+			}
+		}
+	}
+	files, _ := filepath.Glob(filepath.Join("testdata", "claude", "2.1.282", name+".editor-*.txt"))
+	if checked == 0 || checked != len(files) {
+		t.Fatalf("%d Ctrl+G checks for %d editor copies", checked, len(files))
+	}
+}
+
+// Recorded with keys and output together:
+//   - deletes: Backspace across a line break mid-box, Ctrl+K, Backspace at
+//     the end of the draft, a new row and a Backspace in one burst (the
+//     box scrolls a row out of sight above as the key deletes), Delete, and
+//     Backspace over whole rows at the end, all with the box scrolled;
+//   - bursts: a new row and Ctrl+W, a new row and Delete, Up and Delete,
+//     and Up and Ctrl+K, each landing in one frame mid-box; the last scrolls
+//     a row out of sight below as the key deletes;
+//   - trailing-rows: Ctrl+K and Delete on the last rows with text, above
+//     blank rows that stay;
+//   - blank-lines: a draft that starts with a line break, then a blank line
+//     scrolled onto the marker row, with text out of sight above;
+//   - wide-run: runs of wide characters longer than a row, one after a
+//     single narrow character (the row ends a cell short) and one after a
+//     word (the row is full).
+func TestReplayClaudeKeysAndOutput(t *testing.T) {
+	for _, name := range []string{"deletes", "bursts", "trailing-rows", "blank-lines", "wide-run"} {
+		t.Run(name, func(t *testing.T) { replayRecord(t, name) })
+	}
 }
 
 func readFixture(t *testing.T, path string) []byte {
@@ -146,6 +233,8 @@ var claudeScreens = []struct {
 	{"2.1.282/screens/paste-before-again.txt", true, "[Pasted text #12 +4 lines]"},
 	{"2.1.282/screens/paste-again.txt", true, "aaaa\nbbbb\ncccc\ndddd\neeee"},
 	{"2.1.282/screens/tall.txt", true, "row 11\nrow 12\nrow 13\nrow 14\nrow 15\nrow 16\nrow 17\nrow 18\nrow 19\nrow 20\nrow 21\nrow 22\nrow 23\nrow 24\nrow 25"},
+	{"2.1.282/screens/leading-break.txt", true, "\nafter a leading break"},
+	{"2.1.282/screens/blank-top.txt", true, "\npara two line 01\npara two line 02\npara two line 03\npara two line 04\npara two line 05\npara two line 06\npara two line 07\npara two line 08\npara two line 09\npara two line 10\npara two line 11\npara two line 12\npara two line 13\npara two line 14"},
 	{"2.1.280/screens/empty.txt", true, ""},
 	{"2.1.280/screens/draft.txt", true, "do nothing; reply ok\ntwo[Pasted text #1 +3 lines]"},
 	{"2.1.280/screens/scrolled.txt", true, "r8\nr9\nr10\nr11\nr12\nr13\nr14\nr15\nr16\nr17\nr18\nr19\nr20\nr21\nr22"},
