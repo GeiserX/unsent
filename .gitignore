@@ -9,3 +9,4 @@ coverage*.out
 *.db
 .beads-credential-key
 .beads/proxieddb/
+.beads/

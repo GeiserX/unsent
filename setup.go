@@ -92,11 +92,12 @@ func startupFiles(shell string) []string {
 // up on PATH when it is called, not when the block runs, so an agent that a
 // line after the block puts on PATH still goes through unsent. With the
 // agent not installed, or unsent gone, the wrapper runs the command as the
-// shell would.
+// shell would. The zsh block also holds the command-line hooks
+// (zshHooks).
 func setupBlock(shell string) string {
-	defined, look := `declare -F`, `type -P`
+	defined, look, hooks := `declare -F`, `type -P`, ""
 	if shell == "zsh" {
-		defined, look = `typeset -f`, `whence -p`
+		defined, look, hooks = `typeset -f`, `whence -p`, zshHooks
 	}
 	return rcBlockStart + " written by `unsent setup`; `unsent setup --undo` removes it\n" +
 		"for _unsent_a in " + strings.Join(agentCommands(), " ") + "; do\n" +
@@ -105,6 +106,7 @@ func setupBlock(shell string) string {
 		"  fi\n" +
 		"done\n" +
 		"unset _unsent_a\n" +
+		hooks +
 		rcBlockEnd + "\n"
 }
 

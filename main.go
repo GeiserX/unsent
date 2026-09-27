@@ -50,6 +50,8 @@ Usage:
   unsent setup --undo [zsh|bash]
                              remove that block (from every shell's rc file
                              when none is named); drafts stay
+  unsent init zsh            print the hooks that save zsh's command line as
+                             you type it; unsent setup zsh already writes them
   unsent status [zsh|bash]   which agents this shell runs through unsent,
                              which profile each gets, what skips the wrapper,
                              and the saving and on-send settings
@@ -105,6 +107,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdSetup(args[1:], stdout, stderr)
 	case "status":
 		return cmdStatus(args[1:], stdout, stderr)
+	case "init":
+		return cmdInit(args[1:], stdout, stderr)
 	case "--as":
 		if len(args) < 3 {
 			fmt.Fprint(stderr, usage)

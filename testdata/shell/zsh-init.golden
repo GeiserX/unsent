@@ -1,0 +1,69 @@
+# The command line, saved as you type it, for unsent list and restore.
+if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
+    zmodload zsh/system zsh/datetime 2>/dev/null &&
+    zmodload -F zsh/files b:zf_mkdir b:zf_mv 2>/dev/null &&
+    emulate zsh -c 'autoload -Uz add-zle-hook-widget'; then
+  typeset -gi _unsent_fd=-1 _unsent_size=0 _unsent_n=0
+  typeset -g _unsent_log= _unsent_last=
+  function _unsent_put {
+    emulate -L zsh
+    setopt no_multibyte
+    local d n
+    if (( _unsent_fd == -1 )); then
+      _unsent_fd=-2
+      d=${UNSENT_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/unsent}
+      zf_mkdir -p -m 700 $d $d/shell 2>/dev/null
+      _unsent_log=$d/shell/zsh-$$-${EPOCHREALTIME//[^0-9]/}.log
+      sysopen -a -m 600 -o create,excl,nofollow,sync,cloexec -u n $_unsent_log 2>/dev/null || return 1
+      _unsent_fd=$n _unsent_size=0
+      _unsent_put v 1
+    fi
+    (( _unsent_fd >= 0 )) || return 1
+    syswrite -c n -o $_unsent_fd "$1 $EPOCHSECONDS ${#2}"$'\n'"$2"$'\n' && (( _unsent_size += n ))
+  }
+  function _unsent_line {
+    emulate -L zsh
+    [[ $CONTEXT == start || $CONTEXT == cont ]] || return 0
+    local t=$PREBUFFER$BUFFER
+    if [[ $t == ' '* ]]; then
+      (( _unsent_n )) && _unsent_put f ''
+      _unsent_n=0 _unsent_last=' '
+      return 0
+    fi
+    [[ $1 == b && $t == "$_unsent_last" ]] && return 0
+    _unsent_last=$t
+    _unsent_put $1 "$t" && (( ++_unsent_n ))
+    return 0
+  }
+  function _unsent_init {
+    emulate -L zsh
+    if [[ $CONTEXT == cont ]]; then
+      _unsent_put c ''
+    elif [[ $CONTEXT == start ]]; then
+      if (( _unsent_fd >= 0 && _unsent_size > 262144 )); then
+        zf_mv $_unsent_log ${_unsent_log%.log}.done 2>/dev/null
+        exec {_unsent_fd}>&-
+        _unsent_fd=-1
+      fi
+      _unsent_n=0 _unsent_last=
+      _unsent_put i "$PWD"
+    fi
+    return 0
+  }
+  function _unsent_redraw { _unsent_line b }
+  function _unsent_finish { _unsent_line s }
+  add-zle-hook-widget line-init _unsent_init
+  add-zle-hook-widget line-pre-redraw _unsent_redraw
+  add-zle-hook-widget line-finish _unsent_finish
+  if (( ! ${+functions[TRAPHUP]} )) || functions -c TRAPHUP _unsent_hup_next 2>/dev/null; then
+    function TRAPHUP {
+      zle && _unsent_line h
+      if (( ${+functions[_unsent_hup_next]} )); then
+        _unsent_hup_next "$@"
+        return
+      fi
+      unfunction TRAPHUP
+      kill -HUP ${sysparams[pid]}
+    }
+  fi
+fi
