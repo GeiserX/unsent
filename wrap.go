@@ -49,6 +49,16 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		}
 		return 0
 	}
+	// Arm the signal handlers before anything slow (the store, the
+	// pseudo-terminal): a hang-up or Ctrl+C during startup must be handled,
+	// not take unsent down with the default action. The buffered channels
+	// hold what arrives before the loop below runs.
+	resizes, sigs := make(chan os.Signal, 1), make(chan os.Signal, 4)
+	signal.Notify(resizes, syscall.SIGWINCH)
+	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer signal.Stop(resizes)
+	defer signal.Stop(sigs)
+
 	st, err := openStore()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
@@ -151,14 +161,8 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		}
 	}()
 
-	// Resizes and stop signals get separate channels: a burst of resizes
-	// while a save runs must not crowd out a hang-up.
-	resizes, sigs := make(chan os.Signal, 1), make(chan os.Signal, 4)
-	signal.Notify(resizes, syscall.SIGWINCH)
-	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	defer signal.Stop(resizes)
-	defer signal.Stop(sigs)
-
+	// (The stop signals and resizes were armed at the top of wrap; resizes
+	// get their own channel so a burst of them cannot crowd out a hang-up.)
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	tick := time.NewTicker(saveInterval)
