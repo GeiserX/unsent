@@ -62,7 +62,10 @@ import (
 // never passes through the line editor. zsh skips a redraw when more input is pending, so a shell killed
 // in that gap loses its last keys. The hooks write only into a folder the
 // shell's user owns, so a root shell that reads the user's rc file, as
-// sudo -s does on macOS, saves nothing there and creates nothing.
+// sudo -s does on macOS, saves nothing there and creates nothing. A shell
+// with no unsent on its PATH at a prompt saves nothing either, as the
+// wrappers fall back then, so uninstalling unsent without undoing setup
+// leaves no log that nothing will import.
 //
 // The hooks' functions run under emulate -L zsh, and add-zle-hook-widget
 // is loaded under zsh emulation, because its own dispatcher fails under a
@@ -89,6 +92,7 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     local d p n
     if (( _unsent_fd == -1 )); then
       _unsent_fd=-2
+      (( ${+commands[unsent]} )) || return 1
       d=${UNSENT_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/unsent}
       p=$d/shell
       while [[ ! -e $p ]]; do p=${p:h}; done

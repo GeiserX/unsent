@@ -15,14 +15,15 @@ import (
 )
 
 // runStatus runs `unsent status` for one real shell binary, asking it with
-// an empty environment but for HOME, ZDOTDIR, TERM and path, as env -i
-// does, so no real rc file or agent is reached.
+// an empty environment but for HOME, ZDOTDIR, UNSENT_HOME, TERM and path,
+// as env -i does, so no real rc file or agent is reached, and a log the
+// hooks opened would land where liveLogs looks.
 func (h setupHome) runStatus(t *testing.T, sh, path string) string {
 	t.Helper()
 	orig := statusEnv
 	t.Cleanup(func() { statusEnv = orig })
 	statusEnv = func() []string {
-		return []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "PATH=" + path, "TERM=dumb"}
+		return []string{"HOME=" + h.home, "ZDOTDIR=" + h.zdotdir, "UNSENT_HOME=" + filepath.Join(h.home, "state"), "PATH=" + path, "TERM=dumb"}
 	}
 	t.Setenv("SHELL", sh)
 	var o, e bytes.Buffer

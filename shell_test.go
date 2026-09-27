@@ -128,6 +128,8 @@ func startZsh(t *testing.T, hooks string, unsentHome bool, env ...string) *zshSe
 	home := t.TempDir()
 	agentBin := filepath.Join(home, "agent-bin")
 	writeScript(t, filepath.Join(agentBin, "claude"), `printf 'claude[%s]\n' "$@"`)
+	// The hooks save nothing unless unsent is on the shell's PATH.
+	writeScript(t, filepath.Join(agentBin, "unsent"), "exit 0")
 	hookFile := filepath.Join(home, "hooks.zsh")
 	if err := os.WriteFile(hookFile, []byte(hooks), 0o644); err != nil {
 		t.Fatal(err)

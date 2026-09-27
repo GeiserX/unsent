@@ -11,6 +11,7 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
     local d p n
     if (( _unsent_fd == -1 )); then
       _unsent_fd=-2
+      (( ${+commands[unsent]} )) || return 1
       d=${UNSENT_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/unsent}
       p=$d/shell
       while [[ ! -e $p ]]; do p=${p:h}; done

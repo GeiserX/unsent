@@ -682,7 +682,18 @@ func TestSetupSavesTheZshCommandLine(t *testing.T) {
 				t.Errorf("setup does not say the command line is saved:\n%s", out)
 			}
 
-			s := h.rcZsh(t, sh, path)
+			// unsent uninstalled with the block left in: nothing would ever
+			// import a log, so the shell writes none, for a line run with
+			// Enter or one left at the prompt.
+			s := h.rcZsh(t, sh, h.agentBin+":/usr/bin:/bin")
+			s.echo("print run-without-unsent\r", "run-without-unsent\r\n")
+			s.echo("typed without unsent", "typed without unsent")
+			s.hangUp()
+			if l := s.logs(); len(l) > 0 {
+				t.Fatalf("a shell with no unsent on PATH wrote logs: %v", l)
+			}
+
+			s = h.rcZsh(t, sh, path)
 			s.line("typed where setup ran")
 			s.hangUp()
 			if out := zshLines(t); !strings.Contains(out, "typed where setup ran") {
