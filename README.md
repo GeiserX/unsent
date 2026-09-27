@@ -46,7 +46,7 @@ Everything else stays the same. Same terminal, same keys, same arguments, so `un
 alias claude='unsent claude'
 ```
 
-When the agent starts through a command that doesn't carry its name, such as `npx` or a renamed binary, name the agent: `unsent --as claude npx @anthropic-ai/claude-code`, or set `UNSENT_AGENT=claude`.
+When the agent starts through a command that doesn't carry its name, such as `npx` or a renamed binary, name the agent: `unsent --as claude npx @anthropic-ai/claude-code`, or put the variable in front of that one command: `UNSENT_AGENT=claude unsent npx @anthropic-ai/claude-code`. Don't export `UNSENT_AGENT` in your shell profile: every wrapped command whose name unsent doesn't recognize would then be read as that agent.
 
 After a crash, a closed window or a reboot:
 

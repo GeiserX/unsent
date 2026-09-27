@@ -9,7 +9,7 @@
 | `main.go` | CLI: `unsent <agent>`, `--as`, `list`, `show`, `restore`, `version`; the recovery notice; drafts filtered by agent and folder (the resolved real path) |
 | `wrap.go` | Pseudo-terminal passthrough, shadow screen, save loop, signals, Ctrl+Z suspend |
 | `screen.go` | Snapshot of the shadow screen (text, dim cells, cursor) |
-| `extract.go` | The `profile` type (one per agent: name, command names, box reader, paste placeholder, delete keys), `profileFor`, and `agentFor` (`--as`, then `UNSENT_AGENT`, then the command's base name) |
+| `extract.go` | The `profile` type (one per agent: name, command names, box reader, paste placeholder, delete keys), `profileFor`, and `agentFor` (`--as`, then a base name a profile answers to, then `UNSENT_AGENT`, then the base name) |
 | `agent_claude.go` | Claude Code's profile and its box reader (`claudeBox`) |
 | `stitch.go` | Rebuilds drafts taller than the box: word-level edit-distance alignment of each view against the known text; un-wraps rows back into lines |
 | `paste.go` | Captures bracketed pastes and expands the profile's placeholders, such as `[Pasted text #N +M lines]` |

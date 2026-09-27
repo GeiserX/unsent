@@ -65,10 +65,18 @@ func profileFor(command string) *profile {
 	return nil
 }
 
-// agentFor names the agent a command starts: as (from --as), else
-// UNSENT_AGENT, else the command's base name. The first two are for
-// commands whose name does not say it: npx, node cli.js, a renamed binary.
+// agentFor names the agent a command starts: as (from --as), else the
+// command's base name when a profile answers to it, else UNSENT_AGENT, else
+// the base name. --as and UNSENT_AGENT are for commands whose name does not
+// say it: npx, node cli.js, a renamed binary. A command that names a known
+// agent keeps that name, so an exported UNSENT_AGENT cannot tag it as
+// another agent.
 func agentFor(as, command string) string {
+	if as == "" {
+		if p := profileFor(command); p != nil {
+			return p.name
+		}
+	}
 	for _, name := range []string{as, os.Getenv("UNSENT_AGENT"), filepath.Base(command)} {
 		if name != "" {
 			return agentName(name)

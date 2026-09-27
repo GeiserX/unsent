@@ -107,12 +107,13 @@ func fakeAgent() {
 // and returns its exit code and the store it wrote to.
 func runWrapped(t *testing.T, script func(type_ func(string))) (int, *store) {
 	t.Helper()
-	return runWrappedAs(t, "claude", "claude", script)
+	return runWrappedAs(t, "claude", []string{"claude"}, script)
 }
 
 // runWrappedAs is runWrapped with the fake agent installed as command and
-// wrapped as agent.
-func runWrappedAs(t *testing.T, agent, command string, script func(type_ func(string))) (int, *store) {
+// started through run with argv, so the agent is named the way the command
+// line names it.
+func runWrappedAs(t *testing.T, command string, argv []string, script func(type_ func(string))) (int, *store) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("UNSENT_HOME", home)
@@ -157,8 +158,12 @@ func runWrappedAs(t *testing.T, agent, command string, script func(type_ func(st
 	}()
 	defer func() { user.Close(); term.Close() }()
 
+	// run wraps on the process's own terminal, so lend it the pair.
+	oldIn, oldOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = term, term
+	defer func() { os.Stdin, os.Stdout = oldIn, oldOut }()
 	code := make(chan int, 1)
-	go func() { code <- wrap(agent, []string{command}, term, term) }()
+	go func() { code <- run(argv, io.Discard, io.Discard) }()
 	select {
 	case <-ready:
 	case <-time.After(10 * time.Second):
@@ -196,30 +201,42 @@ func TestWrapSavesDraftLeftInTheBox(t *testing.T) {
 	}
 }
 
-// --as picks the profile for a command whose name does not say which agent
-// it starts, and the draft is recorded under that agent. The folder is
-// recorded as its real path, not the symlink the agent was started from.
+// --as, or UNSENT_AGENT, picks the profile for a command whose name does
+// not say which agent it starts, and the draft is recorded under that agent.
+// The folder is recorded as its real path, not the symlink the agent was
+// started from.
 func TestWrapAsNamesTheAgent(t *testing.T) {
-	real := t.TempDir()
-	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(real, link); err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(link)
-	code, st := runWrappedAs(t, agentFor("claude", "renamed-agent"), "renamed-agent", func(type_ func(string)) {
-		type_("typed into a renamed binary")
-		type_("\x04")
-	})
-	if code != 0 {
-		t.Fatalf("exit %d", code)
-	}
-	rs := st.orphans()
-	if len(rs) != 1 || rs[0].Draft != "typed into a renamed binary" {
-		t.Fatalf("orphans %+v: the profile named by --as did not read the box", rs)
-	}
-	want, _ := filepath.EvalSymlinks(real)
-	if rs[0].Agent != "claude" || rs[0].Command[0] != "renamed-agent" || rs[0].Cwd != want {
-		t.Fatalf("agent %q, command %q, cwd %q (want %q)", rs[0].Agent, rs[0].Command, rs[0].Cwd, want)
+	for _, c := range []struct {
+		env  string
+		argv []string
+	}{
+		{"", []string{"--as", "claude", "renamed-agent"}},
+		{"claude", []string{"renamed-agent"}},
+	} {
+		t.Run(strings.Join(c.argv, " "), func(t *testing.T) {
+			t.Setenv("UNSENT_AGENT", c.env)
+			real := t.TempDir()
+			link := filepath.Join(t.TempDir(), "link")
+			if err := os.Symlink(real, link); err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(link)
+			code, st := runWrappedAs(t, "renamed-agent", c.argv, func(type_ func(string)) {
+				type_("typed into a renamed binary")
+				type_("\x04")
+			})
+			if code != 0 {
+				t.Fatalf("exit %d", code)
+			}
+			rs := st.orphans()
+			if len(rs) != 1 || rs[0].Draft != "typed into a renamed binary" {
+				t.Fatalf("orphans %+v: the named profile did not read the box", rs)
+			}
+			want, _ := filepath.EvalSymlinks(real)
+			if rs[0].Agent != "claude" || rs[0].Command[0] != "renamed-agent" || rs[0].Cwd != want {
+				t.Fatalf("agent %q, command %q, cwd %q (want %q)", rs[0].Agent, rs[0].Command, rs[0].Cwd, want)
+			}
+		})
 	}
 }
 

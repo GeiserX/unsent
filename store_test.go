@@ -385,4 +385,13 @@ func TestAgentFor(t *testing.T) {
 	if p := profileFor(agentFor("", "node")); p != &claude {
 		t.Fatal("UNSENT_AGENT did not pick the profile")
 	}
+	// A command that names a known agent keeps it: an exported variable
+	// must not tag it as another agent. --as still wins.
+	t.Setenv("UNSENT_AGENT", "codex")
+	if got := agentFor("", "/usr/local/bin/claude"); got != "claude" {
+		t.Fatalf("known base name under UNSENT_AGENT=codex: %q", got)
+	}
+	if got := agentFor("codex", "claude"); got != "codex" {
+		t.Fatalf("--as over a known base name: %q", got)
+	}
 }
