@@ -238,6 +238,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
 				if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
+					killedBy = st.Signal()
 					return 128 + int(st.Signal())
 				}
 				return exit.ExitCode()
@@ -248,6 +249,29 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 }
 
 const ctrlZ = 0x1a
+
+// killedBy is the signal that killed the agent, once wrap has returned
+// 128+n for it; exitAs dies of it too.
+var killedBy syscall.Signal
+
+// exitAs ends unsent with code, or, when the agent was killed by a signal,
+// by that same signal, so the shell's $? and job control see what they
+// would see without unsent. It runs only after wrap has returned: the
+// terminal is restored, the draft saved and the lock released. Go's runtime
+// dies of a hang-up, Ctrl+C or SIGTERM nobody listens for, and nothing
+// survives SIGKILL. The others it would answer with a goroutine dump, or
+// ignore, so they keep 128+n, as does a signal unsent was started with
+// ignored, which signal.Reset leaves ignored.
+func exitAs(code int) {
+	switch sig := killedBy; sig {
+	case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL:
+		signal.Reset(sig)
+		syscall.Kill(os.Getpid(), sig)
+		// Delivery is not instant; a signal still ignored never comes.
+		time.Sleep(100 * time.Millisecond)
+	}
+	os.Exit(code)
+}
 
 // stopSelf suspends the wrapper the way Ctrl+Z suspends any job, and returns
 // when the shell resumes it.

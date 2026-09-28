@@ -6,8 +6,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,7 +36,18 @@ func TestMain(m *testing.M) {
 				return nil, errors.New("forced pty failure")
 			}
 		}
-		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
+	}
+	// The test binary as unsent at its end, after the agent was killed by
+	// signal UNSENT_TEST_KILLED_BY, with the stop signals armed and
+	// disarmed as wrap does.
+	if os.Getenv("UNSENT_TEST_RUN") == "exit" {
+		n, _ := strconv.Atoi(os.Getenv("UNSENT_TEST_KILLED_BY"))
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+		signal.Stop(sigs)
+		killedBy = syscall.Signal(n)
+		exitAs(128 + n)
 	}
 	if os.Getenv("UNSENT_FAKE_AGENT") == "1" {
 		fakeAgent()
@@ -43,7 +56,7 @@ func TestMain(m *testing.M) {
 	// The test binary as unsent itself, for tests that need it in a
 	// terminal of its own.
 	if os.Getenv("UNSENT_TEST_RUN") == "1" {
-		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
 	os.Exit(m.Run())
 }
@@ -121,7 +134,11 @@ func fakeAgent() {
 				in = ""
 			case in[0] == 4: // Ctrl+D quits
 				return
-			case in[0] == 5: // Ctrl+E quits with an error
+			case in[0] == 5: // Ctrl+E quits with an error, or dies of UNSENT_FAKE_SIGNAL
+				if n, err := strconv.Atoi(os.Getenv("UNSENT_FAKE_SIGNAL")); err == nil {
+					syscall.Kill(os.Getpid(), syscall.Signal(n))
+					time.Sleep(10 * time.Second)
+				}
 				os.Exit(3)
 			case in[0] == 7: // Ctrl+G hands the draft to $VISUAL, then $EDITOR
 				editDraft(strings.Join(draft, ""))
@@ -577,6 +594,14 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 // and returns the exit code and everything the terminal showed.
 func unsentClaude(t *testing.T, unsent []string, bin string, env []string, errLog *os.File) (code int, shown string) {
 	t.Helper()
+	state, shown := unsentClaudeState(t, unsent, bin, env, errLog)
+	return state.ExitCode(), shown
+}
+
+// unsentClaudeState is unsentClaude returning how unsent ended, so a test
+// can tell a signal from an exit code.
+func unsentClaudeState(t *testing.T, unsent []string, bin string, env []string, errLog *os.File) (state *os.ProcessState, shown string) {
+	t.Helper()
 	user, tty, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -638,7 +663,7 @@ func unsentClaude(t *testing.T, unsent []string, bin string, env []string, errLo
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	return cmd.ProcessState.ExitCode(), string(out)
+	return cmd.ProcessState, string(out)
 }
 
 // claude 2>err.log keeps its redirect: with stdin and stdout on the
@@ -731,6 +756,75 @@ func TestWrapHandsOverWhenItCannotSave(t *testing.T) {
 			}
 			if !strings.Contains(shown, "to-stderr") || !strings.Contains(shown, "hello") {
 				t.Fatalf("terminal %q: the agent did not run on it", shown)
+			}
+		})
+	}
+}
+
+// An agent killed by a signal is reported to the shell as killed by that
+// signal, as it would be without unsent, not as the exit code 128+n: job
+// control and $? tell the two apart. The draft is saved first, and a normal
+// exit code still comes through as it is.
+func TestWrapDiesOfTheSignalThatKilledTheAgent(t *testing.T) {
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	for _, sig := range []syscall.Signal{syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGKILL, 0} {
+		t.Run(fmt.Sprint(sig), func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("UNSENT_HOME", home)
+			env := []string{"UNSENT_HOME=" + home}
+			if sig != 0 {
+				env = append(env, fmt.Sprintf("UNSENT_FAKE_SIGNAL=%d", sig))
+			}
+			state, shown := unsentClaudeState(t, []string{self, "claude"}, bin, env, nil)
+			ws := state.Sys().(syscall.WaitStatus)
+			if sig == 0 {
+				if ws.Signaled() || ws.ExitStatus() != 3 {
+					t.Fatalf("unsent ended %v; want exit status 3", state)
+				}
+			} else if !ws.Signaled() || ws.Signal() != sig {
+				t.Fatalf("unsent ended %v; want killed by %v, as the agent was (terminal %q)", state, sig, shown)
+			}
+			st, err := openStore()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" {
+				t.Fatalf("orphans %+v, want the draft", rs)
+			}
+		})
+	}
+}
+
+// When dying of the signal does not end unsent, the shell gets 128+n: a
+// hang-up unsent was started with ignored (nohup) stays ignored, and a
+// SIGQUIT would make Go's runtime print a goroutine dump and exit 2.
+func TestExitAsFallsBackTo128PlusN(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		sig  syscall.Signal
+		argv []string
+	}{
+		{"ignored hang-up", syscall.SIGHUP, []string{"/bin/sh", "-c", `trap "" HUP; exec "$0"`, self}},
+		{"quit", syscall.SIGQUIT, []string{self}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			cmd := exec.Command(c.argv[0], c.argv[1:]...)
+			cmd.Env = append(os.Environ(), "UNSENT_TEST_RUN=exit", fmt.Sprintf("UNSENT_TEST_KILLED_BY=%d", c.sig))
+			out, err := cmd.CombinedOutput()
+			ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
+			if ws.Signaled() || ws.ExitStatus() != 128+int(c.sig) || len(out) != 0 {
+				t.Fatalf("ended %v (%v), printed %q; want exit status %d and nothing printed", cmd.ProcessState, err, out, 128+int(c.sig))
 			}
 		})
 	}
