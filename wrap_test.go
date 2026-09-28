@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,6 +28,12 @@ func TestMain(m *testing.M) {
 	if os.Getenv("UNSENT_TEST_RUN") == "wrap" {
 		os.Unsetenv("UNSENT_TEST_RUN")
 		os.Setenv("UNSENT_FAKE_AGENT", "1")
+		if os.Getenv("UNSENT_TEST_PTY") == "fail" {
+			os.Unsetenv("UNSENT_TEST_PTY")
+			startPty = func(*exec.Cmd, *pty.Winsize) (*os.File, error) {
+				return nil, errors.New("forced pty failure")
+			}
+		}
 		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
 	if os.Getenv("UNSENT_FAKE_AGENT") == "1" {
@@ -558,6 +565,77 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 	}
 }
 
+// unsentClaude runs the test binary as unsent claude in a terminal of its
+// own, with bin, which holds the fake claude, first on PATH and env added
+// to the environment. errLog, when not nil, is where its stderr goes
+// instead. It types hello, waits past a save, quits the fake agent with 3
+// and returns the exit code and everything the terminal showed.
+func unsentClaude(t *testing.T, self, bin string, env []string, errLog *os.File) (code int, shown string) {
+	t.Helper()
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { user.Close(); tty.Close() }()
+	pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
+	cmd := exec.Command(self, "claude")
+	cmd.Env = append(append(os.Environ(), "UNSENT_TEST_RUN=wrap", "UNSENT_FAKE_STDERR=to-stderr",
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH")), env...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+	if errLog != nil {
+		cmd.Stderr = errLog
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var out []byte
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := user.Read(buf)
+			mu.Lock()
+			out = append(out, buf[:n]...)
+			mu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}()
+	waitFor := func(want string) {
+		t.Helper()
+		for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
+			mu.Lock()
+			s := string(out)
+			mu.Unlock()
+			if strings.Contains(s, want) {
+				return
+			}
+			if time.Since(start) > 10*time.Second {
+				cmd.Process.Kill()
+				t.Fatalf("the terminal never showed %q: %q", want, s)
+			}
+		}
+	}
+	waitFor("❯")
+	user.WriteString("hello")
+	waitFor("hello")
+	time.Sleep(3 * saveInterval) // a wrapper has saved it by now
+	user.WriteString("\x05")     // the fake agent quits with 3
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("unsent claude did not exit")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	return cmd.ProcessState.ExitCode(), string(out)
+}
+
 // claude 2>err.log keeps its redirect: with stdin and stdout on the
 // terminal and stderr on a file, unsent hands over to the agent, so the
 // agent's stderr reaches the file and its exit status comes through. With
@@ -573,73 +651,7 @@ func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
 	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
 		t.Fatal(err)
 	}
-	// unsent claude in a terminal of its own; errLog, when not nil, is
-	// where its stderr goes instead.
-	start := func(errLog *os.File) (code int, shown string) {
-		t.Helper()
-		user, tty, err := pty.Open()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() { user.Close(); tty.Close() }()
-		pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
-		cmd := exec.Command(self, "claude")
-		cmd.Env = append(os.Environ(), "UNSENT_TEST_RUN=wrap", "UNSENT_FAKE_STDERR=to-stderr",
-			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
-		if errLog != nil {
-			cmd.Stderr = errLog
-		}
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
-		if err := cmd.Start(); err != nil {
-			t.Fatal(err)
-		}
-		var mu sync.Mutex
-		var out []byte
-		go func() {
-			buf := make([]byte, 4096)
-			for {
-				n, err := user.Read(buf)
-				mu.Lock()
-				out = append(out, buf[:n]...)
-				mu.Unlock()
-				if err != nil {
-					return
-				}
-			}
-		}()
-		waitFor := func(want string) {
-			t.Helper()
-			for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
-				mu.Lock()
-				s := string(out)
-				mu.Unlock()
-				if strings.Contains(s, want) {
-					return
-				}
-				if time.Since(start) > 10*time.Second {
-					cmd.Process.Kill()
-					t.Fatalf("the terminal never showed %q: %q", want, s)
-				}
-			}
-		}
-		waitFor("❯")
-		user.WriteString("hello")
-		waitFor("hello")
-		time.Sleep(3 * saveInterval) // a wrapper has saved it by now
-		user.WriteString("\x05")     // the fake agent quits with 3
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			cmd.Process.Kill()
-			t.Fatal("unsent claude did not exit")
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		return cmd.ProcessState.ExitCode(), string(out)
-	}
+	start := func(errLog *os.File) (int, string) { return unsentClaude(t, self, bin, nil, errLog) }
 
 	errLog, err := os.Create(filepath.Join(t.TempDir(), "err.log"))
 	if err != nil {
@@ -666,6 +678,46 @@ func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
 	}
 	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" {
 		t.Fatalf("stderr on the terminal: orphans %+v, want the draft: unsent should have wrapped", rs)
+	}
+}
+
+// A draft saver that cannot run never costs the session: with the draft
+// folder unwritable, or no pseudo-terminal to be had, unsent says so in one
+// line and hands over, so the agent runs to the end on the terminal and its
+// exit status is the session's.
+func TestWrapHandsOverWhenItCannotSave(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only folder")
+	}
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	locked := t.TempDir()
+	if err := os.Chmod(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o700) })
+	const off = "; drafts are not being saved this session"
+	for _, c := range []struct {
+		name, home, pty, want string
+	}{
+		{"unwritable UNSENT_HOME", locked, "", "unsent: cannot open the draft folder: mkdir " + locked},
+		{"no pseudo-terminal", t.TempDir(), "fail", "unsent: cannot start a pseudo-terminal: forced pty failure" + off},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			code, shown := unsentClaude(t, self, bin, []string{"UNSENT_HOME=" + c.home, "UNSENT_TEST_PTY=" + c.pty}, nil)
+			if code != 3 || !strings.Contains(shown, c.want) || strings.Count(shown, off) != 1 {
+				t.Fatalf("exit %d, terminal %q; want exit 3 and one line %q ending %q", code, shown, c.want, off)
+			}
+			if !strings.Contains(shown, "to-stderr") || !strings.Contains(shown, "hello") {
+				t.Fatalf("terminal %q: the agent did not run on it", shown)
+			}
+		})
 	}
 }
 

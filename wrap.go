@@ -45,11 +45,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		// pseudo-terminal would turn the pipe into keystrokes, and the
 		// agent's stderr would land in it instead of the file. Get out of
 		// the way.
-		if err := execAgent(bin, args); err != nil {
-			fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
-			return 126
-		}
-		return 0
+		return handOver(bin, args)
 	}
 	// Arm the signal handlers before anything slow (the store, the
 	// pseudo-terminal): a hang-up or Ctrl+C during startup must be handled,
@@ -60,11 +56,20 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer signal.Stop(resizes)
 	defer signal.Stop(sigs)
+	// broken hands the session to the agent when unsent cannot run it: a
+	// draft saver that fails must not cost the user the session. The
+	// handlers go first, so the agent gets the dispositions unsent was
+	// started with (a hang-up ignored under nohup stays ignored).
+	broken := func(what string, err error) int {
+		fmt.Fprintf(os.Stderr, "unsent: %s: %v; drafts are not being saved this session\n", what, err)
+		signal.Stop(resizes)
+		signal.Stop(sigs)
+		return handOver(bin, args)
+	}
 
 	st, err := openStore()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
-		return 1
+		return broken("cannot open the draft folder", err)
 	}
 	cwd, _ := os.Getwd()
 	cwd = realPath(cwd)
@@ -72,10 +77,9 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 
 	cmd := exec.Command(bin, args[1:]...)
 	cols, rows := termSize(in)
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+	ptmx, err := startPty(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
-		return 1
+		return broken("cannot start a pseudo-terminal", err)
 	}
 	defer ptmx.Close()
 
@@ -265,6 +269,19 @@ func onTerminal(in, out *os.File) bool {
 // execAgent replaces the wrapper with the agent.
 var execAgent = func(bin string, args []string) error {
 	return syscall.Exec(bin, args, os.Environ())
+}
+
+// startPty starts the agent on a new pseudo-terminal; tests make it fail.
+var startPty = pty.StartWithSize
+
+// handOver replaces unsent with the agent, so the agent's exit status is
+// the session's. It returns only when the agent cannot be started.
+func handOver(bin string, args []string) int {
+	if err := execAgent(bin, args); err != nil {
+		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
+		return 126
+	}
+	return 0
 }
 
 // off reports whether UNSENT_OFF switches unsent off: the way out when a
