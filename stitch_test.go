@@ -303,41 +303,6 @@ func (r *stitchRun) checkKeys(what string, deleted int) {
 	}
 }
 
-// byteExact reports whether got is the draft byte for byte, allowing only
-// the limit unwrap documents: a line break typed where the row before it
-// is full comes back as a space. Full means the next line's first word
-// would not have fitted after that row, so the screen shows a wrap. (The
-// fuzz never types a list item or a code fence, which unwrap keeps apart.)
-// It wraps with wrapText, not unwrap, so a broken unwrap cannot excuse
-// itself.
-func byteExact(got, truth string, width int) bool {
-	if len(got) != len(truth) {
-		return false
-	}
-	lineStart := 0
-	for i := 0; i < len(truth); i++ {
-		if got[i] != truth[i] && (truth[i] != '\n' || got[i] != ' ' || !fullRowAt(truth, lineStart, i, width)) {
-			return false
-		}
-		if truth[i] == '\n' {
-			lineStart = i + 1
-		}
-	}
-	return true
-}
-
-// fullRowAt reports whether the line break at text[i], ending the line
-// that starts at lineStart, looks like a wrap on screen.
-func fullRowAt(text string, lineStart, i, width int) bool {
-	next, _, _ := strings.Cut(text[i+1:], "\n")
-	first, _, _ := strings.Cut(next, " ")
-	if i == lineStart || next == "" {
-		return false
-	}
-	rows := wrapText(text[lineStart:i], width)
-	return runewidth.StringWidth(rows[len(rows)-1])+1+runewidth.StringWidth(first) > width
-}
-
 // save runs one save the way the session does: stitch the view, and keep
 // the previous version when keepOld says so. Then it checks the guarantee:
 // every word the previous save held that is still in the true draft is in
@@ -734,53 +699,6 @@ func TestWrapTextMatchesClaudeCode(t *testing.T) {
 	if got := wrapText("漢字", 1); strings.Join(got, "|") != "漢|字" {
 		t.Fatalf("wide chars at width 1: %q", got)
 	}
-}
-
-// wrapText wraps text the way Claude Code does (measured; see CLAUDE.md): greedy, at word boundaries,
-// breaking words longer than a row.
-func wrapText(text string, width int) []string {
-	var rows []string
-	for _, line := range strings.Split(text, "\n") {
-		if width <= 0 || runewidth.StringWidth(line) <= width {
-			rows = append(rows, line)
-			continue
-		}
-		cur, before := "", len(rows)
-		for _, word := range strings.Split(line, " ") {
-			broken := false
-			for runewidth.StringWidth(word) > width {
-				broken = true
-				if cur != "" {
-					rows = append(rows, cur)
-					cur = ""
-				}
-				head := runewidth.Truncate(word, width, "")
-				if head == "" {
-					// A character wider than the row: it gets a row to itself.
-					_, n := utf8.DecodeRuneInString(word)
-					head = word[:n]
-				}
-				rows = append(rows, head)
-				word = word[len(head):]
-			}
-			if broken && word == "" {
-				continue
-			}
-			switch {
-			case cur == "":
-				cur = word
-			case runewidth.StringWidth(cur)+1+runewidth.StringWidth(word) <= width:
-				cur += " " + word
-			default:
-				rows = append(rows, cur)
-				cur = word
-			}
-		}
-		if cur != "" || len(rows) == before {
-			rows = append(rows, cur)
-		}
-	}
-	return rows
 }
 
 func TestStitchWideCharacterText(t *testing.T) {

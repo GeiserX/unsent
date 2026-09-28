@@ -30,6 +30,9 @@ type view struct {
 	// text deleted at the edge of the box from text moved out of sight.
 	deleted      int
 	deletedAhead bool
+	// under is the screen row just below the box, where unsent may draw a
+	// line of its own, or -1 when there is none.
+	under int
 }
 
 // An extractor finds the agent's input box on the screen. ok is false when
@@ -66,6 +69,9 @@ type profile struct {
 	// started, which records and sent logs carry as agent_session; nil when
 	// the profile cannot read one.
 	session *sessionSource
+	// restore is what putting a draft back in the box needs (restore.go);
+	// nil turns restore-in-box off for the agent.
+	restore *restoreCaps
 }
 
 // profiles are the agents unsent can read.

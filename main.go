@@ -73,6 +73,11 @@ nothing, since the shell's own history has it; UNSENT_ON_SEND_ZSH=log logs
 it. A shell line you clear goes to history, and the last line of a closed
 shell waits in unsent list.
 
+Reopen a Claude Code conversation that left a draft (--resume, -c, the resume
+picker, /resume) and the draft goes back into its empty box, not sent.
+UNSENT_NOTICE=0 turns off the draft notices and the line under the box; the
+draft still goes back.
+
 UNSENT_OFF=1 runs the agent directly, as if unsent were not there.
 UNSENT_DEBUG_DIR=<folder> logs every key, all output and each save's view
 there, for debugging; the files hold everything typed.

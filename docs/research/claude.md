@@ -4,7 +4,7 @@ Lane: `claude`. Source lane output: `.omc/spec/research/claude.json`. Captures l
 
 **Tags.** `measured` = seen on screen or in bytes, with the capture file named. `measured (no capture)` = the lane reports it, but no capture survives to re-check. `source` = read in the 2.1.282 binary's JS (strings dump `/tmp/unsent-spec-claude/strings.txt`). `docs` = public docs. `guess` = inference.
 
-**Environment of every measurement in sections 1 to 9.** tmux 3.7c at 120x40, `env -i` with `TERM=xterm-256color`, throwaway `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` (so a 401 banner on screen), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_TELEMETRY=1`, no plugins or hooks, empty non-git cwd (`start.sh`). The `TMUX` variable was stripped by `env -i`. Anything about hints, start-up timing or keyboard protocol may differ in the maintainer's real terminal and config. Nothing was submitted. Section 10 is a later run with its own environment, stated there.
+**Environment of every measurement in sections 1 to 9.** tmux 3.7c at 120x40, `env -i` with `TERM=xterm-256color`, throwaway `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` (so a 401 banner on screen), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_TELEMETRY=1`, no plugins or hooks, empty non-git cwd (`start.sh`). The `TMUX` variable was stripped by `env -i`. Anything about hints, start-up timing or keyboard protocol may differ in the maintainer's real terminal and config. Nothing was submitted. Sections 10 and 11 are later runs with their own environments, stated there.
 
 ## 1. The box
 
@@ -229,6 +229,48 @@ So: the placeholder loses no text. Claude Code holds the exact draft, and Ctrl+G
 
 **What this section could not measure.** Whether a session started through `npx` or a launcher that does not `exec` puts a different pid in the file than unsent's child (only `exec` was run). The default location without `CLAUDE_CONFIG_DIR`. Whether the model acts on `additionalContext` as the docs say, because no model replied. Two terminals resuming one session at the same time.
 
+## 11. Restore-in-box on a configured install (measured 2026-09-28)
+
+**Environment.** Claude Code 2.1.282 (the binary copied from the MacBook) on a Mac mini, in a scratch folder under `/Volumes/Data`, in a private tmux server at 120x40. The environment was the one of section 10 (`env -i`, scratch `HOME` and `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL=http://127.0.0.1:9`), plus `HTTPS_PROXY` and `HTTP_PROXY` pointed at the same dead port and `CLAUDE_CODE_MAX_RETRIES=0`. Nothing reached the network, and every send failed at once with `ECONNREFUSED`. This time `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` was not set. The config was a copy of a configured install's `settings.json` (model, env, permissions, fullscreen TUI, hooks, enabled plugins), its `plugins/` folder with the install paths rewritten to the copy, and its user memory files. It held no credentials, transcripts, `history.jsonl` or `sessions/`. Two things differ from that install. The status line command was replaced with a stub that reads stdin and prints one line. The hook scripts do not exist on the mini, so both `SessionStart` hooks failed on the spot (`SessionStart:startup hook error`). A third config replaced both `SessionStart` hooks with `sleep 5`, to see whether a slow hook changes when a paste is taken.
+
+**Settle delay.** `settle.py` started Claude Code, polled `capture-pane` every 10 ms until the box was drawn, pasted a draft with `paste-buffer -p -r` a set delay after that first frame, waited 15 s and compared the Ctrl+G copy with the draft (`cmp`). The drafts were a 1,391-character text with 6 line breaks and accents (it shows as `[Pasted text #1 +6 lines]`), and two short ones that go in as typed text, 2 lines and 3 lines.
+
+| Start | Config | Draft | Paste after the box | Ctrl+G copy |
+| --- | --- | --- | --- | --- |
+| new chat | copied | long | 0 s | byte-identical |
+| new chat | copied | 2 lines, 3 lines | 0, 0.25, 0.5, 1 s | byte-identical, all 8 |
+| `--resume <id>` | copied | 3 lines | 0, 0.25, 0.5, 1 s | byte-identical, all 4 |
+| `-c` | copied | long | 0, 0.25, 0.5, 1 s | byte-identical, all 4 |
+| new chat | `sleep 5` hooks | 3 lines | 0, 1, 3, 6 s | byte-identical, all 4 |
+| new chat | `sleep 5` hooks | long | 0 s | byte-identical |
+
+The box appeared 0.23 to 0.30 s after start, and 0.96 s on the first, cold, start. So a paste on the first frame that shows the box went in whole, new chat or resumed, with the plugins loaded and with hooks still running [measured, one run each]. The settle delay is 0 at the 10 ms resolution of the poll. The profile waits 1 s after the box first appears, as margin, and then needs three empty reads at the 0.4 s tick. In the restore runs below the paste came 2.1 to 2.4 s after the box. The Esc+Enter warm-up of CLAUDE.md is about typed keys and was not measured here.
+
+**What a restore meets.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| The trust dialog draws a `─` rule above the question and its options as ` ❯ No, exit` and `   Yes, I trust this folder`, indented, with `No, exit` chosen by default. The reader finds no box in it | measured | `testdata/claude/2.1.282/screens/trust-dialog.txt` |
+| The `/resume` picker replaces the box while it is open: its entries are indented (`   ❯ say hi, first message`), and no box is drawn. The `--resume` picker is the same (section 10) | measured | `capture-pane` with the picker open |
+| With `editorMode: vim` the row under an empty box shows `-- INSERT --` in insert mode. In normal mode it shows nothing that tells it from vim off. A bracketed paste in normal mode went in as text, whole: a 3-line draft came back byte-identical through Ctrl+G, and a long one showed its placeholder. So a restore needs no check for vim mode | measured | `cfg-vim` run, `editor-1.txt` |
+| A tab inside a paste becomes 4 spaces in the box: the Ctrl+G copy of `col a<TAB>col b` holds spaces. Leading and trailing spaces, an empty line and a trailing line break came back as they were | measured | `od -c` of the copies |
+| tmux answers the queries Claude Code sends at start with XTVERSION (`ESC P>|tmux 3.6b ESC \`), DA1 (`ESC[?1;2;4c`) and a cell size report (`ESC[6;32;16t`), 15 to 20 ms after the first paint of the box. The cell size report has no private marker, so unsent first took it for a key, and the restore was cancelled as if the user had typed. Reports ending in `t` or `$y` are no longer counted as keys | measured | `UNSENT_DEBUG_DIR` raw log |
+| `/exit` and Enter leave the alternate screen without an empty box, so the last read still showed `/exit` and it was left behind as a draft, which a restore would then have put back. A submit key followed by a screen with no box, when the agent exits, now counts as a send | measured | `unsent list` after the run |
+
+**Restore runs through unsent.** A first run sent one message, pasted the long draft and closed the window (tmux `kill-server`, so SIGHUP). The orphan held the draft and the conversation's id. Each run below then opened the conversation through unsent.
+
+| How it was opened | Result | Tag |
+| --- | --- | --- |
+| `claude --resume <id>` | pasted 2.25 s after the box; `[Pasted text #1 +6 lines]` in the box and `unsent: put back your draft from 09:26 today, not sent` on the row under it; Ctrl+G copy byte-identical | measured |
+| `claude -c` | the same, pasted 2.22 s after the box (2.40 s in a run with the raw log on) | measured |
+| `claude --resume`, Enter on the first entry | pasted 2.3 s after Enter; Ctrl+G copy byte-identical | measured |
+| a new chat, then `/resume` and Enter on the entry | nothing in 5 s of the new chat; pasted 2.1 s after the choice; Ctrl+G copy byte-identical | measured |
+| an untrusted folder, `--resume <id>` | nothing while the trust dialog was open for 5 s; pasted 2.4 s after the Enter that trusted the folder | measured |
+| two tmux sessions, both `--resume <id>` at once | one pasted, the other did not | measured |
+| a new chat; a new chat and `/clear`; `--resume <id> --fork-session`; `claude "say nothing"`; `claude -c "say nothing"` | nothing in 5 s; the notice after exit named the draft | measured |
+
+The line under the box replaces Claude Code's footer row. Typing after it made Claude Code repaint the rows under the box, and the frame stayed whole. Each restore moves the orphan to history, so a draft reopened several times leaves one history entry per reopening.
+
 ## Risks
 
 - `pastePlaceholder` misses `[...Truncated text #N +M lines...]`, `[Image #N]`, `[Audio #N]`. A box value over 10,000 characters is shown with its middle collapsed [source]; if that text was typed or came back from `$EDITOR`, unsent's paste tracker never saw it as a paste. The previous full draft is still archived by `keepOld` (the new text shares only 1,000 characters with it, so `similar` fails and it goes to history) [source, `wrap.go:538`], but the current draft saves with the literal placeholder [guess].
@@ -244,7 +286,7 @@ So: the placeholder loses no text. Claude Code holds the exact draft, and Ctrl+G
 2. When does the dim `Try "…"` hint show? Needs the real config (or decoding `be`).
 3. Does the `History n/m` label stay after editing a recalled entry?
 4. Does the box ever jump on large moves (start/end of buffer, mouse click) as CLAUDE.md says? Needs a per-step capture.
-5. Is the ~9 s Esc+Enter warm-up caused by plugins/hooks?
+5. Is the ~9 s Esc+Enter warm-up caused by plugins/hooks? A paste does not wait for it (section 11).
 6. Why does Ctrl+L not clear despite `chat:clearInput`?
 7. Does Up restore the pasted text of a cleared placeholder draft (in-memory or `paste-cache`), given `history.jsonl` stores `pastedContents: {}`?
 8. Is the composer API reachable over the per-session socket?

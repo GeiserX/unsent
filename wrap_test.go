@@ -106,9 +106,27 @@ func fakeAgent() {
 	os.Stderr.WriteString(os.Getenv("UNSENT_FAKE_STDERR"))
 	// UNSENT_FAKE_SESSION is the session the agent is in, in a session file
 	// as Claude Code keeps it; Ctrl+O switches to UNSENT_FAKE_SESSION_NEXT
-	// in place, as /resume does. The files go when the agent exits.
-	if id := os.Getenv("UNSENT_FAKE_SESSION"); id != "" {
+	// in place, as /resume does. The files go when the agent exits. As in
+	// Claude Code, --resume <id> opens that session, --resume alone opens a
+	// picker with a fresh session until Enter chooses UNSENT_FAKE_SESSION,
+	// and --fork-session starts a session of its own.
+	id, picking := os.Getenv("UNSENT_FAKE_SESSION"), false
+	for i, a := range os.Args[1:] {
+		switch {
+		case a == "--fork-session":
+			id = fmt.Sprintf("forked-%d", os.Getpid())
+		case a == "--resume" && i+2 < len(os.Args):
+			id = os.Args[i+2]
+		case a == "--resume":
+			picking = true
+		}
+	}
+	if picking {
+		fakeSession(fmt.Sprintf("fresh-%d", os.Getpid()))
+	} else if id != "" {
 		fakeSession(id)
+	}
+	if id != "" || picking {
 		defer func() {
 			names, _ := filepath.Glob(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "sessions", fmt.Sprintf("%d.*", os.Getpid())))
 			for _, n := range names {
@@ -127,7 +145,17 @@ func fakeAgent() {
 	pastes := 0
 	var pasting, esc bool
 	var paste strings.Builder
-	draw := func() { os.Stdout.WriteString(drawBox(cols, strings.Join(draft, ""))) }
+	// A picker (the --resume one, or the one /resume opens) hides the box
+	// until Enter chooses.
+	draw := func() {
+		if picking {
+			os.Stdout.WriteString("\x1b[H\x1b[2JResume session\r\n   ❯ a conversation\r\n")
+			return
+		}
+		os.Stdout.WriteString(drawBox(cols, strings.Join(draft, "")))
+	}
+	// Bracketed paste on, as Claude Code turns it on.
+	os.Stdout.WriteString("\x1b[?2004h")
 	draw()
 	buf := make([]byte, 4096)
 	for {
@@ -157,6 +185,28 @@ func fakeAgent() {
 			case strings.HasPrefix(in, "\x1b[200~"):
 				pasting = true
 				in = in[6:]
+			case picking && in[0] == '\r': // the picker's choice
+				picking = false
+				fakeSession(os.Getenv("UNSENT_FAKE_SESSION"))
+				in = in[1:]
+			case picking:
+				in = in[1:]
+			case len(in) >= 3 && in[:2] == "\x1b[" && strings.IndexByte("ABCDIO", in[2]) >= 0:
+				// Arrow keys and focus reports change nothing in the box.
+				in = in[3:]
+			case in[0] == '\r' && strings.Join(draft, "") == "/resume":
+				// The /resume picker keeps the session until the choice.
+				draft, picking = nil, true
+				os.Setenv("UNSENT_FAKE_SESSION", os.Getenv("UNSENT_FAKE_SESSION_NEXT"))
+				in = in[1:]
+			case in[0] == '\r' && strings.Join(draft, "") == "/exit":
+				// Claude Code leaves the screen without drawing an empty box.
+				os.Stdout.WriteString("\x1b[H\x1b[2Jbye\r\n")
+				return
+			case in[0] == '\r' && strings.Join(draft, "") == "/clear":
+				draft = nil
+				fakeSession(fmt.Sprintf("cleared-%d", os.Getpid()))
+				in = in[1:]
 			case strings.HasPrefix(in, "\x1b\r"):
 				draft = append(draft, "\n")
 				in = in[2:]
@@ -1302,6 +1352,10 @@ func TestTypedKeys(t *testing.T) {
 		{"\x1bP>|WezTerm 2024\x1b\\", false},         // XTVERSION
 		{"\x1b[?62;22c\x1b[>1;10;0c\x1b[?1u", false}, // DA1, DA2, kitty flags
 		{"\x1b]11;rgb:0/0/0", false},                 // cut short
+		{"\x1b[6;32;16t\x1b[?1;2;4c", false},         // cell size, as tmux answers Claude Code
+		{"\x1b[4;800;1200t\x1b[8;40;120t", false},    // window size in pixels and cells
+		{"\x1b[2026;2$y\x1b[?2026;2$y", false},       // mode reports
+		{"\x1b[6;32;16t" + "q", true},
 		{"\x1b[?1u" + "x", true},
 		{"\x1b]11;rgb:0/0/0\x07" + "\x1b[I" + "y", true},
 	} {

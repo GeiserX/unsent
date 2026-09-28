@@ -91,7 +91,9 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	st.importShells()
 	cwd, _ := os.Getwd()
 	cwd = realPath(cwd)
-	fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
+	if notices() {
+		fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
+	}
 
 	s := &session{
 		rec:    newRecord(args, cwd),
@@ -99,6 +101,11 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		screen: vt.NewEmulator(cols, rows),
 		pastes: &pasteTracker{rows: rows},
 		prof:   profileFor(agent),
+		out:    &termOut{w: out},
+	}
+	s.toAgent = func(b []byte) {
+		raw.record('i', b)
+		ptmx.Write(b)
 	}
 	s.rec.Agent = agent
 	if raw == nil {
@@ -115,6 +122,9 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	}
 	if s.prof != nil {
 		s.ids = newSessionTracker(s.prof.session, cmd.Process.Pid, started)
+		// Only a command the profile answers to has arguments it can read:
+		// with --as, a prompt could hide among a launcher's.
+		s.rs.on = s.ids != nil && s.prof.restore != nil && profileFor(args[0]) == s.prof && s.prof.restore.chat(args[1:])
 	}
 	if s.off != "" {
 		fmt.Fprintln(os.Stderr, s.off)
@@ -144,7 +154,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		for {
 			n, err := ptmx.Read(buf)
 			if n > 0 {
-				out.Write(buf[:n])
+				s.out.Write(buf[:n])
 				raw.record('o', buf[:n])
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
@@ -171,8 +181,11 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 				continue
 			}
 			if n > 0 {
+				// Keys and a restore's paste never interleave (tryRestore).
+				s.ptyMu.Lock()
 				s.input(buf[:n])
 				ptmx.Write(buf[:n])
+				s.ptyMu.Unlock()
 			}
 			if err != nil {
 				return
@@ -204,6 +217,8 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			cmd.Process.Signal(syscall.SIGCONT)
 		case <-tick.C:
 			timedSave(s)
+			s.tryRestore()
+			s.out.tick()
 		case <-suspend:
 			// The agent runs in its own terminal session, where the kernel
 			// drops a suspend signal: it would print "suspended" and hang.
@@ -231,13 +246,14 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			// Let the last output reach the shadow screen before the final save.
 			time.Sleep(50 * time.Millisecond)
 			s.save()
+			s.endRestore()
 			s.finish()
 			// The agent has left the screen, and with it anything printed
 			// while it ran: say now what the user must know.
 			if cooked != nil {
 				term.Restore(int(in.Fd()), cooked)
 			}
-			for _, l := range s.exitLines() {
+			for _, l := range append(s.exitLines(), s.restoreLines()...) {
 				fmt.Fprintln(os.Stderr, l)
 			}
 			// The notice printed before the agent started is hidden too, on
@@ -247,7 +263,9 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			// restore picks once we exit.
 			st.release()
 			st.importShells() // a shell may have closed with a line while the agent ran
-			fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
+			if notices() {
+				fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
+			}
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
 				if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
@@ -333,6 +351,11 @@ func off() bool {
 var (
 	frameBegin = []byte("\x1b[?2026h")
 	frameEnd   = []byte("\x1b[?2026l")
+	// Bracketed paste on and off: without it a line break in a restored
+	// draft would be Enter. The same length as the frame marks, so the kept
+	// tail covers a split one.
+	bracketOn  = []byte("\x1b[?2004h")
+	bracketOff = []byte("\x1b[?2004l")
 )
 
 // maxFrameWait is how long a save waits for an open frame to close. Frames
@@ -375,6 +398,9 @@ type session struct {
 	keys    keyLog
 	armed   bool
 	cleared bool
+	// leftOnSubmit is set when the screen after a submit key typed into the
+	// box shows no box, until a box is read again.
+	leftOnSubmit bool
 
 	rec    *record
 	store  *store
@@ -388,6 +414,18 @@ type session struct {
 	// typed into.
 	ids  *sessionTracker
 	seen *string
+
+	// Restore-in-box (restore.go): rs is its state; shown is when the box
+	// came into view (zero while it is out of view) and bracketed whether
+	// the agent has bracketed paste on, both under mu. toAgent writes to the
+	// agent as keys do, under ptyMu, which keeps keys out of a paste; out is
+	// the user's terminal.
+	rs        restoreState
+	shown     time.Time
+	bracketed bool
+	ptyMu     sync.Mutex
+	toAgent   func([]byte)
+	out       *termOut
 }
 
 // input notes one chunk of keys on its way to the agent: the pastes in it,
@@ -400,6 +438,9 @@ func (s *session) input(keys []byte) {
 	}
 	defer s.guard()
 	typed := s.pastes.feed(keys)
+	if s.rs.on && typedKeys(keys) {
+		s.rs.lastKey.Store(time.Now().UnixNano())
+	}
 	if s.prof != nil {
 		if !s.typed.Load() && typedKeys(keys) {
 			s.typed.Store(true)
@@ -428,8 +469,9 @@ func (s *session) fail(r any) {
 
 // typedKeys reports whether b holds a key the user typed, not only focus
 // and mouse reports or the terminal's answers to the agent's queries: a
-// string (OSC, DCS, APC, PM, SOS) or a CSI with a private marker (?, >, =),
-// which no key carries.
+// string (OSC, DCS, APC, PM, SOS), a CSI with a private marker (?, >, =),
+// a window report (CSI ... t, the answer to the cell size query Claude Code
+// sends at start) or a mode report (CSI ... $ y), which no key carries.
 func typedKeys(b []byte) bool {
 	for i := 0; i < len(b); {
 		if b[i] == 0x1b && i+1 < len(b) {
@@ -446,8 +488,8 @@ func typedKeys(b []byte) bool {
 				}
 				continue
 			case '[':
-				if i+2 < len(b) && bytes.IndexByte([]byte("?>="), b[i+2]) >= 0 {
-					n, _ := keyLen(b[i:])
+				n, _ := keyLen(b[i:])
+				if i+2 < len(b) && bytes.IndexByte([]byte("?>="), b[i+2]) >= 0 || reportCSI(b[i:i+n]) {
 					i += n
 					continue
 				}
@@ -460,6 +502,17 @@ func typedKeys(b []byte) bool {
 		i += n
 	}
 	return false
+}
+
+// reportCSI reports whether a whole CSI sequence is one of the terminal's
+// reports that has no private marker: a window report ends in t, a mode
+// report in $ y. No key ends that way.
+func reportCSI(seq []byte) bool {
+	if len(seq) < 3 {
+		return false
+	}
+	final := seq[len(seq)-1]
+	return final == 't' || final == 'y' && seq[len(seq)-2] == '$'
 }
 
 func (s *session) feedScreen(output <-chan []byte) {
@@ -489,6 +542,7 @@ func (s *session) write(chunk []byte) {
 	s.trackFrames(chunk)
 	s.screen.Write(s.strings.strip(chunk))
 	s.dirty = true
+	s.watchBox()
 }
 
 // trackFrames notes whether the output so far ends inside a frame.
@@ -500,6 +554,12 @@ func (s *session) trackFrames(chunk []byte) {
 		s.inFrame = true
 	case e > b:
 		s.inFrame = false
+	}
+	switch on, off := bytes.LastIndex(data, bracketOn), bytes.LastIndex(data, bracketOff); {
+	case on > off:
+		s.bracketed = true
+	case off > on:
+		s.bracketed = false
 	}
 	if keep := len(frameBegin) - 1; len(data) > keep {
 		data = data[len(data)-keep:]
@@ -619,9 +679,12 @@ func (s *session) look(scr *screen) bool {
 	v, ok := s.prof.read(scr)
 	if !ok {
 		// The box is not on screen (a menu, a permission prompt, an editor):
-		// keep the last draft we saw.
+		// keep the last draft we saw. Right after a submit key, the agent
+		// may have left for good with it (/exit): see finish.
+		s.leftOnSubmit = armed
 		return false
 	}
+	s.leftOnSubmit = false
 	s.matched = true
 	sent := false
 	if v.empty {
@@ -631,6 +694,7 @@ func (s *session) look(scr *screen) bool {
 	v.deleted, v.deletedAhead = s.deletes.recent()
 	before := s.stitch
 	draft := s.pastes.expand(s.stitch.update(v), s.rec.Draft, s.prof)
+	s.verifyRestore(draft, v.width)
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
 	}
@@ -721,6 +785,12 @@ func (s *session) sendOff() error {
 // so its file goes away; a non-empty one stays for `unsent restore`.
 func (s *session) finish() {
 	s.rec.Ended = time.Now()
+	if s.leftOnSubmit && !s.cleared && s.rec.Draft != "" && s.sendOff() == nil {
+		// The agent left on the submit key (/exit): it took the draft, which
+		// must not come back as one left behind, nor be put back in the box
+		// when the conversation is reopened.
+		s.rec.Draft = ""
+	}
 	if s.rec.Draft == "" {
 		s.store.remove(s.rec)
 		s.store.dropVersions(s.rec)
