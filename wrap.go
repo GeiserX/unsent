@@ -122,9 +122,10 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	}
 	if s.prof != nil {
 		s.ids = newSessionTracker(s.prof.session, cmd.Process.Pid, started)
-		// Only a command the profile answers to has arguments it can read:
-		// with --as, a prompt could hide among a launcher's.
-		s.rs.on = s.ids != nil && s.prof.restore != nil && profileFor(args[0]) == s.prof && s.prof.restore.chat(args[1:])
+		// With --as the arguments are a launcher's, read as the agent's
+		// own: one that could be a prompt, or an option the agent does not
+		// have, turns restore off, and the notice after exit names the draft.
+		s.rs.on = s.ids != nil && s.prof.restore != nil && s.prof.restore.chat(args[1:])
 	}
 	if s.off != "" {
 		fmt.Fprintln(os.Stderr, s.off)
@@ -181,11 +182,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 				continue
 			}
 			if n > 0 {
-				// Keys and a restore's paste never interleave (tryRestore).
-				s.ptyMu.Lock()
-				s.input(buf[:n])
-				ptmx.Write(buf[:n])
-				s.ptyMu.Unlock()
+				s.forward(buf[:n], ptmx)
 			}
 			if err != nil {
 				return
@@ -426,6 +423,16 @@ type session struct {
 	ptyMu     sync.Mutex
 	toAgent   func([]byte)
 	out       *termOut
+}
+
+// forward passes a chunk of keys the user typed on to the agent, under
+// ptyMu: a key never lands inside a restore's paste (tryRestore), it
+// follows it.
+func (s *session) forward(keys []byte, agent io.Writer) {
+	s.ptyMu.Lock()
+	defer s.ptyMu.Unlock()
+	s.input(keys)
+	agent.Write(keys)
 }
 
 // input notes one chunk of keys on its way to the agent: the pastes in it,

@@ -157,7 +157,8 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - Pressing Esc while Claude Code works on a message can put that message back in the box. The sent log still holds it, although Claude Code didn't answer it.
 - A draft with a tab in it isn't pasted back, because Claude Code's box turns each tab into four spaces. It goes to the clipboard instead, and the line under the box says so.
 - A conversation you typed in but never sent can't be resumed, since Claude Code keeps no transcript for it. Its draft only comes back through the notice and `unsent restore`.
-- A draft goes back into the box only when `unsent` can read the command line: `claude` with its own options. Started with a prompt (`claude "fix it"`), a subcommand, `--as` or `UNSENT_AGENT`, it gets the notice instead.
+- A draft goes back into the box only when the command line reads as a chat start: `claude` with its own options. Started with a prompt (`claude "fix it"`) or a subcommand, it gets the notice instead. With `--as` or `UNSENT_AGENT` the command's arguments are read the same way, so a launcher started bare or with Claude Code's options restores, and `npx @anthropic-ai/claude-code` gets the notice.
+- The line saying a draft was put back is drawn under the box only when Claude Code runs on the alternate screen. Otherwise the line printed after exit says it.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.
 
 ## Development

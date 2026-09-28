@@ -72,11 +72,16 @@ type restoreState struct {
 	lastKey atomic.Int64
 	// id is the session the rest is about, and since when its box was first
 	// in view (zero until then); done is set once a restore fired, failed or
-	// was cancelled in it; empties counts empty reads in a row.
-	id      string
-	since   time.Time
-	done    bool
-	empties int
+	// was cancelled in it; empties counts empty reads in a row. switched is
+	// when a save loop first read id, when the agent switched to it from an
+	// earlier one (/resume <id>), and zero for the run's first; anyID is
+	// set once an id was read.
+	id       string
+	since    time.Time
+	done     bool
+	empties  int
+	switched time.Time
+	anyID    bool
 	// inj is the restore waiting to be read back.
 	inj *injection
 	// back holds the drafts put back this run, for the lines after exit.
@@ -146,7 +151,15 @@ func (s *session) tryRestore() {
 	}
 	id := s.ids.current()
 	if id != s.rs.id {
-		s.rs.id, s.rs.since, s.rs.done, s.rs.empties = id, time.Time{}, false, 0
+		// A box that stayed in view through the switch (/resume <id>, which
+		// opens no picker) was first found before it: only the keys typed
+		// since the switch count, not the ones that asked for it.
+		switched := time.Time{}
+		if s.rs.anyID {
+			switched = now
+		}
+		s.rs.id, s.rs.since, s.rs.done, s.rs.empties, s.rs.switched = id, time.Time{}, false, 0, switched
+		s.rs.anyID = s.rs.anyID || id != ""
 	}
 	if id == "" || s.rs.done {
 		return
@@ -155,8 +168,11 @@ func (s *session) tryRestore() {
 	if scr == nil {
 		return
 	}
-	if s.rs.since.IsZero() {
+	if s.rs.since.IsZero() && !shown.IsZero() {
 		s.rs.since = shown
+		if shown.Before(s.rs.switched) {
+			s.rs.since = s.rs.switched
+		}
 	}
 	caps := s.prof.restore
 	if s.rs.since.IsZero() || now.Before(s.rs.since.Add(caps.settle)) {
@@ -232,9 +248,10 @@ func (s *session) restoreView() (*screen, time.Time, bool) {
 // stays for `unsent restore`.
 func (s *session) clipboardInstead(r *record, why, claim string) {
 	s.store.unclaim(claim, r)
-	msg := fmt.Sprintf("unsent: your draft from %s %s; copied it to the clipboard, not sent", when(r.Updated), why)
+	// What to do comes first: the line under the box is cut to the width.
+	msg := fmt.Sprintf("unsent: your draft from %s is on the clipboard, not put back or sent: it %s", when(r.Updated), why)
 	if err := copyToClipboard(r.Draft); err != nil {
-		msg = fmt.Sprintf("unsent: your draft from %s %s; `unsent restore` copies it", when(r.Updated), why)
+		msg = fmt.Sprintf("unsent: `unsent restore` copies your draft from %s, not put back: it %s", when(r.Updated), why)
 	}
 	s.note(msg)
 	s.rs.back = append(s.rs.back, msg)
@@ -261,16 +278,25 @@ func (s *session) verifyRestore(draft string, width int) {
 }
 
 // note draws msg on the row under the box, once the agent's frame is
-// complete, unless the notices are off.
+// complete, unless the notices are off. Only on the alternate screen: there
+// the shadow screen's rows are the terminal's. An agent on the main screen
+// draws below whatever the terminal held before, so a row of the shadow
+// screen can be the box's row on the terminal, or one of the scrollback;
+// there the line after exit says it alone. The line is cut to the width,
+// so it never wraps onto the agent's next row.
 func (s *session) note(msg string) {
 	if !notices() || s.out == nil {
 		return
 	}
 	s.mu.Lock()
 	v, ok := s.prof.read(snapshot(s.screen))
+	alt, width := s.screen.IsAltScreen(), s.screen.Width()
 	s.mu.Unlock()
-	if !ok || v.under < 0 {
+	if !ok || v.under < 0 || !alt {
 		return
+	}
+	if r := []rune(msg); len(r) > width-1 {
+		msg = string(r[:max(0, width-1)])
 	}
 	s.out.show(fmt.Sprintf("\x1b7\x1b[%d;1H\x1b[0m\x1b[2K%s\x1b8", v.under+1, msg))
 }

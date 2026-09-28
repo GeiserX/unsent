@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // quickClaude is Claude Code's profile with no settle delay, so a restore
@@ -81,8 +82,21 @@ func newRestoreRigIn(t *testing.T, prof *profile, id, dir string) *restoreRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(r.store.release)
-	r.write([]byte("\x1b[?2004h"))
+	// The alternate screen, where the line under the box is drawn, and
+	// bracketed paste on.
+	r.write([]byte("\x1b[?1049h\x1b[?2004h"))
 	return r
+}
+
+// agentWriter is the agent's side of the pseudo-terminal for keys the
+// rig forwards: they land where the restore's paste does.
+type agentWriter struct{ r *restoreRig }
+
+func (w agentWriter) Write(b []byte) (int, error) {
+	w.r.sentMu.Lock()
+	defer w.r.sentMu.Unlock()
+	w.r.sent = append(w.r.sent, b...)
+	return len(b), nil
 }
 
 // ticks runs n ticks of the save loop: a save, then the restore check.
@@ -291,7 +305,9 @@ func TestRestorePickerKeysDoNotCancel(t *testing.T) {
 	r := newRestoreRig(t, quickClaude(), "conv-z")
 	seedOrphan(t, r.store, "old-a", "claude", "conv-a", "keep me")
 	r.draw("")
-	r.ticks(1)
+	// Idle long enough for conv-z's one try, which finds no orphan: the
+	// switch gives conv-a a try of its own.
+	r.ticks(5)
 	r.input([]byte("/resume"))
 	r.draw("/resume")
 	r.input([]byte("\r"))
@@ -420,8 +436,156 @@ func TestRestoreTabsGoToTheClipboard(t *testing.T) {
 	if o := orphanAt(r.store, "old-a"); o == nil || o.RestoreTries != 1 {
 		t.Fatalf("orphan %+v", o)
 	}
-	if got := r.term.String(); !strings.Contains(got, "has tabs") || !strings.Contains(got, "`unsent restore` copies it") {
+	// The line under the box is cut to the width, so it never wraps onto
+	// the agent's next row; what to do comes first. The line after exit is
+	// whole.
+	got := r.term.String()
+	line, ok := strings.CutPrefix(got, "\x1b7\x1b[")
+	if _, line, _ = strings.Cut(line, "\x1b[2K"); !ok || !strings.HasSuffix(line, "\x1b8") {
 		t.Fatalf("line under the box %q", got)
+	}
+	line = strings.TrimSuffix(line, "\x1b8")
+	if !strings.HasPrefix(line, "unsent: `unsent restore` copies your draft from") || utf8.RuneCountInString(line) > 99 {
+		t.Fatalf("line under the box %q, %d wide at 100 columns", line, utf8.RuneCountInString(line))
+	}
+	if l := r.restoreLines(); len(l) != 1 || !strings.HasSuffix(l[0], "has tabs, which Claude Code's box turns into spaces") {
+		t.Fatalf("lines after exit %q", l)
+	}
+}
+
+// An agent on the main screen draws below whatever the terminal held, so
+// the shadow screen's rows are not the terminal's: no line under the box,
+// where it could land on the draft; the line after exit says it.
+func TestRestoreNoteOnlyOnTheAlternateScreen(t *testing.T) {
+	r := newRestoreRig(t, quickClaude(), "conv-a")
+	r.write([]byte("\x1b[?1049l"))
+	seedOrphan(t, r.store, "old-a", "claude", "conv-a", "back in the box")
+	r.draw("")
+	r.ticks(3)
+	r.draw("back in the box")
+	r.ticks(1)
+	if !inHistory(r.store, "back in the box") {
+		t.Fatal("not read back")
+	}
+	time.Sleep(60 * time.Millisecond)
+	r.out.tick()
+	if got := r.term.String(); got != "" {
+		t.Fatalf("drew %q on the main screen", got)
+	}
+	if got := r.restoreLines(); len(got) != 1 || !strings.Contains(got[0], "put back your draft") {
+		t.Fatalf("lines after exit %q", got)
+	}
+}
+
+// /resume <id> switches the conversation with the box in view the whole
+// time: the keys that asked for it do not cancel the restore, a key typed
+// after the switch does.
+func TestRestoreAfterResumeWithAnID(t *testing.T) {
+	for _, after := range []string{"", "\x1b[A"} {
+		t.Run(fmt.Sprintf("key after %q", after), func(t *testing.T) {
+			r := newRestoreRig(t, quickClaude(), "conv-z")
+			seedOrphan(t, r.store, "old-a", "claude", "conv-a", "keep me")
+			r.draw("")
+			r.ticks(5)
+			r.input([]byte("/resume conv-a"))
+			r.draw("/resume conv-a")
+			r.ticks(1)
+			r.input([]byte("\r"))
+			*r.id = "conv-a"
+			r.draw("")
+			r.ticks(1)
+			if after != "" {
+				r.input([]byte(after))
+			}
+			r.ticks(4)
+			want := "\x1b[200~keep me\x1b[201~"
+			if after != "" {
+				want = ""
+			}
+			if got := r.pasted(); got != want {
+				t.Fatalf("pasted %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// No paste before the settle delay, however many empty reads; the three
+// empty reads count only after it.
+func TestRestoreWaitsTheSettleDelay(t *testing.T) {
+	prof := quickClaude()
+	prof.restore.settle = 300 * time.Millisecond
+	r := newRestoreRig(t, prof, "conv-a")
+	seedOrphan(t, r.store, "old-a", "claude", "conv-a", "keep me")
+	r.draw("")
+	r.ticks(4)
+	if got := r.pasted(); got != "" {
+		t.Fatalf("pasted inside the settle delay: %q", got)
+	}
+	time.Sleep(350 * time.Millisecond)
+	r.ticks(2)
+	if got := r.pasted(); got != "" {
+		t.Fatalf("pasted after two empty reads past the delay: %q", got)
+	}
+	r.ticks(1)
+	if got := r.pasted(); got != "\x1b[200~keep me\x1b[201~" {
+		t.Fatalf("pasted %q", got)
+	}
+}
+
+// The measured settle delay keeps its margin (docs/research/claude.md
+// section 11).
+func TestClaudeSettleKeepsItsMargin(t *testing.T) {
+	if claude.restore.settle < time.Second || claude.restore.empties < 3 {
+		t.Fatalf("Claude Code's settle %v and %d empty reads", claude.restore.settle, claude.restore.empties)
+	}
+}
+
+// Keys on their way to the agent hold ptyMu: a restore that finds it held
+// writes nothing, puts the orphan back untouched, and tries again at the
+// next tick.
+func TestRestoreWaitsForKeysInFlight(t *testing.T) {
+	r := newRestoreRig(t, quickClaude(), "conv-a")
+	seedOrphan(t, r.store, "old-a", "claude", "conv-a", "keep me")
+	r.draw("")
+	r.ptyMu.Lock()
+	r.ticks(4)
+	r.sentMu.Lock()
+	sent := string(r.sent)
+	r.sentMu.Unlock()
+	o := orphanAt(r.store, "old-a")
+	r.ptyMu.Unlock()
+	if sent != "" || o == nil || o.RestoreTries != 0 || r.rs.done {
+		t.Fatalf("with keys in flight: pasted %q, orphan %+v, done %v", sent, o, r.rs.done)
+	}
+	r.ticks(1)
+	if got := r.pasted(); got != "\x1b[200~keep me\x1b[201~" {
+		t.Fatalf("pasted %q", got)
+	}
+}
+
+// A key typed while the paste is being written follows it, never lands
+// inside it.
+func TestRestoreKeyFollowsThePaste(t *testing.T) {
+	r := newRestoreRig(t, quickClaude(), "conv-a")
+	release := make(chan struct{})
+	write := r.toAgent
+	r.toAgent = func(b []byte) {
+		<-release
+		write(b)
+	}
+	seedOrphan(t, r.store, "old-a", "claude", "conv-a", "keep me")
+	r.draw("")
+	r.ticks(3)
+	done := make(chan struct{})
+	go func() {
+		r.forward([]byte("x"), agentWriter{r})
+		close(done)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	<-done
+	if got := r.pasted(); got != "\x1b[200~keep me\x1b[201~x" {
+		t.Fatalf("agent got %q", got)
 	}
 }
 
@@ -567,17 +731,29 @@ func TestWrapRestoreOnReopen(t *testing.T) {
 		argv       []string
 		start, nxt string
 		keys       []string
+		// idle waits in the first conversation long enough for its own
+		// try, as a new chat left alone does, before the keys.
+		idle bool
 	}{
-		{"--resume <id>", []string{"claude", "--resume", "conv-a"}, "", "", nil},
-		{"-c", []string{"claude", "-c"}, "conv-a", "", nil},
-		{"picker", []string{"claude", "--resume"}, "conv-a", "", []string{"\x1b[B", "\r"}},
-		{"/resume", []string{"claude"}, "conv-z", "conv-a", []string{"/resume", "\r", "\x1b[B", "\r"}},
+		{"--resume <id>", []string{"claude", "--resume", "conv-a"}, "", "", nil, false},
+		{"-c", []string{"claude", "-c"}, "conv-a", "", nil, false},
+		{"picker", []string{"claude", "--resume"}, "conv-a", "", []string{"\x1b[B", "\r"}, false},
+		{"/resume", []string{"claude"}, "conv-z", "conv-a", []string{"/resume", "\r", "\x1b[B", "\r"}, true},
+		{"/resume conv-a", []string{"claude"}, "conv-z", "", []string{"/resume conv-a", "\r"}, true},
+		{"a launcher, --as", []string{"--as", "claude", "launcher", "--resume", "conv-a"}, "", "", nil, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home, st := wrapWithOrphan(t, "left in conv a\nsecond line")
 			t.Setenv("UNSENT_FAKE_SESSION", c.start)
 			t.Setenv("UNSENT_FAKE_SESSION_NEXT", c.nxt)
-			_, st, screen, stderr := runWrappedIn(t, home, "claude", c.argv, func(type_ func(string)) {
+			command := "claude"
+			if c.argv[0] == "--as" {
+				command = c.argv[2]
+			}
+			_, st, screen, stderr := runWrappedIn(t, home, command, c.argv, func(type_ func(string)) {
+				if c.idle {
+					time.Sleep(6 * saveInterval)
+				}
 				for _, k := range c.keys {
 					type_(k)
 				}
@@ -601,6 +777,62 @@ func TestWrapRestoreOnReopen(t *testing.T) {
 			}
 			if !strings.Contains(screen, "unsent: put back your draft from") || !strings.Contains(stderr, "unsent: put back your draft from") {
 				t.Fatalf("no word of the restore: stderr %q", stderr)
+			}
+		})
+	}
+}
+
+// End to end on the main screen, as Claude Code's default renderer draws:
+// the restore runs, nothing is drawn under the box, and the line after
+// exit says it.
+func TestWrapRestoreOnTheMainScreen(t *testing.T) {
+	quickRestore(t)
+	t.Setenv("UNSENT_FAKE_MAIN_SCREEN", "1")
+	home, st := wrapWithOrphan(t, "back on the main screen")
+	_, st, screen, stderr := runWrappedIn(t, home, "claude", []string{"claude", "--resume", "conv-a"}, func(type_ func(string)) {
+		waitFor(t, "the restore to read back", func() bool { return inHistory(st, "back on the main screen") })
+		time.Sleep(2 * saveInterval)
+		type_("\x04")
+	})
+	if strings.Contains(screen, "unsent: put back") || !strings.Contains(stderr, "unsent: put back your draft from") {
+		t.Fatalf("screen %q, stderr %q", screen, stderr)
+	}
+}
+
+// A launcher started with what could be a prompt gets no restore, as
+// claude would: its arguments are read as Claude Code's own.
+func TestWrapNoRestoreThroughALauncherWithAPrompt(t *testing.T) {
+	quickRestore(t)
+	home, _ := wrapWithOrphan(t, "left in conv a")
+	t.Setenv("UNSENT_FAKE_SESSION", "conv-a")
+	_, st, _, stderr := runWrappedIn(t, home, "launcher", []string{"--as", "claude", "launcher", "fix the build"}, func(type_ func(string)) {
+		time.Sleep(6 * saveInterval)
+		type_("\x04")
+	})
+	if o := orphanAt(st, "old-a"); o == nil || o.RestoreTries != 0 || strings.Contains(stderr, "put back") {
+		t.Fatalf("restored through a launcher given a prompt: %+v, %q", o, stderr)
+	}
+}
+
+// A draft still in the box when the agent exits was not sent, under
+// UNSENT_ON_SEND=delete too: a submit answered by a menu, then the box
+// again, and a menu opened with no submit key, both leave it an orphan.
+func TestWrapDraftInTheBoxAtExitIsKept(t *testing.T) {
+	for name, keys := range map[string][]string{
+		"a menu after a submit, then the box": {"/tasks", "\r", "\x14", "keep me", "\x04"},
+		"a menu with no submit":               {"keep me", "\x14", "\x04"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			claudeConfig(t)
+			t.Setenv("UNSENT_FAKE_SESSION", "conv-a")
+			t.Setenv("UNSENT_ON_SEND", "delete")
+			_, st, _, _ := runWrappedOut(t, "claude", []string{"claude"}, func(type_ func(string)) {
+				for _, k := range keys {
+					type_(k)
+				}
+			})
+			if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "keep me" {
+				t.Fatalf("orphans after exit %+v", rs)
 			}
 		})
 	}

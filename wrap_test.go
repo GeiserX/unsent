@@ -143,18 +143,27 @@ func fakeAgent() {
 	}
 	var draft []string
 	pastes := 0
-	var pasting, esc bool
+	var pasting, esc, away bool
 	var paste strings.Builder
 	// A picker (the --resume one, or the one /resume opens) hides the box
-	// until Enter chooses.
+	// until Enter chooses; so does a menu (away).
 	draw := func() {
-		if picking {
+		switch {
+		case picking:
 			os.Stdout.WriteString("\x1b[H\x1b[2JResume session\r\n   ❯ a conversation\r\n")
-			return
+		case away:
+			os.Stdout.WriteString("\x1b[H\x1b[2JTasks\r\n  nothing running\r\n")
+		default:
+			os.Stdout.WriteString(drawBox(cols, strings.Join(draft, "")))
 		}
-		os.Stdout.WriteString(drawBox(cols, strings.Join(draft, "")))
 	}
-	// Bracketed paste on, as Claude Code turns it on.
+	// The alternate screen, as Claude Code's fullscreen renderer uses it,
+	// unless UNSENT_FAKE_MAIN_SCREEN draws on the main screen, below what
+	// the terminal held, as its default renderer does. Bracketed paste on,
+	// as Claude Code turns it on.
+	if os.Getenv("UNSENT_FAKE_MAIN_SCREEN") != "1" {
+		os.Stdout.WriteString("\x1b[?1049h")
+	}
 	os.Stdout.WriteString("\x1b[?2004h")
 	draw()
 	buf := make([]byte, 4096)
@@ -190,6 +199,23 @@ func fakeAgent() {
 				fakeSession(os.Getenv("UNSENT_FAKE_SESSION"))
 				in = in[1:]
 			case picking:
+				in = in[1:]
+			case away && in[0] == 4: // Ctrl+D quits from a menu too
+				return
+			case away: // Ctrl+T closes the menu; other keys do nothing
+				away = in[0] != 0x14
+				in = in[1:]
+			case in[0] == 0x14: // Ctrl+T opens a menu with no box, keeping the draft
+				away = true
+				in = in[1:]
+			case in[0] == '\r' && strings.Join(draft, "") == "/tasks":
+				// A command that opens a menu, as /config does.
+				draft, away = nil, true
+				in = in[1:]
+			case in[0] == '\r' && strings.HasPrefix(strings.Join(draft, ""), "/resume "):
+				// /resume <id> switches in place: no picker, the box stays.
+				fakeSession(strings.TrimPrefix(strings.Join(draft, ""), "/resume "))
+				draft = nil
 				in = in[1:]
 			case len(in) >= 3 && in[:2] == "\x1b[" && strings.IndexByte("ABCDIO", in[2]) >= 0:
 				// Arrow keys and focus reports change nothing in the box.
