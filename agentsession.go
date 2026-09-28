@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -126,7 +127,13 @@ func depthBelow(parents map[int]int, pid, root int) int {
 // processParents maps each running process to its parent, from ps, which
 // macOS and Linux both have; empty when ps cannot run.
 var processParents = func() map[int]int {
-	out, _ := exec.Command("ps", "-A", "-o", "pid=", "-o", "ppid=").Output()
+	// A stalled ps must not hold the save loop, which is what saves the
+	// draft when the window closes.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ps", "-A", "-o", "pid=", "-o", "ppid=")
+	cmd.WaitDelay = time.Second
+	out, _ := cmd.Output()
 	parents := map[int]int{}
 	for line := range strings.SplitSeq(string(out), "\n") {
 		f := strings.Fields(line)

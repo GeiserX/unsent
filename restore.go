@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // Restore-in-box: when the agent is in a conversation that left a draft
@@ -295,9 +297,7 @@ func (s *session) note(msg string) {
 	if !ok || v.under < 0 || !alt {
 		return
 	}
-	if r := []rune(msg); len(r) > width-1 {
-		msg = string(r[:max(0, width-1)])
-	}
+	msg = runewidth.Truncate(msg, max(0, width-1), "")
 	s.out.show(fmt.Sprintf("\x1b7\x1b[%d;1H\x1b[0m\x1b[2K%s\x1b8", v.under+1, msg))
 }
 
