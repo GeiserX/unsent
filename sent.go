@@ -228,9 +228,13 @@ func onSendFrom(agent string) (value, from string) {
 	return "log", "the default"
 }
 
-// The sent log keeps every message sent in a session, in sent/<session>.jsonl:
-// a header line, then one line per message. It is a convenience copy of
-// text the agent already holds, so unlike drafts it expires.
+// The sent log keeps every message sent in a session: a header line, then
+// one line per message. When the profile reads the agent's own session id
+// the log is per conversation, sent/<agent>-<agent_session>.jsonl, and a
+// run that resumes the conversation adds a line saying when before its
+// first message; otherwise it is per run of unsent, sent/<session>.jsonl.
+// It is a convenience copy of text the agent already holds, so unlike
+// drafts it expires.
 const (
 	sentFormat = 1
 	// sentMaxBytes caps one session's log; the oldest messages go first.
@@ -242,11 +246,15 @@ const (
 // sentHeader is the first line of a sent log. Never rename or retype a
 // field without bumping sentFormat.
 type sentHeader struct {
-	Format  int       `json:"format"`
-	Session string    `json:"session"`
-	Agent   string    `json:"agent"`
-	Cwd     string    `json:"cwd"`
-	Started time.Time `json:"started"`
+	Format int `json:"format"`
+	// Session is unsent's id of the run that started the log.
+	Session string `json:"session"`
+	Agent   string `json:"agent"`
+	// AgentSession is the agent's own id of the conversation, the same
+	// field the draft record carries; "" for a log kept per run.
+	AgentSession string    `json:"agent_session"`
+	Cwd          string    `json:"cwd"`
+	Started      time.Time `json:"started"`
 	// Dropped counts the oldest messages removed to keep the log under
 	// sentMaxBytes.
 	Dropped int `json:"dropped,omitempty"`
@@ -259,14 +267,35 @@ type sentMessage struct {
 	Pastes []string `json:"pastes,omitempty"`
 }
 
+// sentResume is the line a run adds to a conversation's log it resumed,
+// before its first message there.
+type sentResume struct {
+	Resumed time.Time `json:"resumed"`
+	// Session is unsent's id of the run that resumed it.
+	Session string `json:"session"`
+	// after is how many messages come before it in the log.
+	after int
+}
+
 type sentLog struct {
 	sentHeader
 	messages []sentMessage
+	resumes  []sentResume
 	path     string
 }
 
 func (s *store) sentPath(id string) string {
 	return filepath.Join(s.dir, "sent", id+".jsonl")
+}
+
+// sentPathOf is the sent log a record's messages go to: its conversation's,
+// found by agent and agent session, when the profile read the agent's
+// session id, else its run's.
+func (s *store) sentPathOf(r *record) string {
+	if r.AgentSession == "" || !sessionIDRE.MatchString(r.AgentSession) {
+		return s.sentPath(r.ID)
+	}
+	return s.sentPath(r.agent() + "-" + r.AgentSession)
 }
 
 // logSent appends the record's draft to its session's sent log, flushed to
@@ -288,15 +317,29 @@ func (s *store) logSentAt(r *record, when time.Time) error {
 	if err != nil {
 		return err
 	}
-	path := s.sentPath(r.ID)
+	path, conversation := s.sentPathOf(r), r.AgentSession != ""
+	joined := r.joined
+	if joined.IsZero() {
+		joined = r.Started
+	}
 	var data []byte
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_EXCL, 0o600)
 	created := err == nil
 	if created {
-		h, _ := json.Marshal(sentHeader{Format: sentFormat, Session: r.ID, Agent: r.agent(), Cwd: r.Cwd, Started: r.Started})
-		data = append(h, '\n')
+		h := sentHeader{Format: sentFormat, Session: r.ID, Agent: r.agent(), Cwd: r.Cwd, Started: r.Started}
+		if conversation {
+			// The conversation started in this run, when the run joined it.
+			h.AgentSession, h.Started = r.AgentSession, joined
+		}
+		b, _ := json.Marshal(h)
+		data = append(b, '\n')
 	} else if errors.Is(err, os.ErrExist) {
 		f, err = os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600)
+		if err == nil && conversation && !s.joins[path].Equal(joined) {
+			// The conversation has a log from before this run joined it.
+			b, _ := json.Marshal(sentResume{Resumed: joined, Session: r.ID})
+			data = append(b, '\n')
+		}
 	}
 	if err != nil {
 		return err
@@ -316,6 +359,12 @@ func (s *store) logSentAt(r *record, when time.Time) error {
 	if err != nil {
 		return err
 	}
+	if conversation {
+		if s.joins == nil {
+			s.joins = map[string]time.Time{}
+		}
+		s.joins[path] = joined
+	}
 	if created {
 		if err := syncDir(filepath.Dir(path)); err != nil {
 			return err
@@ -330,34 +379,57 @@ func (s *store) logSentAt(r *record, when time.Time) error {
 
 // trimSent drops a sent log's oldest messages until it fits in
 // sentMaxBytes, keeping at least the newest, and counts them in the header.
+// A resume line goes with the messages before it; lines of a kind this
+// build does not know stay.
 func trimSent(path string) error {
 	l, err := readSent(path)
 	if err != nil {
 		return err
 	}
-	h, _ := json.Marshal(l.sentHeader)
-	var lines [][]byte
-	size := len(h) + 1
-	for _, m := range l.messages {
-		b, _ := json.Marshal(m)
-		lines = append(lines, b)
-		size += len(b) + 1
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
 	}
-	drop := 0
-	for drop < len(lines)-1 && size > sentMaxBytes {
-		size -= len(lines[drop]) + 1
-		drop++
+	body := bytes.Split(bytes.TrimSuffix(data, []byte("\n")), []byte("\n"))[1:]
+	h, _ := json.Marshal(l.sentHeader)
+	size, left := len(h)+1, 0
+	for _, b := range body {
+		size += len(b) + 1
+		if isMessage(b) {
+			left++
+		}
+	}
+	cut, drop := 0, 0
+	for cut < len(body) && size > sentMaxBytes {
+		if isMessage(body[cut]) {
+			if left == 1 {
+				break
+			}
+			left--
+			drop++
+		}
+		size -= len(body[cut]) + 1
+		cut++
 	}
 	if drop == 0 {
 		return nil
 	}
 	l.Dropped += drop
 	h, _ = json.Marshal(l.sentHeader)
-	data := append(h, '\n')
-	for _, b := range lines[drop:] {
-		data = append(append(data, b...), '\n')
+	out := append(h, '\n')
+	for _, b := range body[cut:] {
+		out = append(append(out, b...), '\n')
 	}
-	return writeFileDurable(path, data)
+	return writeFileDurable(path, out)
+}
+
+// isMessage reports whether a sent log line is a message (see readSent).
+func isMessage(line []byte) bool {
+	var m struct {
+		sentMessage
+		sentResume
+	}
+	return json.Unmarshal(line, &m) == nil && m.Resumed.IsZero() && !m.Time.IsZero()
 }
 
 // pruneSent deletes sent logs not written for sentMaxAge, then the oldest
@@ -385,9 +457,19 @@ func readSent(path string) (*sentLog, error) {
 		return nil, errors.New(path + " is not a sent log")
 	}
 	for _, line := range lines[1:] {
-		var m sentMessage
-		if len(bytes.TrimSpace(line)) > 0 && json.Unmarshal(line, &m) == nil {
-			l.messages = append(l.messages, m)
+		var m struct {
+			sentMessage
+			sentResume
+		}
+		// A message has a time; a line of a kind a later build added has
+		// neither a time nor a resume, and is skipped.
+		switch {
+		case len(bytes.TrimSpace(line)) == 0 || json.Unmarshal(line, &m) != nil:
+		case !m.Resumed.IsZero():
+			m.sentResume.after = len(l.messages)
+			l.resumes = append(l.resumes, m.sentResume)
+		case !m.Time.IsZero():
+			l.messages = append(l.messages, m.sentMessage)
 		}
 	}
 	return l, nil

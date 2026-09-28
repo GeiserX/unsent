@@ -1,8 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf16"
 
 	"github.com/mattn/go-runewidth"
@@ -45,6 +50,68 @@ var claude = profile{
 	// "2.1.282 (Claude Code)".
 	verified: "2.1.282",
 	version:  []string{"--version"},
+	session:  &sessionSource{read: claudeSession, pids: claudeSessionPids},
+}
+
+// claudeSessions is the folder where Claude Code keeps one file per
+// running process, sessions/<pid>.json, under its config folder:
+// $CLAUDE_CONFIG_DIR, or ~/.claude when that is unset.
+func claudeSessions() string {
+	dir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		dir = filepath.Join(home, ".claude")
+	}
+	return filepath.Join(dir, "sessions")
+}
+
+// claudeSession reads the session process pid is in from its
+// sessions/<pid>.json. Claude Code writes that file at start, before any
+// key, and rewrites it when the process changes session: a choice in the
+// resume picker, /resume, /clear. While the --resume picker is open it
+// names a fresh session that matches no conversation; the /resume picker
+// keeps the current one until the choice. Only the pid's own .json file is
+// opened, never the <pid>.<hash>.key peer token beside it. A file left by
+// an earlier process with the same pid (after kill -9) names a start
+// before since, and is not this process's.
+func claudeSession(pid int, since time.Time) (string, bool) {
+	dir := claudeSessions()
+	if dir == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, strconv.Itoa(pid)+".json"))
+	if err != nil {
+		return "", false
+	}
+	var f struct {
+		PID       int    `json:"pid"`
+		SessionID string `json:"sessionId"`
+		StartedAt int64  `json:"startedAt"` // Unix milliseconds
+	}
+	if json.Unmarshal(data, &f) != nil {
+		return "", true
+	}
+	if (f.PID != 0 && f.PID != pid) || (f.StartedAt != 0 && time.UnixMilli(f.StartedAt).Before(since.Add(-time.Second))) {
+		return "", false
+	}
+	return f.SessionID, true
+}
+
+// claudeSessionPids lists the pids that have a sessions/<pid>.json. Only
+// names are read here.
+func claudeSessionPids() []int {
+	entries, _ := os.ReadDir(claudeSessions())
+	var pids []int
+	for _, e := range entries {
+		name, ok := strings.CutSuffix(e.Name(), ".json")
+		if pid, err := strconv.Atoi(name); ok && err == nil && pid > 0 && strconv.Itoa(pid) == name {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
 }
 
 // claudeBox reads Claude Code's input box. It is drawn as:

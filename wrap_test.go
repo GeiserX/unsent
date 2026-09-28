@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -58,7 +59,27 @@ func TestMain(m *testing.M) {
 	if os.Getenv("UNSENT_TEST_RUN") == "1" {
 		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
-	os.Exit(m.Run())
+	// No test reads a real Claude Code config: its session files name the
+	// user's own conversations.
+	cfg, err := os.MkdirTemp("", "unsent-claude-config-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	code := m.Run()
+	os.RemoveAll(cfg)
+	os.Exit(code)
+}
+
+// fakeSession writes the fake agent's session file the way Claude Code
+// writes sessions/<pid>.json, with the peer token file beside it.
+func fakeSession(id string) {
+	dir := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "sessions")
+	os.MkdirAll(dir, 0o700)
+	pid := os.Getpid()
+	b, _ := json.Marshal(map[string]any{"pid": pid, "sessionId": id, "startedAt": time.Now().UnixMilli(), "kind": "interactive"})
+	os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.json", pid)), b, 0o644)
+	os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.0123abcd.key", pid)), []byte("peer token"), 0o600)
 }
 
 func fakeAgent() {
@@ -83,6 +104,18 @@ func fakeAgent() {
 	}
 	// UNSENT_FAKE_STDERR is what the agent writes to its stderr at start.
 	os.Stderr.WriteString(os.Getenv("UNSENT_FAKE_STDERR"))
+	// UNSENT_FAKE_SESSION is the session the agent is in, in a session file
+	// as Claude Code keeps it; Ctrl+O switches to UNSENT_FAKE_SESSION_NEXT
+	// in place, as /resume does. The files go when the agent exits.
+	if id := os.Getenv("UNSENT_FAKE_SESSION"); id != "" {
+		fakeSession(id)
+		defer func() {
+			names, _ := filepath.Glob(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "sessions", fmt.Sprintf("%d.*", os.Getpid())))
+			for _, n := range names {
+				os.Remove(n)
+			}
+		}()
+	}
 	if old, err := term.MakeRaw(0); err == nil {
 		defer term.Restore(0, old)
 	}
@@ -138,6 +171,9 @@ func fakeAgent() {
 				in = ""
 			case in[0] == 4: // Ctrl+D quits
 				return
+			case in[0] == 0x0f: // Ctrl+O switches session, as /resume does
+				fakeSession(os.Getenv("UNSENT_FAKE_SESSION_NEXT"))
+				in = in[1:]
 			case in[0] == 5: // Ctrl+E quits with an error, or dies of UNSENT_FAKE_SIGNAL
 				if n, err := strconv.Atoi(os.Getenv("UNSENT_FAKE_SIGNAL")); err == nil {
 					syscall.Kill(os.Getpid(), syscall.Signal(n))
@@ -221,7 +257,13 @@ func runWrappedAs(t *testing.T, command string, argv []string, script func(type_
 // showed and what unsent printed on its own stderr.
 func runWrappedOut(t *testing.T, command string, argv []string, script func(type_ func(string))) (code int, st *store, screen, stderr string) {
 	t.Helper()
-	home := t.TempDir()
+	return runWrappedIn(t, t.TempDir(), command, argv, script)
+}
+
+// runWrappedIn is runWrappedOut with the state folder home, so two runs
+// can share one.
+func runWrappedIn(t *testing.T, home, command string, argv []string, script func(type_ func(string))) (code int, st *store, screen, stderr string) {
+	t.Helper()
 	t.Setenv("UNSENT_HOME", home)
 	t.Setenv("UNSENT_FAKE_AGENT", "1")
 	bin := t.TempDir()

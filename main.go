@@ -39,8 +39,8 @@ Usage:
                              list sessions with sent messages, newest first
   unsent log <session> [--copy N]
                              print a session's sent messages (session: a number
-                             from unsent log, or its id); --copy N copies
-                             message N to the clipboard
+                             from unsent log, its id, or the agent's own session
+                             id); --copy N copies message N to the clipboard
   unsent forget --log <id>
                              delete one session's sent log (id: the session id
                              unsent log shows, never a number, which can move)
@@ -65,7 +65,8 @@ Usage:
                              agent hands it
   unsent version
 
-A message you send goes to its session's sent log, not to history.
+A message you send goes to its session's sent log, not to history. A Claude
+Code conversation keeps one log across every run that resumes it.
 UNSENT_ON_SEND=delete keeps nothing of it; UNSENT_ON_SEND_CLAUDE=delete does
 that for one agent, and wins over UNSENT_ON_SEND. A shell line you run keeps
 nothing, since the shell's own history has it; UNSENT_ON_SEND_ZSH=log logs
@@ -406,9 +407,8 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	l := findSent(logs, o.rest[0])
+	l := oneSent(logs, o.rest[0], stderr)
 	if l == nil {
-		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", o.rest[0])
 		return 2
 	}
 	if o.copy > 0 {
@@ -425,31 +425,65 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "Copied message %d, %s, to the clipboard.\n", o.copy, lines(text))
 		return 0
 	}
-	fmt.Fprintf(stdout, "%s in %s, started %s, session %s\n", l.Agent, shortPath(l.Cwd, 60), when(l.Started), l.Session)
+	fmt.Fprintf(stdout, "%s in %s, started %s, session %s", l.Agent, shortPath(l.Cwd, 60), when(l.Started), l.Session)
+	if l.AgentSession != "" {
+		fmt.Fprintf(stdout, ", %s session %s", l.Agent, l.AgentSession)
+	}
+	fmt.Fprintln(stdout)
 	if l.Dropped > 0 {
 		fmt.Fprintf(stdout, "(%d earlier messages were dropped to keep the log under %d MB)\n", l.Dropped, sentMaxBytes>>20)
 	}
+	resumes := l.resumes
+	resumed := func(before int) {
+		for len(resumes) > 0 && resumes[0].after <= before {
+			fmt.Fprintf(stdout, "\n(resumed %s, session %s)\n", when(resumes[0].Resumed), resumes[0].Session)
+			resumes = resumes[1:]
+		}
+	}
 	for i, m := range l.messages {
+		resumed(i)
 		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", i+1, when(m.Time), m.Text)
 		for _, p := range m.Pastes {
 			fmt.Fprintf(stdout, "--- a paste that could not be placed in the message ---\n%s\n", p)
 		}
 	}
+	resumed(len(l.messages))
 	return 0
 }
 
-// findSent picks a sent log by its number in unsent log, or its session id.
-func findSent(logs []*sentLog, arg string) *sentLog {
+// findSent picks sent logs by their number in unsent log, unsent's session
+// id, or the agent's own session id. One run of unsent can start the logs
+// of several conversations (the agent's /resume or /clear), so an id of
+// unsent's can name more than one.
+func findSent(logs []*sentLog, arg string) []*sentLog {
 	if n, err := strconv.Atoi(arg); err == nil {
 		if n >= 1 && n <= len(logs) {
-			return logs[n-1]
+			return logs[n-1 : n]
 		}
 		return nil
 	}
+	var out []*sentLog
 	for _, l := range logs {
-		if l.Session == arg {
-			return l
+		if l.Session == arg || l.AgentSession == arg {
+			out = append(out, l)
 		}
+	}
+	return out
+}
+
+// oneSent is the one sent log arg names, or nil, having said why on stderr.
+func oneSent(logs []*sentLog, arg string, stderr io.Writer) *sentLog {
+	found := findSent(logs, arg)
+	switch len(found) {
+	case 0:
+		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", arg)
+		return nil
+	case 1:
+		return found[0]
+	}
+	fmt.Fprintf(stderr, "unsent: %q started %d conversations' sent logs; name one by the agent's session id:\n", arg, len(found))
+	for _, l := range found {
+		fmt.Fprintf(stderr, "  %s  %s, %d sent\n", l.AgentSession, when(l.Started), len(l.messages))
 	}
 	return nil
 }
@@ -472,9 +506,8 @@ func cmdForget(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	st.pruneSent()
-	l := findSent(st.sentLogs(), args[1])
+	l := oneSent(st.sentLogs(), args[1], stderr)
 	if l == nil {
-		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", args[1])
 		return 2
 	}
 	if err := os.Remove(l.path); err != nil {

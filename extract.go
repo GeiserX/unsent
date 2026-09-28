@@ -62,6 +62,10 @@ type profile struct {
 	// the reader never finds the box, the user learns both.
 	verified string
 	version  []string
+	// session reads the agent's own session id for the process unsent
+	// started, which records and sent logs carry as agent_session; nil when
+	// the profile cannot read one.
+	session *sessionSource
 }
 
 // profiles are the agents unsent can read.

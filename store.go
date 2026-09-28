@@ -40,6 +40,15 @@ type record struct {
 	// Agent names the agent the draft came from (see agentFor), so it is
 	// only offered back to that agent.
 	Agent string `json:"agent"`
+	// AgentSession is the agent's own id of the conversation the draft was
+	// typed in, as the profile read it at the save (see sessionTracker);
+	// "" when unknown, and in files written before the field existed. The
+	// sent log's header carries the same field.
+	AgentSession string `json:"agent_session"`
+	// joined is when this run entered AgentSession: the run's start for
+	// the first id, the switch for a later one. A resumed conversation's
+	// sent log says so with this time.
+	joined time.Time
 	// Cwd is the folder the agent ran in, as a resolved real path. Files
 	// written before that may hold a path through a symlink.
 	Cwd     string    `json:"cwd"`
@@ -88,6 +97,9 @@ type store struct {
 	dir    string
 	warned bool
 	lock   *os.File
+	// joins holds, per conversation sent log this process appended to, the
+	// joined time of the record it last appended for (see logSentAt).
+	joins map[string]time.Time
 }
 
 func stateDir() (string, error) {

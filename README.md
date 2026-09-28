@@ -90,7 +90,7 @@ A line you run with Enter keeps nothing, because zsh's own history has it (`UNSE
 
 ## Sent messages
 
-Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. After you start a new session, the old one's messages are one command away:
+Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. For Claude Code the log belongs to the conversation: resume it (`claude --resume`, `claude -c`, the resume picker or `/resume`) and new messages join the same log, after a line saying when it was resumed, and `unsent log <id>` also takes Claude Code's own session id. After you start a new session, the old one's messages are one command away:
 
 ```sh
 unsent log                 # sessions with sent messages, newest first
@@ -137,7 +137,7 @@ A few things make that more than a screenshot:
 
 ## Where your drafts live
 
-Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
+Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session, or per conversation for Claude Code. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
 
 ## Limits
 

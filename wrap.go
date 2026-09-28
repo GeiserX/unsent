@@ -77,6 +77,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	}
 	cmd := exec.Command(bin, args[1:]...)
 	cols, rows := termSize(in)
+	started := time.Now()
 	ptmx, err := startPty(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 	if err != nil {
 		return broken("cannot start a pseudo-terminal", err)
@@ -111,6 +112,9 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		// a dead one and could clean up its files.
 		s.off = fmt.Sprintf("unsent: %v; running without saving drafts", err)
 		s.prof = nil
+	}
+	if s.prof != nil {
+		s.ids = newSessionTracker(s.prof.session, cmd.Process.Pid, started)
 	}
 	if s.off != "" {
 		fmt.Fprintln(os.Stderr, s.off)
@@ -378,6 +382,11 @@ type session struct {
 	stitch stitcher
 	// prof is the agent's profile, or nil when nothing is saved.
 	prof *profile
+	// ids follows the agent's own session id, nil when the profile reads
+	// none; seen is the id the save read, while it reads the screen of
+	// now, and "" while it reads the screens keys were typed into.
+	ids  *sessionTracker
+	seen string
 }
 
 // input notes one chunk of keys on its way to the agent: the pastes in it,
@@ -533,6 +542,13 @@ func (s *session) save() {
 	if scr == nil {
 		return
 	}
+	// Read after the screen, so a box drawn for a session the agent just
+	// switched to comes with that session's id. It is the id of this
+	// screen only: the screens the keys were typed into come from before
+	// the switch, and a /clear or a picker choice sent from one of them
+	// belongs to the session it was typed in.
+	seen := s.ids.current()
+	s.seen = ""
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		os.WriteFile(filepath.Join(dir, "screen.txt"), []byte(scr.String()), 0o600)
 	}
@@ -557,6 +573,7 @@ func (s *session) save() {
 	if answered {
 		// Until the agent draws something after a submit key, the screen is
 		// the one that key was typed into, already read above.
+		s.seen = seen
 		s.look(scr)
 	}
 }
@@ -618,8 +635,14 @@ func (s *session) look(scr *screen) bool {
 	}
 	if draft == s.rec.Draft {
 		// Output that leaves the box as it was (a window title, a spinner
-		// above it) is not the agent's answer to a submit key yet.
+		// above it) is not the agent's answer to a submit key yet. A send
+		// still to come goes to the session it was typed in.
 		s.armed = armed
+		if !armed && s.follow() && s.rec.Draft != "" {
+			if err := s.store.write(s.rec); err != nil {
+				s.store.warn(err)
+			}
+		}
 		return true
 	}
 	s.stitched = s.stitched || v.capped
@@ -638,6 +661,9 @@ func (s *session) look(scr *screen) bool {
 		// replace it. The next save tries again.
 		return true
 	}
+	// The old draft went where its session's drafts go; the new one is in
+	// the session the agent is in now.
+	s.follow()
 	if draft == "" {
 		s.pastes.reset()
 		s.store.dropVersions(s.rec)
@@ -650,6 +676,21 @@ func (s *session) look(scr *screen) bool {
 	if err := s.store.write(s.rec); err != nil {
 		s.store.warn(err)
 	}
+	return true
+}
+
+// follow moves the record to the session this save read, when the agent
+// changed session (a picker choice, /resume, /clear), and reports whether
+// it did. A read that found no id leaves the record where it was.
+func (s *session) follow() bool {
+	if s.seen == "" || s.seen == s.rec.AgentSession {
+		return false
+	}
+	s.rec.joined = s.rec.Started
+	if s.rec.AgentSession != "" {
+		s.rec.joined = time.Now()
+	}
+	s.rec.AgentSession = s.seen
 	return true
 }
 
