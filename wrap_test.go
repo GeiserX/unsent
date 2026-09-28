@@ -59,6 +59,11 @@ func fakeAgent() {
 		fmt.Printf("%s (Fake Agent)\n", v)
 		return
 	}
+	// UNSENT_FAKE_HUP makes the agent hang itself up at start: it lives on
+	// only if it was started with the hang-up ignored.
+	if os.Getenv("UNSENT_FAKE_HUP") == "1" {
+		syscall.Kill(os.Getpid(), syscall.SIGHUP)
+	}
 	// UNSENT_FAKE_STDERR is what the agent writes to its stderr at start.
 	os.Stderr.WriteString(os.Getenv("UNSENT_FAKE_STDERR"))
 	if old, err := term.MakeRaw(0); err == nil {
@@ -565,12 +570,12 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 	}
 }
 
-// unsentClaude runs the test binary as unsent claude in a terminal of its
-// own, with bin, which holds the fake claude, first on PATH and env added
+// unsentClaude runs unsent, the command that starts the test binary as
+// unsent claude, in a terminal of its own, with bin, which holds the fake claude, first on PATH and env added
 // to the environment. errLog, when not nil, is where its stderr goes
 // instead. It types hello, waits past a save, quits the fake agent with 3
 // and returns the exit code and everything the terminal showed.
-func unsentClaude(t *testing.T, self, bin string, env []string, errLog *os.File) (code int, shown string) {
+func unsentClaude(t *testing.T, unsent []string, bin string, env []string, errLog *os.File) (code int, shown string) {
 	t.Helper()
 	user, tty, err := pty.Open()
 	if err != nil {
@@ -578,7 +583,7 @@ func unsentClaude(t *testing.T, self, bin string, env []string, errLog *os.File)
 	}
 	defer func() { user.Close(); tty.Close() }()
 	pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
-	cmd := exec.Command(self, "claude")
+	cmd := exec.Command(unsent[0], unsent[1:]...)
 	cmd.Env = append(append(os.Environ(), "UNSENT_TEST_RUN=wrap", "UNSENT_FAKE_STDERR=to-stderr",
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH")), env...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
@@ -651,7 +656,9 @@ func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
 	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
 		t.Fatal(err)
 	}
-	start := func(errLog *os.File) (int, string) { return unsentClaude(t, self, bin, nil, errLog) }
+	start := func(errLog *os.File) (int, string) {
+		return unsentClaude(t, []string{self, "claude"}, bin, nil, errLog)
+	}
 
 	errLog, err := os.Create(filepath.Join(t.TempDir(), "err.log"))
 	if err != nil {
@@ -684,7 +691,8 @@ func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
 // A draft saver that cannot run never costs the session: with the draft
 // folder unwritable, or no pseudo-terminal to be had, unsent says so in one
 // line and hands over, so the agent runs to the end on the terminal and its
-// exit status is the session's.
+// exit status is the session's. A hang-up ignored when unsent started (as
+// under nohup) is still ignored by the agent it hands over to.
 func TestWrapHandsOverWhenItCannotSave(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root writes into a read-only folder")
@@ -703,14 +711,21 @@ func TestWrapHandsOverWhenItCannotSave(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(locked, 0o700) })
 	const off = "; drafts are not being saved this session"
+	direct := []string{self, "claude"}
+	// sh ignores the hang-up before unsent starts, as nohup does, and the
+	// fake agent hangs itself up.
+	noHup := []string{"/bin/sh", "-c", `trap "" HUP; exec "$0" claude`, self}
 	for _, c := range []struct {
-		name, home, pty, want string
+		name, home, pty, hup, want string
+		unsent                     []string
 	}{
-		{"unwritable UNSENT_HOME", locked, "", "unsent: cannot open the draft folder: mkdir " + locked},
-		{"no pseudo-terminal", t.TempDir(), "fail", "unsent: cannot start a pseudo-terminal: forced pty failure" + off},
+		{"unwritable UNSENT_HOME", locked, "", "", "unsent: cannot open the draft folder: mkdir " + locked, direct},
+		{"no pseudo-terminal", t.TempDir(), "fail", "", "unsent: cannot start a pseudo-terminal: forced pty failure" + off, direct},
+		{"hang-up ignored", locked, "", "1", "unsent: cannot open the draft folder: mkdir " + locked, noHup},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			code, shown := unsentClaude(t, self, bin, []string{"UNSENT_HOME=" + c.home, "UNSENT_TEST_PTY=" + c.pty}, nil)
+			code, shown := unsentClaude(t, c.unsent, bin,
+				[]string{"UNSENT_HOME=" + c.home, "UNSENT_TEST_PTY=" + c.pty, "UNSENT_FAKE_HUP=" + c.hup}, nil)
 			if code != 3 || !strings.Contains(shown, c.want) || strings.Count(shown, off) != 1 {
 				t.Fatalf("exit %d, terminal %q; want exit 3 and one line %q ending %q", code, shown, c.want, off)
 			}
