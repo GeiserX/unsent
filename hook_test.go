@@ -148,6 +148,17 @@ func TestHookClaudeNoteGolden(t *testing.T) {
 	golden(t, "hook-claude-note.golden", runHook(t, hookJSON(hookConv, work, "resume")))
 }
 
+// UNSENT_NOTICE=0 quiets the screen, not the hook: installing the hook is
+// how the user asked for the note.
+func TestHookClaudeRunIgnoresUnsentNotice(t *testing.T) {
+	work := seedHook(t)
+	t.Setenv("UNSENT_NOTICE", "0")
+	out := runHook(t, hookJSON(hookConv, work, "resume"))
+	if why := checkHookOutput(out); why != "" {
+		t.Fatalf("with UNSENT_NOTICE=0 the output %s: %q", why, out)
+	}
+}
+
 // A store that is not there gets no note, and the hook makes no folder.
 func TestHookClaudeNoStore(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "none")
@@ -204,8 +215,9 @@ func TestHookClaudeOutputCheckCatchesInitialUserMessage(t *testing.T) {
 		}}
 	}
 	t.Cleanup(func() { hookOutput = old })
-	if why := checkHookOutput(runHook(t, hookJSON(hookConv, work, "resume"))); why == "" {
-		t.Fatal("the output check stays green with initialUserMessage in the output")
+	out := runHook(t, hookJSON(hookConv, work, "resume"))
+	if why := checkHookOutput(out); why != "holds initialUserMessage" {
+		t.Fatalf("the output check did not catch initialUserMessage: %q, output %q", why, out)
 	}
 }
 
@@ -246,15 +258,40 @@ func TestHookClaudeConfigGolden(t *testing.T) {
 	}
 }
 
-// The real lookup gives the test binary's absolute path, through its
-// symlinks.
+// The real lookup gives the test binary's absolute path.
 func TestHookExeIsAbsolute(t *testing.T) {
 	p, err := hookExe()
 	if err != nil || !filepath.IsAbs(p) {
 		t.Fatalf("%q, %v", p, err)
 	}
-	if r, _ := filepath.EvalSymlinks(p); r != p {
-		t.Fatalf("%q resolves to %q", p, r)
+}
+
+// An unsent on PATH that is a symlink to the running binary, as Homebrew's
+// bin/unsent is to its versioned Cellar copy, is named by the link, which
+// an upgrade keeps; the target it resolves to is removed by one.
+func TestHookExeKeepsThePathSymlink(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	link := filepath.Join(bin, "unsent")
+	if err := os.Symlink(exe, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if p, err := hookExe(); err != nil || p != link {
+		t.Fatalf("got %q, %v; want the link %q", p, err, link)
+	}
+	// An unsent on PATH that is another binary is not this one.
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(link, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := hookExe(); err != nil || p == link {
+		t.Fatalf("got %q, %v; want the running binary, not another unsent on PATH", p, err)
 	}
 }
 

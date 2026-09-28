@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -50,15 +51,25 @@ type hookCommand struct {
 	Command string `json:"command"`
 }
 
-// hookExe is the running unsent binary, as an absolute path with its
-// symlinks resolved, so the shell Claude Code runs the hook in needs no
-// unsent on its PATH. A test swaps it for a fixed path.
+// hookExe is the running unsent binary as an absolute path, so the shell
+// Claude Code runs the hook in needs no unsent on its PATH. It keeps
+// symlinks: Homebrew's bin/unsent survives an upgrade, while the versioned
+// Cellar path it points at is removed. When the unsent on PATH is this same
+// binary, that path wins, since on Linux os.Executable has already resolved
+// the link. A test swaps it for a fixed path.
 var hookExe = func() (string, error) {
 	p, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	return filepath.EvalSymlinks(p)
+	if q, err := exec.LookPath("unsent"); err == nil && filepath.IsAbs(q) {
+		if a, err := os.Stat(p); err == nil {
+			if b, err := os.Stat(q); err == nil && os.SameFile(a, b) {
+				return q, nil
+			}
+		}
+	}
+	return p, nil
 }
 
 // hookInputMax caps how much of the hook's stdin is read.
@@ -91,7 +102,7 @@ func printClaudeHook(stdout, stderr io.Writer) int {
 	}
 	settings := shortPath(filepath.Join(filepath.Dir(claudeSessions()), "settings.json"), 200)
 	fmt.Fprintf(stderr, "unsent: add this to %s, next to any hooks already there; unsent never edits that file.\n", settings)
-	fmt.Fprintln(stderr, "unsent: it names the unsent binary by its path, so run this again after unsent moves (an upgrade can move it).")
+	fmt.Fprintln(stderr, "unsent: it names the unsent binary by its path, so run this again if unsent moves.")
 	return 0
 }
 
