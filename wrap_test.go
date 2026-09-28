@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -58,7 +59,35 @@ func TestMain(m *testing.M) {
 	if os.Getenv("UNSENT_TEST_RUN") == "1" {
 		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
-	os.Exit(m.Run())
+	// No test reads a real Claude Code config: its session files name the
+	// user's own conversations.
+	cfg, err := os.MkdirTemp("", "unsent-claude-config-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	// A binary built with -race sleeps a second before it exits, so that a
+	// race report another goroutine is printing can finish. Every fake
+	// agent and every unsent this binary starts is one, and a test waits
+	// for each to exit: 100 ms still lets a report finish, and saves most
+	// of that second per run.
+	if raceEnabled {
+		os.Setenv("GORACE", strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=100"))
+	}
+	code := m.Run()
+	os.RemoveAll(cfg)
+	os.Exit(code)
+}
+
+// fakeSession writes the fake agent's session file the way Claude Code
+// writes sessions/<pid>.json, with the peer token file beside it.
+func fakeSession(id string) {
+	dir := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "sessions")
+	os.MkdirAll(dir, 0o700)
+	pid := os.Getpid()
+	b, _ := json.Marshal(map[string]any{"pid": pid, "sessionId": id, "startedAt": time.Now().UnixMilli(), "kind": "interactive"})
+	os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.json", pid)), b, 0o644)
+	os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.0123abcd.key", pid)), []byte("peer token"), 0o600)
 }
 
 func fakeAgent() {
@@ -83,6 +112,36 @@ func fakeAgent() {
 	}
 	// UNSENT_FAKE_STDERR is what the agent writes to its stderr at start.
 	os.Stderr.WriteString(os.Getenv("UNSENT_FAKE_STDERR"))
+	// UNSENT_FAKE_SESSION is the session the agent is in, in a session file
+	// as Claude Code keeps it; Ctrl+O switches to UNSENT_FAKE_SESSION_NEXT
+	// in place, as /resume does. The files go when the agent exits. As in
+	// Claude Code, --resume <id> opens that session, --resume alone opens a
+	// picker with a fresh session until Enter chooses UNSENT_FAKE_SESSION,
+	// and --fork-session starts a session of its own.
+	id, picking := os.Getenv("UNSENT_FAKE_SESSION"), false
+	for i, a := range os.Args[1:] {
+		switch {
+		case a == "--fork-session":
+			id = fmt.Sprintf("forked-%d", os.Getpid())
+		case a == "--resume" && i+2 < len(os.Args):
+			id = os.Args[i+2]
+		case a == "--resume":
+			picking = true
+		}
+	}
+	if picking {
+		fakeSession(fmt.Sprintf("fresh-%d", os.Getpid()))
+	} else if id != "" {
+		fakeSession(id)
+	}
+	if id != "" || picking {
+		defer func() {
+			names, _ := filepath.Glob(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "sessions", fmt.Sprintf("%d.*", os.Getpid())))
+			for _, n := range names {
+				os.Remove(n)
+			}
+		}()
+	}
 	if old, err := term.MakeRaw(0); err == nil {
 		defer term.Restore(0, old)
 	}
@@ -92,9 +151,28 @@ func fakeAgent() {
 	}
 	var draft []string
 	pastes := 0
-	var pasting, esc bool
+	var pasting, esc, away bool
 	var paste strings.Builder
-	draw := func() { os.Stdout.WriteString(drawBox(cols, strings.Join(draft, ""))) }
+	// A picker (the --resume one, or the one /resume opens) hides the box
+	// until Enter chooses; so does a menu (away).
+	draw := func() {
+		switch {
+		case picking:
+			os.Stdout.WriteString("\x1b[H\x1b[2JResume session\r\n   ❯ a conversation\r\n")
+		case away:
+			os.Stdout.WriteString("\x1b[H\x1b[2JTasks\r\n  nothing running\r\n")
+		default:
+			os.Stdout.WriteString(drawBox(cols, strings.Join(draft, "")))
+		}
+	}
+	// The alternate screen, as Claude Code's fullscreen renderer uses it,
+	// unless UNSENT_FAKE_MAIN_SCREEN draws on the main screen, below what
+	// the terminal held, as its default renderer does. Bracketed paste on,
+	// as Claude Code turns it on.
+	if os.Getenv("UNSENT_FAKE_MAIN_SCREEN") != "1" {
+		os.Stdout.WriteString("\x1b[?1049h")
+	}
+	os.Stdout.WriteString("\x1b[?2004h")
 	draw()
 	buf := make([]byte, 4096)
 	for {
@@ -124,6 +202,45 @@ func fakeAgent() {
 			case strings.HasPrefix(in, "\x1b[200~"):
 				pasting = true
 				in = in[6:]
+			case picking && in[0] == '\r': // the picker's choice
+				picking = false
+				fakeSession(os.Getenv("UNSENT_FAKE_SESSION"))
+				in = in[1:]
+			case picking:
+				in = in[1:]
+			case away && in[0] == 4: // Ctrl+D quits from a menu too
+				return
+			case away: // Ctrl+T closes the menu; other keys do nothing
+				away = in[0] != 0x14
+				in = in[1:]
+			case in[0] == 0x14: // Ctrl+T opens a menu with no box, keeping the draft
+				away = true
+				in = in[1:]
+			case in[0] == '\r' && strings.Join(draft, "") == "/tasks":
+				// A command that opens a menu, as /config does.
+				draft, away = nil, true
+				in = in[1:]
+			case in[0] == '\r' && strings.HasPrefix(strings.Join(draft, ""), "/resume "):
+				// /resume <id> switches in place: no picker, the box stays.
+				fakeSession(strings.TrimPrefix(strings.Join(draft, ""), "/resume "))
+				draft = nil
+				in = in[1:]
+			case len(in) >= 3 && in[:2] == "\x1b[" && strings.IndexByte("ABCDIO", in[2]) >= 0:
+				// Arrow keys and focus reports change nothing in the box.
+				in = in[3:]
+			case in[0] == '\r' && strings.Join(draft, "") == "/resume":
+				// The /resume picker keeps the session until the choice.
+				draft, picking = nil, true
+				os.Setenv("UNSENT_FAKE_SESSION", os.Getenv("UNSENT_FAKE_SESSION_NEXT"))
+				in = in[1:]
+			case in[0] == '\r' && strings.Join(draft, "") == "/exit":
+				// Claude Code leaves the screen without drawing an empty box.
+				os.Stdout.WriteString("\x1b[H\x1b[2Jbye\r\n")
+				return
+			case in[0] == '\r' && strings.Join(draft, "") == "/clear":
+				draft = nil
+				fakeSession(fmt.Sprintf("cleared-%d", os.Getpid()))
+				in = in[1:]
 			case strings.HasPrefix(in, "\x1b\r"):
 				draft = append(draft, "\n")
 				in = in[2:]
@@ -138,6 +255,9 @@ func fakeAgent() {
 				in = ""
 			case in[0] == 4: // Ctrl+D quits
 				return
+			case in[0] == 0x0f: // Ctrl+O switches session, as /resume does
+				fakeSession(os.Getenv("UNSENT_FAKE_SESSION_NEXT"))
+				in = in[1:]
 			case in[0] == 5: // Ctrl+E quits with an error, or dies of UNSENT_FAKE_SIGNAL
 				if n, err := strconv.Atoi(os.Getenv("UNSENT_FAKE_SIGNAL")); err == nil {
 					syscall.Kill(os.Getpid(), syscall.Signal(n))
@@ -221,7 +341,66 @@ func runWrappedAs(t *testing.T, command string, argv []string, script func(type_
 // showed and what unsent printed on its own stderr.
 func runWrappedOut(t *testing.T, command string, argv []string, script func(type_ func(string))) (code int, st *store, screen, stderr string) {
 	t.Helper()
-	home := t.TempDir()
+	return runWrappedIn(t, t.TempDir(), command, argv, script)
+}
+
+// runWrappedIn is runWrappedOut with the state folder home, so two runs
+// can share one.
+func runWrappedIn(t *testing.T, home, command string, argv []string, script func(type_ func(string))) (code int, st *store, screen, stderr string) {
+	t.Helper()
+	return runWrappedWith(t, home, command, argv, func(w *wrapRun) { script(w.type_) })
+}
+
+// wrapRun is a wrapped run in progress, as its script sees it: type_ types
+// keys, and the waits end on what the wrapper and the agent did.
+type wrapRun struct {
+	t     *testing.T
+	type_ func(string)
+	// screen is everything the terminal showed so far.
+	screen func() string
+	// saved holds when the last timed save to end began, and decided when
+	// the tick began whose restore try left this session's restore decided,
+	// in Unix nanoseconds.
+	saved, decided *atomic.Int64
+}
+
+// waitShown waits for text on the terminal.
+func (w *wrapRun) waitShown(text string) {
+	w.t.Helper()
+	waitFor(w.t, fmt.Sprintf("%q on the screen", text), func() bool { return strings.Contains(w.screen(), text) })
+}
+
+// waitSave waits for a timed save that began at least 100 ms from now to
+// end, by when the wrapper has what the terminal shows now on its shadow
+// screen, and the tick before it has drawn any line it queued.
+func (w *wrapRun) waitSave() {
+	w.t.Helper()
+	after := time.Now().Add(100 * time.Millisecond).UnixNano()
+	waitFor(w.t, "a timed save", func() bool { return w.saved.Load() > after })
+}
+
+// waitDecided waits for a tick that begins from now on to leave the
+// restore decided for the session the agent is in, as it read the session
+// then: this run cannot restore, or the session had its one try. From then
+// on nothing more is put back into it, so a check that no restore came can
+// end there.
+func (w *wrapRun) waitDecided() {
+	w.t.Helper()
+	after := time.Now().UnixNano()
+	waitFor(w.t, "the restore's decision", func() bool { return w.decided.Load() > after })
+}
+
+// restoreDecided reports whether s restores nothing more into the session
+// the agent is in. It runs on the save loop's goroutine, which alone
+// touches s.rs and s.ids.
+func restoreDecided(s *session) bool {
+	return !s.rs.on || s.broken.Load() || s.rs.done && s.rs.id == s.ids.id
+}
+
+// runWrappedWith is runWrappedIn whose script can wait on the run's
+// events.
+func runWrappedWith(t *testing.T, home, command string, argv []string, script func(w *wrapRun)) (code int, st *store, screen, stderr string) {
+	t.Helper()
 	t.Setenv("UNSENT_HOME", home)
 	t.Setenv("UNSENT_FAKE_AGENT", "1")
 	bin := t.TempDir()
@@ -271,13 +450,22 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 	oldIn, oldOut := os.Stdin, os.Stdout
 	os.Stdin, os.Stdout = term, term
 	defer func() { os.Stdin, os.Stdout = oldIn, oldOut }()
-	// saved holds when the last timed save to end began.
-	var saved atomic.Int64
+	// The restore state a save finds is what the tick before it left: that
+	// tick's try ran after its save, and read the session id then. So a
+	// decision counts from when that earlier save began, never from this
+	// one: a session the agent switched to meanwhile (/clear) is not read
+	// yet. prev is touched only by the save loop's goroutine.
+	var saved, decided atomic.Int64
+	var prev int64
 	oldSave := timedSave
 	timedSave = func(s *session) {
-		began := time.Now()
+		began := time.Now().UnixNano()
+		if restoreDecided(s) {
+			decided.Store(prev)
+		}
+		prev = began
 		oldSave(s)
-		saved.Store(began.UnixNano())
+		saved.Store(began)
 	}
 	defer func() { timedSave = oldSave }()
 	exit := make(chan int, 1)
@@ -292,7 +480,13 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 	// terminal, by when the wrapper has it on its shadow screen too. A key
 	// the agent draws nothing for, such as Ctrl+Z, waits three save
 	// intervals.
-	script(func(s string) {
+	w := &wrapRun{t: t, saved: &saved, decided: &decided}
+	w.screen = func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return string(shown)
+	}
+	w.type_ = func(s string) {
 		mu.Lock()
 		before := len(shown)
 		mu.Unlock()
@@ -310,7 +504,8 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 				return
 			}
 		}
-	})
+	}
+	script(w)
 	select {
 	case code = <-exit:
 	case <-time.After(10 * time.Second):
@@ -1148,6 +1343,63 @@ func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
 	}
 }
 
+// UNSENT_NOTICE=0 turns off the draft notices, never a line that says
+// drafts are not being saved: silence is the worst failure there. Each
+// line is checked with the notices on too, so the test sees the notice go.
+func TestNoticesOffKeepTheLinesThatSayNothingIsSaved(t *testing.T) {
+	for _, notice := range []string{"", "0"} {
+		t.Run("UNSENT_NOTICE="+notice, func(t *testing.T) {
+			t.Setenv("UNSENT_NOTICE", notice)
+			t.Run("no reader", func(t *testing.T) {
+				st := testStore(t)
+				work := realPath(t.TempDir())
+				t.Chdir(work)
+				seedAs(t, st, "left", "sh", work, "a draft left behind", 5)
+				user, term, err := pty.Open()
+				if err != nil {
+					t.Fatal(err)
+				}
+				go io.Copy(io.Discard, user)
+				defer func() { user.Close(); term.Close() }()
+				stderr := lendStderr(t)
+				code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term, nil)
+				said := stderr()
+				line := "unsent: no reader for \"sh\" yet, running it without saving drafts\n"
+				if code != 0 || strings.Count(said, line) != 2 {
+					t.Fatalf("exit %d, stderr %q: want %q before start and after exit", code, said, line)
+				}
+				if got := strings.Count(said, "recovered a draft"); got != map[string]int{"": 2, "0": 0}[notice] {
+					t.Fatalf("stderr %q: %d notices", said, got)
+				}
+			})
+			t.Run("hand over", func(t *testing.T) {
+				bin := t.TempDir()
+				self, err := os.Executable()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+					t.Fatal(err)
+				}
+				_, shown := unsentClaude(t, []string{self, "claude"}, bin,
+					[]string{"UNSENT_HOME=" + t.TempDir(), "UNSENT_TEST_PTY=fail", "UNSENT_NOTICE=" + notice}, nil)
+				if !strings.Contains(shown, "; drafts are not being saved this session") {
+					t.Fatalf("terminal %q", shown)
+				}
+			})
+			t.Run("box never read", func(t *testing.T) {
+				old := claude.read
+				claude.read = func(*screen) (view, bool) { return view{}, false }
+				defer func() { claude.read = old }()
+				_, _, _, said := runWrappedOut(t, "claude", []string{"claude"}, func(type_ func(string)) { type_("hello"); type_("\x04") })
+				if !strings.Contains(said, "unsent: could not read claude") || !strings.Contains(said, "nothing was saved") {
+					t.Fatalf("stderr %q", said)
+				}
+			})
+		})
+	}
+}
+
 // The recovery notice is printed before the agent starts and again after it
 // exits, because an agent on the alternate screen hides the first one. The
 // second is asked afresh: a draft restored while the agent ran is not
@@ -1260,6 +1512,10 @@ func TestTypedKeys(t *testing.T) {
 		{"\x1bP>|WezTerm 2024\x1b\\", false},         // XTVERSION
 		{"\x1b[?62;22c\x1b[>1;10;0c\x1b[?1u", false}, // DA1, DA2, kitty flags
 		{"\x1b]11;rgb:0/0/0", false},                 // cut short
+		{"\x1b[6;32;16t\x1b[?1;2;4c", false},         // cell size, as tmux answers Claude Code
+		{"\x1b[4;800;1200t\x1b[8;40;120t", false},    // window size in pixels and cells
+		{"\x1b[2026;2$y\x1b[?2026;2$y", false},       // mode reports
+		{"\x1b[6;32;16t" + "q", true},
 		{"\x1b[?1u" + "x", true},
 		{"\x1b]11;rgb:0/0/0\x07" + "\x1b[I" + "y", true},
 	} {

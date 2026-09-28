@@ -504,14 +504,17 @@ func scenarioSubshellHup(s *zshSession) error {
 }
 
 // takes sends keys and waits for a b record of want, so the shell is
-// still running and saving. It fails as soon as the shell ends.
+// still running and saving. It fails as soon as the shell ends, or once
+// the line editor has drawn the keys with no such record, since the
+// line-pre-redraw hook writes it before that redraw.
 func (s *zshSession) takes(keys, want string) error {
 	s.t.Helper()
-	from := len(s.records())
+	from, n := len(s.records()), s.outLen()
 	if _, err := s.pty.WriteString(keys); err != nil {
 		return fmt.Errorf("the shell took no keys: %v", err)
 	}
 	var ended error
+	saved := func() bool { return s.index(s.records(), from, "b", want) >= 0 }
 	err := s.await(zshStall, func() bool {
 		select {
 		case err := <-s.ended:
@@ -520,15 +523,37 @@ func (s *zshSession) takes(keys, want string) error {
 			return true
 		default:
 		}
-		return s.index(s.records(), from, "b", want) >= 0
+		return saved() || s.drawn(n, keys)
 	})
 	if ended != nil {
 		return ended
+	}
+	if err == nil && !saved() {
+		err = errors.New("the line editor drew the keys with no record before")
 	}
 	if err != nil {
 		return fmt.Errorf("the shell saved no %q: %v", want, err)
 	}
 	return nil
+}
+
+// drawn says whether the line editor has drawn keys, sent when the
+// terminal had shown n bytes: they show after n and after the current
+// prompt's switch to bracketed paste. The terminal's own echo of keys
+// typed before the line editor runs comes before that switch, and zsh
+// runs the line-pre-redraw hook before every redraw, so once this holds
+// the hooks have seen the keys.
+func (s *zshSession) drawn(n int, keys string) bool {
+	out := s.shown(0)
+	p := strings.LastIndex(out, zshPrompt)
+	if p < 0 {
+		return false
+	}
+	z := strings.Index(out[p:], zleOn)
+	if z < 0 {
+		return false
+	}
+	return strings.Contains(out[max(n, p+z+len(zleOn)):], keys)
 }
 
 // TestZshHooksHupToASubshellSparesTheShell checks the hooks' TRAPHUP, run
@@ -921,11 +946,13 @@ add-zle-hook-widget line-finish _mine_finish
 `
 
 // minesRan waits for the user's widgets in want to have written to
-// $HOME/mine.
-func minesRan(s *zshSession, want ...string) error {
+// $HOME/mine, or for past, which holds once zsh is past the point where
+// they run: a widget still missing then never ran, and the check fails
+// at once instead of waiting out zshStall.
+func minesRan(s *zshSession, past func() bool, want ...string) error {
 	f := filepath.Join(s.home, "mine")
 	var ran string
-	if err := s.await(zshStall, func() bool {
+	all := func() bool {
 		b, _ := os.ReadFile(f)
 		ran = string(b)
 		for _, w := range want {
@@ -934,7 +961,12 @@ func minesRan(s *zshSession, want ...string) error {
 			}
 		}
 		return true
-	}); err != nil {
+	}
+	err := s.await(zshStall, func() bool { return all() || past() })
+	if err == nil && !all() {
+		err = errors.New("zsh went past them")
+	}
+	if err != nil {
 		return fmt.Errorf("the user's hooks %q did not all run (%v); they wrote %q", want, err, ran)
 	}
 	return nil
@@ -958,12 +990,16 @@ func scenarioUsersHooksWithoutUnsent(t *testing.T, hooks string) error {
 	if err := os.WriteFile(filepath.Join(home, "mine"), nil, 0o644); err != nil {
 		return err
 	}
+	// echo waits for the redraw, which comes after line-pre-redraw.
 	s.echo("echo hi", "echo hi")
-	if err := minesRan(s, "_mine_redraw"); err != nil {
+	if err := minesRan(s, func() bool { return true }, "_mine_redraw"); err != nil {
 		return err
 	}
+	// line-finish runs before the command, line-init before the next
+	// prompt switches bracketed paste on.
+	n = s.outLen()
 	s.send("\r")
-	if err := minesRan(s, "_mine_redraw", "_mine_finish", "zle-line-init"); err != nil {
+	if err := minesRan(s, func() bool { return s.prompted(n) }, "_mine_redraw", "_mine_finish", "zle-line-init"); err != nil {
 		return err
 	}
 	if logs := s.logs(); len(logs) != 0 {
@@ -977,12 +1013,17 @@ func scenarioUsersHooksWithoutUnsent(t *testing.T, hooks string) error {
 // line-pre-redraw, the kind a syntax highlighter uses, must still run.
 func scenarioUsersHooksOnACursorMove(t *testing.T, hooks string) error {
 	s := startZsh(t, zshUsersHooks+hooks, true)
-	s.line("abc")
+	// Wait for the redraw, not only our record: the user's widget runs
+	// after ours, and a write of it for "abc" must not land after mine
+	// is emptied.
+	s.echo("abc", "abc")
 	if err := os.WriteFile(filepath.Join(s.home, "mine"), nil, 0o644); err != nil {
 		return err
 	}
+	n := s.outLen()
 	s.send("\x1b[D")
-	return minesRan(s, "_mine_redraw")
+	// zle moves the cursor back with a Backspace, after the hooks ran.
+	return minesRan(s, func() bool { return strings.Contains(s.shown(n), "\b") }, "_mine_redraw")
 }
 
 // TestZshHooksLetTheUsersHooksRun runs the user's hooks after ours with no

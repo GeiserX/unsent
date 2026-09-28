@@ -15,6 +15,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # The race detector slows the stitcher's fuzz several times over, so
+        # the race run skips it and a run of its own holds the full fuzz.
+        # Each test runs once; the two coverage profiles add up to the
+        # whole suite. The two run as jobs of their own, side by side, so
+        # the run takes as long as the slower one, not both.
+        suite: [race, fuzz]
+    name: test (${{ matrix.os }}, ${{ matrix.suite }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -22,21 +29,25 @@ jobs:
         with:
           go-version-file: go.mod
       # The shell tests run the hooks in a real zsh; the Linux runner has none.
-      - if: runner.os == 'Linux'
+      - if: runner.os == 'Linux' && matrix.suite == 'race'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
-      - run: go vet ./...
-      # The race detector slows the stitcher's fuzz several times over, so
-      # the race run skips it and a second run holds the full fuzz. Each
-      # test runs once; the two coverage profiles add up to the whole suite.
-      - run: go test -race -count=1 -skip Fuzz -coverprofile=coverage-race.out ./...
-      - run: go test -count=1 -run Fuzz -coverprofile=coverage-fuzz.out ./...
+      - if: matrix.suite == 'race'
+        run: go vet ./...
+      # Only the Linux jobs upload coverage, so only they pay for measuring
+      # it, which slows the fuzz by about a third.
+      - if: matrix.suite == 'race'
+        run: go test -race -count=1 -skip Fuzz ${{ matrix.os == 'ubuntu-latest' && '-coverprofile=coverage.out' || '' }} ./...
+      - if: matrix.suite == 'fuzz'
+        run: go test -count=1 -run Fuzz ${{ matrix.os == 'ubuntu-latest' && '-coverprofile=coverage.out' || '' }} ./...
         env:
           UNSENT_FUZZ_SEEDS: "50"
+      # Codecov adds the two uploads up (codecov.yml waits for both).
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v7
         with:
-          files: coverage-race.out,coverage-fuzz.out
+          files: coverage.out
+          flags: ${{ matrix.suite }}
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 

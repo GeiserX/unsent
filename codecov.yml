@@ -1,5 +1,9 @@
 codecov:
   require_ci_to_pass: true
+  # CI uploads twice per commit, the race run and the fuzz run: report on
+  # their sum, never on one alone.
+  notify:
+    after_n_builds: 2
 
 coverage:
   precision: 2
@@ -16,6 +20,7 @@ coverage:
         threshold: 5%
 
 comment:
+  after_n_builds: 2
   layout: "reach,diff,flags,files"
   behavior: default
   require_changes: true

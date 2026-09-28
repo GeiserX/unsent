@@ -10,6 +10,7 @@ Real output of Claude Code, replayed by `replay_test.go` through the shadow scre
 - `*.editor-N.txt`: the same for a `.rec`, one per Ctrl+G in it. At the Nth Ctrl+G the saved draft must match the Nth copy.
 - `*.keys.json`: the tmux keys sent to make the capture, in order (`type` is literal text, `keys` are tmux key names, `paste` is text sent with `paste-buffer -p`, `wait` is seconds).
 - `screens/*.txt`: one screen copied with `tmux capture-pane -p -e`, colours included (`scrolled.txt` without them).
+- `sessions/*.json`: Claude Code's own `sessions/<pid>.json`, copied from the scratch config while unsent ran it, which `agentsession_test.go` reads: at start (`start.json`), with the `--resume` picker open (`picker-open.json`, a fresh id that names no conversation) and after its choice (`picker-chosen.json`), after `/clear` (`clear.json`, a new id), with the `/resume` picker open (`slash-resume-open.json`, still the id before) and after its choice (`slash-resume-chosen.json`). The `<pid>.<hash>.key` peer token beside each was not copied.
 
 ## How they were made
 

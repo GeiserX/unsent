@@ -1,8 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf16"
 
 	"github.com/mattn/go-runewidth"
@@ -45,6 +51,131 @@ var claude = profile{
 	// "2.1.282 (Claude Code)".
 	verified: "2.1.282",
 	version:  []string{"--version"},
+	session:  &sessionSource{read: claudeSession, pids: claudeSessionPids},
+	// Measured on 2.1.282 with a copy of a configured install's settings,
+	// plugins and hooks (docs/research/claude.md section 11): a paste on the
+	// first frame that shows the box, new chat or resumed, went in whole.
+	// The settle delay is margin on that, and the three empty reads come on
+	// top. Claude Code turns each tab in a paste into 4 spaces.
+	restore: &restoreCaps{
+		settle:  time.Second,
+		empties: 3,
+		chat:    claudeChat,
+		faithful: func(draft string) string {
+			if strings.Contains(draft, "\t") {
+				return "has tabs, which Claude Code's box turns into spaces"
+			}
+			return ""
+		},
+	},
+}
+
+// claudeChat reports whether Claude Code's arguments open the chat box with
+// nothing sent on start: no prompt argument (claude "fix x" sends it), no
+// subcommand (claude mcp), no --print, and no mode that leaves the terminal
+// (--bg) or opens a remote session. The resume forms (--resume <id>, -c, the
+// --resume picker) are chat starts. Anything that could be a prompt counts
+// as one: an unknown option that takes a value makes its value read as a
+// prompt, and that only costs a restore, which the notice after exit makes
+// up for.
+func claudeChat(args []string) bool {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" || !strings.HasPrefix(a, "-") || a == "-" {
+			return false
+		}
+		name, _, inline := strings.Cut(a, "=")
+		switch {
+		case slices.Contains(claudeNotChat, name):
+			return false
+		case inline:
+		case slices.Contains(claudeValue, name):
+			i++
+		case slices.Contains(claudeOptional, name):
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+			}
+		}
+	}
+	return true
+}
+
+// Claude Code 2.1.282's options (claude --help) that matter to claudeChat.
+// An option that takes a list (--add-dir a b) is listed as taking one value:
+// a second one reads as a prompt, the safe side.
+var (
+	claudeNotChat = []string{"-p", "--print", "-h", "--help", "-v", "--version", "--bg", "--background",
+		"--cloud", "--environment", "--teleport"}
+	claudeValue = []string{"--add-dir", "--agent", "--agents", "--allowedTools", "--allowed-tools",
+		"--append-system-prompt", "--autocompact", "--betas", "--debug-file", "--disallowedTools",
+		"--disallowed-tools", "--effort", "--fallback-model", "--file", "--input-format", "--json-schema",
+		"--max-budget-usd", "--mcp-config", "--model", "-n", "--name", "--output-format",
+		"--permission-mode", "--permission-prompts", "--plugin-dir", "--plugin-url",
+		"--remote-control-session-name-prefix", "--session-id", "--setting-sources", "--settings",
+		"--system-prompt", "--system-prompt-snapshot", "--tools"}
+	claudeOptional = []string{"-r", "--resume", "-d", "--debug", "--from-pr", "--prompt-suggestions",
+		"--remote-control", "-w", "--worktree"}
+)
+
+// claudeSessions is the folder where Claude Code keeps one file per
+// running process, sessions/<pid>.json, under its config folder:
+// $CLAUDE_CONFIG_DIR, or ~/.claude when that is unset.
+func claudeSessions() string {
+	dir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		dir = filepath.Join(home, ".claude")
+	}
+	return filepath.Join(dir, "sessions")
+}
+
+// claudeSession reads the session process pid is in from its
+// sessions/<pid>.json. Claude Code writes that file at start, before any
+// key, and rewrites it when the process changes session: a choice in the
+// resume picker, /resume, /clear. While the --resume picker is open it
+// names a fresh session that matches no conversation; the /resume picker
+// keeps the current one until the choice. Only the pid's own .json file is
+// opened, never the <pid>.<hash>.key peer token beside it. A file left by
+// an earlier process with the same pid (after kill -9) names a start
+// before since, and is not this process's.
+func claudeSession(pid int, since time.Time) (string, bool) {
+	dir := claudeSessions()
+	if dir == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, strconv.Itoa(pid)+".json"))
+	if err != nil {
+		return "", false
+	}
+	var f struct {
+		PID       int    `json:"pid"`
+		SessionID string `json:"sessionId"`
+		StartedAt int64  `json:"startedAt"` // Unix milliseconds
+	}
+	if json.Unmarshal(data, &f) != nil {
+		return "", true
+	}
+	if (f.PID != 0 && f.PID != pid) || (f.StartedAt != 0 && time.UnixMilli(f.StartedAt).Before(since.Add(-time.Second))) {
+		return "", false
+	}
+	return f.SessionID, true
+}
+
+// claudeSessionPids lists the pids that have a sessions/<pid>.json. Only
+// names are read here.
+func claudeSessionPids() []int {
+	entries, _ := os.ReadDir(claudeSessions())
+	var pids []int
+	for _, e := range entries {
+		name, ok := strings.CutSuffix(e.Name(), ".json")
+		if pid, err := strconv.Atoi(name); ok && err == nil && pid > 0 && strconv.Itoa(pid) == name {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
 }
 
 // claudeBox reads Claude Code's input box. It is drawn as:
@@ -78,7 +209,10 @@ func claudeBox(s *screen) (view, bool) {
 		if end < 0 {
 			continue
 		}
-		v := view{cursor: -1, width: s.cols - 4}
+		v := view{cursor: -1, width: s.cols - 4, under: -1}
+		if end+1 < len(s.rows) {
+			v.under = end + 1
+		}
 		v.capped = end-y >= s.rows2cap()
 		if (s.rows[y].textFrom(2) == "" || s.rows[y].faintFrom(2)) && end == y+1 {
 			v.empty = true

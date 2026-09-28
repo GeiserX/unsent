@@ -40,6 +40,15 @@ type record struct {
 	// Agent names the agent the draft came from (see agentFor), so it is
 	// only offered back to that agent.
 	Agent string `json:"agent"`
+	// AgentSession is the agent's own id of the conversation the draft was
+	// typed in, as the profile read it at the save (see sessionTracker);
+	// "" when unknown, and in files written before the field existed. The
+	// sent log's header carries the same field.
+	AgentSession string `json:"agent_session"`
+	// joined is when this run entered AgentSession: the run's start for
+	// the first id, the switch for a later one. A resumed conversation's
+	// sent log says so with this time.
+	joined time.Time
 	// Cwd is the folder the agent ran in, as a resolved real path. Files
 	// written before that may hold a path through a symlink.
 	Cwd     string    `json:"cwd"`
@@ -54,6 +63,13 @@ type record struct {
 	// Version marks a safety copy: an earlier version of a live draft, kept
 	// because a later save lost text out of sight.
 	Version bool `json:"version,omitempty"`
+	// session is, for a safety copy load read, the id of the session it
+	// was kept from: the id its file holds. load gives the copy its file
+	// name as ID, so every copy is a draft of its own.
+	session string
+	// RestoreTries counts the restores of this orphan into its reopened
+	// session that were not read back (see restore.go).
+	RestoreTries int `json:"restore_tries,omitempty"`
 }
 
 // agent is the agent the draft came from. Files written before records named
@@ -88,6 +104,9 @@ type store struct {
 	dir    string
 	warned bool
 	lock   *os.File
+	// joins holds, per conversation sent log this process appended to, the
+	// joined time of the record it last appended for (see logSentAt).
+	joins map[string]time.Time
 }
 
 func stateDir() (string, error) {
@@ -380,6 +399,10 @@ func (s *store) load(withHistory bool) []*record {
 			if json.Unmarshal(data, &r) != nil || strings.TrimSpace(r.Draft) == "" {
 				continue
 			}
+			if r.Version {
+				r.session = r.ID
+				r.ID = strings.TrimSuffix(filepath.Base(n), ".json")
+			}
 			out = append(out, &r)
 		}
 	}
@@ -389,8 +412,10 @@ func (s *store) load(withHistory bool) []*record {
 
 // orphans are drafts whose session is gone: the window closed, the agent or
 // the machine crashed, or the agent exited with text still in the box. Dead
-// sessions that left an empty box are cleaned up on the way.
+// sessions that left an empty box are cleaned up on the way, and so are the
+// claims of sessions that died restoring an orphan.
 func (s *store) orphans() []*record {
+	s.dropStaleClaims()
 	var out []*record
 	names, _ := filepath.Glob(filepath.Join(s.dir, "drafts", "*.json"))
 	for _, n := range names {
@@ -434,4 +459,74 @@ func (s *store) sweepTemp() {
 			}
 		}
 	}
+}
+
+// claimMark sits between an orphan's file name and the id of the session
+// that claimed it for a restore: drafts/<id>.json.claim-<session>. The name
+// is outside drafts/*.json, so no other process lists or restores it while
+// the claim holds.
+const claimMark = ".json.claim-"
+
+// claim takes an orphan for a restore into the box, atomically: of two
+// processes that open one conversation, the rename succeeds for one. by is
+// the claiming session's record id, whose lock tells whether it still runs.
+func (s *store) claim(r *record, by string) (string, error) {
+	path := filepath.Join(s.dir, "drafts", r.ID+claimMark+by)
+	if err := os.Rename(s.draftPath(r.ID), path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// unclaim puts a claimed orphan back, counting a restore that failed.
+func (s *store) unclaim(path string, r *record) {
+	r.RestoreTries++
+	writeDurable(path, r)
+	s.unclaimAsIs(path, r)
+}
+
+// unclaimAsIs puts a claimed orphan back as it was: nothing was pasted.
+func (s *store) unclaimAsIs(path string, r *record) {
+	if err := os.Rename(path, s.draftPath(r.ID)); err != nil {
+		s.warn(err)
+	}
+}
+
+// keepRestored moves a claimed orphan to history once the box read it
+// back: the draft lives on in the reopened session's own record.
+func (s *store) keepRestored(path string, r *record) error {
+	if err := s.archive(r); err != nil {
+		return err
+	}
+	os.Remove(s.lockPath(r.ID))
+	return os.Remove(path)
+}
+
+// dropStaleClaims puts back the orphans claimed by sessions that are gone:
+// one that died between the claim and the read back must not hide the
+// draft.
+func (s *store) dropStaleClaims() {
+	names, _ := filepath.Glob(filepath.Join(s.dir, "drafts", "*"+claimMark+"*"))
+	for _, n := range names {
+		id, by, _ := strings.Cut(filepath.Base(n), claimMark)
+		if s.alive(&record{ID: by}) {
+			continue
+		}
+		if _, err := os.Stat(s.draftPath(id)); err == nil {
+			continue
+		}
+		os.Rename(n, s.draftPath(id))
+	}
+}
+
+// sessionOrphan is the newest orphan an agent left in folder cwd in the
+// conversation id, that restores have not given up on; nil when there is
+// none.
+func (s *store) sessionOrphan(agent, cwd, id string) *record {
+	for _, r := range s.orphans() {
+		if r.agent() == agent && samePath(r.Cwd, cwd) && sessionMatch(r.AgentSession, id) && r.RestoreTries < maxRestoreTries {
+			return r
+		}
+	}
+	return nil
 }

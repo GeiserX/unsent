@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -27,11 +28,12 @@ Usage:
                              the same, for a command whose name does not say
                              which agent it starts (npx, node cli.js, a renamed
                              binary); UNSENT_AGENT=<agent> does the same
-  unsent list [--all] [--here] [--agent <agent>]
+  unsent list [--all] [--here] [--agent <agent>] [--json]
                              list drafts left behind (--all adds cleared ones
                              and earlier versions; --here keeps this folder's,
-                             --agent one agent's)
-  unsent show [--agent <agent>] [N]
+                             --agent one agent's; --json prints a JSON array,
+                             its shape in the README)
+  unsent show [--agent <agent>] [--json] [N]
                              print draft N (default: this folder's newest)
   unsent restore [--agent <agent>] [N]
                              copy draft N to the clipboard and mark it restored
@@ -39,8 +41,8 @@ Usage:
                              list sessions with sent messages, newest first
   unsent log <session> [--copy N]
                              print a session's sent messages (session: a number
-                             from unsent log, or its id); --copy N copies
-                             message N to the clipboard
+                             from unsent log, its id, or the agent's own session
+                             id); --copy N copies message N to the clipboard
   unsent forget --log <id>
                              delete one session's sent log (id: the session id
                              unsent log shows, never a number, which can move)
@@ -65,12 +67,18 @@ Usage:
                              agent hands it
   unsent version
 
-A message you send goes to its session's sent log, not to history.
+A message you send goes to its session's sent log, not to history. A Claude
+Code conversation keeps one log across every run that resumes it.
 UNSENT_ON_SEND=delete keeps nothing of it; UNSENT_ON_SEND_CLAUDE=delete does
 that for one agent, and wins over UNSENT_ON_SEND. A shell line you run keeps
 nothing, since the shell's own history has it; UNSENT_ON_SEND_ZSH=log logs
 it. A shell line you clear goes to history, and the last line of a closed
 shell waits in unsent list.
+
+Reopen a Claude Code conversation that left a draft (--resume, -c, the resume
+picker, /resume) and the draft goes back into its empty box, not sent.
+UNSENT_NOTICE=0 turns off the draft notices and the line under the box; the
+draft still goes back.
 
 UNSENT_OFF=1 runs the agent directly, as if unsent were not there.
 UNSENT_DEBUG_DIR=<folder> logs every key, all output and each save's view
@@ -152,12 +160,21 @@ func buildVersion() string {
 }
 
 // candidates are the drafts the commands work on, newest first: drafts left
-// behind, then (with all) drafts that were cleared or replaced.
+// behind, then (with all) drafts that were cleared or replaced, and the
+// earlier versions of sessions that ended. A version is listed even while
+// its session's draft is still an orphan: that draft may be the one that
+// lost the text the version holds.
 func candidates(st *store, all bool) []*record {
 	out := st.orphans()
 	if all {
 		for _, r := range st.load(true) {
-			if !contains(out, r) && !st.alive(r) && !isDraftFile(st, r) {
+			switch {
+			case contains(out, r):
+			case r.Version:
+				if !st.alive(&record{ID: r.session}) {
+					out = append(out, r)
+				}
+			case !st.alive(r) && !isDraftFile(st, r):
 				out = append(out, r)
 			}
 		}
@@ -182,6 +199,7 @@ func contains(rs []*record, r *record) bool {
 // options are the flags list, show, restore and log take.
 type options struct {
 	all, here bool
+	json      bool   // list and show --json
 	agent     string // "" for every agent
 	copy      int    // log --copy N; 0 when not given
 	rest      []string
@@ -208,6 +226,8 @@ func parseOptions(args []string, allowed ...string) (options, error) {
 			o.all = true
 		case "--here":
 			o.here = true
+		case "--json":
+			o.json = true
 		case "--agent":
 			if i+1 >= len(args) || args[i+1] == "" {
 				return o, fmt.Errorf("--agent needs an agent name")
@@ -235,7 +255,7 @@ func (o options) keeps(r *record, cwd string) bool {
 }
 
 func cmdList(args []string, stdout, stderr io.Writer) int {
-	o, err := parseOptions(args, "--all", "--here", "--agent")
+	o, err := parseOptions(args, "--all", "--here", "--agent", "--json")
 	if err == nil && len(o.rest) > 0 {
 		err = fmt.Errorf("unexpected argument %q", o.rest[0])
 	}
@@ -259,6 +279,13 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 			width = max(width, len(r.agent()))
 		}
 	}
+	if o.json {
+		items := []draftJSON{}
+		for _, i := range shown {
+			items = append(items, jsonOf(st, rs[i], i+1))
+		}
+		return printJSON(stdout, stderr, items)
+	}
 	if len(shown) == 0 {
 		fmt.Fprintln(stdout, "No drafts to recover.")
 		return 0
@@ -275,7 +302,11 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 }
 
 func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
-	o, err := parseOptions(args, "--agent")
+	allowed := []string{"--agent"}
+	if !restore {
+		allowed = append(allowed, "--json")
+	}
+	o, err := parseOptions(args, allowed...)
 	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 2
@@ -320,6 +351,13 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 		}
 	}
 	r := rs[n-1]
+	if o.json {
+		pastes := r.Pastes
+		if pastes == nil {
+			pastes = []string{}
+		}
+		return printJSON(stdout, stderr, showJSON{jsonOf(st, r, n), r.Draft, pastes})
+	}
 	if !restore {
 		fmt.Fprintln(stdout, r.Draft)
 		for _, p := range r.Pastes {
@@ -344,6 +382,87 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 	if n := unplaced(r); n > 0 {
 		// Restoring moved the draft to history, so its number changed.
 		fmt.Fprintf(stderr, "%d paste(s) could not be put back in place: find the draft in `unsent list --all`, and `unsent show <number>` prints them.\n", n)
+	}
+	return 0
+}
+
+// draftFormat is the version of the shape list --json and show --json
+// print, documented in the README. Fields are only added; a rename or a
+// retype bumps it, the rule the records follow.
+const draftFormat = 1
+
+// draftJSON is one draft as list --json prints it. Times are RFC 3339 with
+// the offset they were saved with, "" when unknown.
+type draftJSON struct {
+	Format       int    `json:"format"`
+	N            int    `json:"n"` // the number show and restore take
+	ID           string `json:"id"`
+	Kind         string `json:"kind"` // orphan, history, version or shell
+	Agent        string `json:"agent"`
+	AgentSession string `json:"agent_session"`
+	Folder       string `json:"folder"`
+	Started      string `json:"started"`
+	Updated      string `json:"updated"`
+	Ended        string `json:"ended"`
+	Lines        int    `json:"lines"`
+	Bytes        int    `json:"bytes"`
+	FirstLine    string `json:"first_line"`
+}
+
+// showJSON is one draft as show --json prints it: the list's fields, the
+// draft with its pastes expanded, and the raw paste texts kept with it.
+type showJSON struct {
+	draftJSON
+	Text   string   `json:"text"`
+	Pastes []string `json:"pastes"`
+}
+
+// firstLineMax caps first_line, in characters.
+const firstLineMax = 100
+
+func jsonOf(st *store, r *record, n int) draftJSON {
+	kind := "history"
+	switch {
+	case isShell(r.agent()):
+		kind = "shell"
+	case r.Version:
+		kind = "version"
+	case isDraftFile(st, r):
+		kind = "orphan"
+	}
+	first := ""
+	for l := range strings.SplitSeq(r.Draft, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			first = l
+			break
+		}
+	}
+	if c := []rune(first); len(c) > firstLineMax {
+		first = string(c[:firstLineMax])
+	}
+	return draftJSON{
+		Format: draftFormat, N: n, ID: r.ID, Kind: kind,
+		Agent: r.agent(), AgentSession: r.AgentSession, Folder: r.Cwd,
+		Started: rfc3339(r.Started), Updated: rfc3339(r.Updated), Ended: rfc3339(r.Ended),
+		Lines: strings.Count(r.Draft, "\n") + 1, Bytes: len(r.Draft), FirstLine: first,
+	}
+}
+
+func rfc3339(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
+}
+
+// printJSON writes v indented, with <, > and & left as they are.
+func printJSON(stdout, stderr io.Writer, v any) int {
+	enc := json.NewEncoder(stdout)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
 	}
 	return 0
 }
@@ -406,9 +525,8 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	l := findSent(logs, o.rest[0])
+	l := oneSent(logs, o.rest[0], stderr)
 	if l == nil {
-		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", o.rest[0])
 		return 2
 	}
 	if o.copy > 0 {
@@ -425,31 +543,65 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "Copied message %d, %s, to the clipboard.\n", o.copy, lines(text))
 		return 0
 	}
-	fmt.Fprintf(stdout, "%s in %s, started %s, session %s\n", l.Agent, shortPath(l.Cwd, 60), when(l.Started), l.Session)
+	fmt.Fprintf(stdout, "%s in %s, started %s, session %s", l.Agent, shortPath(l.Cwd, 60), when(l.Started), l.Session)
+	if l.AgentSession != "" {
+		fmt.Fprintf(stdout, ", %s session %s", l.Agent, l.AgentSession)
+	}
+	fmt.Fprintln(stdout)
 	if l.Dropped > 0 {
 		fmt.Fprintf(stdout, "(%d earlier messages were dropped to keep the log under %d MB)\n", l.Dropped, sentMaxBytes>>20)
 	}
+	resumes := l.resumes
+	resumed := func(before int) {
+		for len(resumes) > 0 && resumes[0].after <= before {
+			fmt.Fprintf(stdout, "\n(resumed %s, session %s)\n", when(resumes[0].Resumed), resumes[0].Session)
+			resumes = resumes[1:]
+		}
+	}
 	for i, m := range l.messages {
+		resumed(i)
 		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", i+1, when(m.Time), m.Text)
 		for _, p := range m.Pastes {
 			fmt.Fprintf(stdout, "--- a paste that could not be placed in the message ---\n%s\n", p)
 		}
 	}
+	resumed(len(l.messages))
 	return 0
 }
 
-// findSent picks a sent log by its number in unsent log, or its session id.
-func findSent(logs []*sentLog, arg string) *sentLog {
+// findSent picks sent logs by their number in unsent log, unsent's session
+// id, or the agent's own session id. One run of unsent can start the logs
+// of several conversations (the agent's /resume or /clear), so an id of
+// unsent's can name more than one.
+func findSent(logs []*sentLog, arg string) []*sentLog {
 	if n, err := strconv.Atoi(arg); err == nil {
 		if n >= 1 && n <= len(logs) {
-			return logs[n-1]
+			return logs[n-1 : n]
 		}
 		return nil
 	}
+	var out []*sentLog
 	for _, l := range logs {
-		if l.Session == arg {
-			return l
+		if l.Session == arg || l.AgentSession == arg {
+			out = append(out, l)
 		}
+	}
+	return out
+}
+
+// oneSent is the one sent log arg names, or nil, having said why on stderr.
+func oneSent(logs []*sentLog, arg string, stderr io.Writer) *sentLog {
+	found := findSent(logs, arg)
+	switch len(found) {
+	case 0:
+		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", arg)
+		return nil
+	case 1:
+		return found[0]
+	}
+	fmt.Fprintf(stderr, "unsent: %q started %d conversations' sent logs; name one by the agent's session id:\n", arg, len(found))
+	for _, l := range found {
+		fmt.Fprintf(stderr, "  %s  %s, %d sent\n", l.AgentSession, when(l.Started), len(l.messages))
 	}
 	return nil
 }
@@ -472,9 +624,8 @@ func cmdForget(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	st.pruneSent()
-	l := findSent(st.sentLogs(), args[1])
+	l := oneSent(st.sentLogs(), args[1], stderr)
 	if l == nil {
-		fmt.Fprintf(stderr, "unsent: no sent log %q; see unsent log\n", args[1])
 		return 2
 	}
 	if err := os.Remove(l.path); err != nil {

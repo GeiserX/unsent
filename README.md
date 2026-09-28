@@ -24,6 +24,8 @@ With `unsent`, the next time you start Claude Code in that folder you see this l
 unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to copy it.
 ```
 
+Reopen the conversation you typed it in, with `claude --resume`, `claude -c`, the resume picker or `/resume`, and you don't need the notice. The draft goes back into the empty box on its own, as one paste, and a line under the box says `unsent: put back your draft from 18:42 today, not sent`. Nothing is sent: you decide what to do with it. A new chat, `/clear` or `--fork-session` is another conversation, so it gets the notice and never a paste.
+
 ## Install
 
 With Homebrew on macOS or Linux, available once the tap is live with v0.3:
@@ -60,6 +62,8 @@ unsent setup --undo   # remove the block again
 
 Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude`, into a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, and a function of the same name is left alone. An alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path, skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
 
+`UNSENT_NOTICE=0` turns off the notices and the line under the box, for sessions nobody watches. Drafts still go back into their conversation's box, and a line saying drafts are not being saved still shows.
+
 To run the agent without `unsent` for a while, for example when an agent update confuses it, set `UNSENT_OFF=1`: `unsent` then hands over to the agent directly. `command claude` also skips the wrapper, for one run.
 
 When the agent starts through a command that doesn't carry its name, such as `npx` or a renamed binary, name the agent: `unsent --as claude npx @anthropic-ai/claude-code`, or put the variable in front of that one command: `UNSENT_AGENT=claude unsent npx @anthropic-ai/claude-code`. Don't export `UNSENT_AGENT` in your shell profile: every wrapped command whose name unsent doesn't recognize would then be read as that agent.
@@ -76,6 +80,22 @@ unsent list --here --agent claude   # only Claude Code's drafts from this folder
 
 Each draft remembers the agent and the folder it came from. The notice only offers a draft back to that agent in that folder, and counts the ones left in subfolders. `unsent restore --agent claude` copies that agent's newest draft from this folder, and a number from `unsent list` reaches any draft.
 
+For a script, a launcher or an agent looking for a lost prompt, `unsent list --json` prints the same list, with the same filters, as a JSON array, newest first. `unsent show N --json` prints one draft as an object with the same fields plus its text:
+
+| Field | What it holds |
+| --- | --- |
+| `format` | the version of this shape, now `1` |
+| `n` | the number `show` and `restore` take |
+| `id` | unsent's id for the draft |
+| `kind` | `orphan` (left behind), `history` (cleared or replaced), `version` (an earlier version) or `shell` (a shell's command line) |
+| `agent`, `agent_session` | the agent, and its own id of the conversation, `""` when unknown |
+| `folder` | the folder it was typed in, as a real path |
+| `started`, `updated`, `ended` | RFC 3339 times with the offset, `""` when unknown |
+| `lines`, `bytes`, `first_line` | its size, and its first line with text, cut to 100 characters |
+| `text`, `pastes` | `show` only: the draft with pastes expanded, and the raw text of each paste |
+
+Fields are only ever added. A renamed or retyped field bumps `format`.
+
 ## Your half-typed zsh command line survives too
 
 A long command typed at the zsh prompt and not yet run is lost the same way: the window closes, or Ctrl+C clears it. `unsent setup zsh` also saves that line as you type it, with a few zsh builtins in the same block, so no process starts with the shell and nothing wraps it.
@@ -90,7 +110,7 @@ A line you run with Enter keeps nothing, because zsh's own history has it (`UNSE
 
 ## Sent messages
 
-Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. After you start a new session, the old one's messages are one command away:
+Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. For Claude Code the log belongs to the conversation: resume it (`claude --resume`, `claude -c`, the resume picker or `/resume`) and new messages join the same log, after a line saying when it was resumed, and `unsent log <id>` also takes Claude Code's own session id. After you start a new session, the old one's messages are one command away:
 
 ```sh
 unsent log                 # sessions with sent messages, newest first
@@ -123,6 +143,7 @@ Anything else runs through `unsent` unchanged; it just isn't saved yet.
 2. It keeps a hidden copy of the screen and, every 0.4 seconds, reads the text in the agent's input box off it.
 3. When the text changes, it writes it to disk: a temporary file, flushed with `fsync`, then renamed into place. A power cut leaves the previous save or the new one, never half a file.
 4. When you send the box, the message goes to the session's sent log. When you clear it, the draft moves to history. When the agent exits with text still in the box, the draft stays for `unsent restore`.
+5. Each draft remembers its conversation: Claude Code names it in `sessions/<pid>.json` under its config folder. When you reopen that conversation, `unsent` waits until the box has been on screen and empty for about two seconds, with nothing typed, then pastes the draft in. Any key you press first cancels it. It takes every escape code out of the draft, so nothing in it can end the paste and press Enter. Once a save reads the draft back from the box, the old copy moves to history; if it never reads back, the draft stays where it was. Two terminals that open one conversation get one paste between them.
 
 **One promise.** `unsent` never throws away text you didn't delete. Text in view is read exactly. Text out of sight above or below the box is inferred, and an inference can be wrong, so while a draft is taller than the box every save that loses text first keeps the previous version. Whatever `unsent` gets wrong, a correct copy is in `unsent list --all`, marked "(earlier version)". Those copies are capped at 30 per session and deleted once the prompt is sent.
 
@@ -137,7 +158,7 @@ A few things make that more than a screenshot:
 
 ## Where your drafts live
 
-Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
+Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session, or per conversation for Claude Code. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
 
 ## Limits
 
@@ -150,6 +171,10 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - A draft that changes wholesale, like a prompt recalled with the Up arrow, is saved from what's on screen, and the old draft goes to history.
 - The sent log holds the box as Claude Code last drew it before your Enter. A key typed so fast before Enter that Claude Code never drew it can be missing. Only plain Enter counts as a send for now: Ctrl+Enter, a remapped submit key, or Enter in a keyboard mode that encodes it differently reads as a clear, and the message goes to history instead.
 - Pressing Esc while Claude Code works on a message can put that message back in the box. The sent log still holds it, although Claude Code didn't answer it.
+- A draft with a tab in it isn't pasted back, because Claude Code's box turns each tab into four spaces. It goes to the clipboard instead, and the line under the box says so.
+- A conversation you typed in but never sent can't be resumed, since Claude Code keeps no transcript for it. Its draft only comes back through the notice and `unsent restore`.
+- A draft goes back into the box only when the command line reads as a chat start: `claude` with its own options. Started with a prompt (`claude "fix it"`) or a subcommand, it gets the notice instead. With `--as` or `UNSENT_AGENT` the command's arguments are read the same way, so a launcher started bare or with Claude Code's options restores, and `npx @anthropic-ai/claude-code` gets the notice.
+- The line saying a draft was put back is drawn under the box only when Claude Code runs on the alternate screen. Otherwise the line printed after exit says it.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.
 
 ## Development
