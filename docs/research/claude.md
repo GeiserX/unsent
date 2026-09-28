@@ -4,7 +4,7 @@ Lane: `claude`. Source lane output: `.omc/spec/research/claude.json`. Captures l
 
 **Tags.** `measured` = seen on screen or in bytes, with the capture file named. `measured (no capture)` = the lane reports it, but no capture survives to re-check. `source` = read in the 2.1.282 binary's JS (strings dump `/tmp/unsent-spec-claude/strings.txt`). `docs` = public docs. `guess` = inference.
 
-**Environment of every measurement.** tmux 3.7c at 120x40, `env -i` with `TERM=xterm-256color`, throwaway `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` (so a 401 banner on screen), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_TELEMETRY=1`, no plugins or hooks, empty non-git cwd (`start.sh`). The `TMUX` variable was stripped by `env -i`. Anything about hints, start-up timing or keyboard protocol may differ in the maintainer's real terminal and config. Nothing was submitted.
+**Environment of every measurement in sections 1 to 9.** tmux 3.7c at 120x40, `env -i` with `TERM=xterm-256color`, throwaway `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` (so a 401 banner on screen), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_TELEMETRY=1`, no plugins or hooks, empty non-git cwd (`start.sh`). The `TMUX` variable was stripped by `env -i`. Anything about hints, start-up timing or keyboard protocol may differ in the maintainer's real terminal and config. Nothing was submitted. Section 10 is a later run with its own environment, stated there.
 
 ## 1. The box
 
@@ -80,7 +80,7 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 - **N is per process** [measured]: history shows `#1`…`#13` in one session; the 2.1.280 run restarts at `#1` (`cap280-draft.txt`).
 - **Paste again to expand** [measured, `cp.txt` then `cap-paste-again.txt`]: pasting the same 5-line text a second time turns `[Pasted text #12 +4 lines]` into the inline text, shown once. unsent's tracker then holds two identical pastes; `expand` skips a paste whose text is already in the draft (`paste.go:112`), so this is harmless [source].
 - **Backspace removes a whole placeholder** [measured (no capture)].
-- **Editor ground truth** [measured (no capture) for the placeholder case]: the lane reports that `before [Pasted text #13 +4 lines] after` came out of Ctrl+G as `before q1\nq2\nq3\nq4\nq5 after`. The surviving `editor-copy.txt` is from a later probe (`editor probe text`, 17 bytes, no trailing newline), which confirms only the no-trailing-newline part.
+- **Editor ground truth** [measured (no capture) for the placeholder case]: the lane reports that `before [Pasted text #13 +4 lines] after` came out of Ctrl+G as `before q1\nq2\nq3\nq4\nq5 after`. The surviving `editor-copy.txt` is from a later probe (`editor probe text`, 17 bytes, no trailing newline), which confirms only the no-trailing-newline part. Section 10 later measured the placeholder case byte for byte with `cmp`.
 
 ## 4. Keys
 
