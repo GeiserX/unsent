@@ -125,8 +125,23 @@ unsent log                 # sessions with sent messages, newest first
 unsent log 1               # every message sent in session 1
 unsent log 1 --copy 3      # copy message 3 of it to the clipboard
 unsent log --here --agent claude   # only Claude Code's sessions in this folder
+unsent log --json          # the same list as a JSON array, for a script or an agent
+unsent log 1 --json        # session 1 and all its messages as one JSON object
 unsent forget --log 20260927-101500-4242   # delete one session's sent log, by the id unsent log shows
 ```
+
+`unsent log --json` prints the same list, with the same filters, newest first. `unsent log N --json` prints one session with the same fields, except that `messages` holds the messages themselves instead of their count. Nothing but the JSON goes to the output. The rules of `list --json` hold: fields are only ever added, and a renamed or retyped field bumps `format`.
+
+| Field | What it holds |
+| --- | --- |
+| `format` | the version of this shape, now `1` |
+| `n` | the number `unsent log` takes |
+| `id` | unsent's id for the run that started the log |
+| `agent`, `agent_session` | the agent, and its own id of the conversation, `""` when unknown |
+| `folder` | the folder the session ran in, as a real path |
+| `started`, `updated` | when the session started and when its last message was sent, RFC 3339 times with the offset |
+| `messages` | in the list, how many messages the session sent. For one session, its messages in order, each with `n` (the number `--copy` takes), `sent` (the time), `text` (pastes expanded) and `pastes` (the raw text of each paste that could not be placed). An entry `{"resumed": <time>}` marks where the conversation was reopened. |
+| `first_line` | the last message's first line with text, cut to 100 characters |
 
 `unsent forget --log` takes the session id, not the number: the numbers move when another session sends its first message.
 

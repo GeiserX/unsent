@@ -513,6 +513,24 @@ func readSent(path string) (*sentLog, error) {
 	return l, nil
 }
 
+// walk calls message for each of the log's messages in order, numbered
+// from 1 as --copy takes them, and resume for each resume line, before the
+// first message of the run it marks.
+func (l *sentLog) walk(message func(n int, m sentMessage), resume func(sentResume)) {
+	rs := l.resumes
+	resumed := func(before int) {
+		for len(rs) > 0 && rs[0].after <= before {
+			resume(rs[0])
+			rs = rs[1:]
+		}
+	}
+	for i, m := range l.messages {
+		resumed(i)
+		message(i+1, m)
+	}
+	resumed(len(l.messages))
+}
+
 // sentLogs reads every sent log, newest session first.
 func (s *store) sentLogs() []*sentLog {
 	names, _ := filepath.Glob(filepath.Join(s.dir, "sent", "*.jsonl"))

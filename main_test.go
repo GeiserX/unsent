@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -579,5 +581,151 @@ func TestCLIJSONEmpty(t *testing.T) {
 	testStore(t)
 	if code, out, _ := runCLI("list", "--all", "--json"); code != 0 || out != "[]\n" {
 		t.Fatalf("exit %d, %q", code, out)
+	}
+}
+
+// seedSentJSON writes two sent logs at fixed times in a fixed zone: a
+// Claude Code conversation with a paste it could not place, resumed by a
+// later run, and a newer log kept per run, with no conversation id.
+func seedSentJSON(t *testing.T) *store {
+	t.Helper()
+	st := testStore(t)
+	zone := time.FixedZone("", 2*3600)
+	at := func(min int) time.Time { return time.Date(2026, 9, 28, 17, min, 7, 0, zone) }
+	conv := "0b1c2d3e-4f50-4a6b-8c9d-0e1f2a3b4c5d"
+	first := testRecord("20260928-170000-4242", "claude", "/work/app", at(0))
+	first.AgentSession = conv
+	first.Draft = "\n  Refactor <the> parser & keep\tthe tests\nsecond line"
+	if err := st.logSentAt(first, at(2)); err != nil {
+		t.Fatal(err)
+	}
+	first.Draft, first.Pastes = "see [Pasted text #1 +3 lines]", []string{"a\nb\nc\nd"}
+	if err := st.logSentAt(first, at(5)); err != nil {
+		t.Fatal(err)
+	}
+	later, err := openStore() // another run, which has appended nothing yet
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumed := testRecord("20260928-174000-5151", "claude", "/work/app", at(40))
+	resumed.AgentSession, resumed.Draft = conv, "carry on"
+	if err := later.logSentAt(resumed, at(41)); err != nil {
+		t.Fatal(err)
+	}
+	run := testRecord("20260928-173000-77", "claude", "/work", at(30))
+	run.Draft = "é" + strings.Repeat("x", firstLineMax+5) + "\nrest"
+	if err := st.logSentAt(run, at(31)); err != nil {
+		t.Fatal(err)
+	}
+	return st
+}
+
+// logShowJSON reads log <session> --json back: the list's fields, and each
+// entry of messages as a message or a resume marker.
+type logShowJSON struct {
+	sentLogJSON
+	Messages []struct {
+		sentMessageJSON
+		sentResumeJSON
+	} `json:"messages"`
+}
+
+// log --json and log <session> --json print the shape the README
+// documents: a change to it shows up as a change to a golden file.
+func TestCLILogJSONGolden(t *testing.T) {
+	seedSentJSON(t)
+	code, out, errOut := runCLI("log", "--json")
+	if code != 0 || errOut != "" {
+		t.Fatalf("log --json: exit %d, %q", code, errOut)
+	}
+	golden(t, "log.golden", out)
+	code, out, errOut = runCLI("log", "2", "--json")
+	if code != 0 || errOut != "" {
+		t.Fatalf("log 2 --json: exit %d, %q", code, errOut)
+	}
+	golden(t, "log-session.golden", out)
+}
+
+// log --json lists the rows the plain listing prints, in its order and with
+// its counts, and log <n> --json holds every message of the log, in order,
+// with the resume marker where the plain print has it.
+func TestCLILogJSONAgreesWithPlain(t *testing.T) {
+	st := seedSentJSON(t)
+	list := func(args ...string) []sentLogJSON {
+		t.Helper()
+		code, out, errOut := runCLI(append([]string{"log", "--json"}, args...)...)
+		var items []sentLogJSON
+		if code != 0 || errOut != "" || json.Unmarshal([]byte(out), &items) != nil {
+			t.Fatalf("log --json %v: exit %d, %q, %q", args, code, out, errOut)
+		}
+		return items
+	}
+	items := list()
+	_, plain, _ := runCLI("log")
+	rows := strings.Split(strings.TrimSuffix(plain, "\n"), "\n")
+	if len(items) != 2 || len(rows) != len(items) {
+		t.Fatalf("log --json has %d items, log %d rows:\n%s", len(items), len(rows), plain)
+	}
+	logs := st.sentLogs()
+	for i, it := range items {
+		f := strings.Fields(rows[i])
+		if f[0] != strconv.Itoa(it.N) || f[1] != it.ID || !strings.Contains(rows[i], fmt.Sprintf("%4d sent", it.Messages)) {
+			t.Fatalf("item %+v, row %q", it, rows[i])
+		}
+		l := logs[it.N-1]
+		if it.Messages != len(l.messages) || it.Updated != rfc3339(l.messages[len(l.messages)-1].Time) {
+			t.Fatalf("item %+v, log has %d messages", it, len(l.messages))
+		}
+		_, out, errOut := runCLI("log", strconv.Itoa(it.N), "--json")
+		var one logShowJSON
+		if err := json.Unmarshal([]byte(out), &one); err != nil || errOut != "" {
+			t.Fatalf("log %d --json: %v %q\n%s", it.N, err, errOut, out)
+		}
+		_, text, _ := runCLI("log", strconv.Itoa(it.N))
+		var sent []string
+		at := 0 // where in the plain print the entry before ends
+		for _, m := range one.Messages {
+			entry := "\n(resumed "
+			if m.Resumed == "" {
+				sent = append(sent, m.Text)
+				entry = fmt.Sprintf("\n%d  %s\n%s\n", m.N, when(l.messages[m.N-1].Time), m.Text)
+				if m.N != len(sent) || m.Sent != rfc3339(l.messages[m.N-1].Time) {
+					t.Fatalf("log %d --json: message %+v is not number %d", it.N, m, len(sent))
+				}
+			}
+			k := strings.Index(text[at:], entry)
+			if k < 0 {
+				t.Fatalf("log %d: %q not after byte %d of the plain print:\n%s", it.N, entry, at, text)
+			}
+			at += k + len(entry)
+		}
+		var want []string
+		for _, m := range l.messages {
+			want = append(want, m.Text)
+		}
+		if !slices.Equal(sent, want) || strings.Count(text, "\n(resumed ") != len(one.Messages)-len(sent) {
+			t.Fatalf("log %d --json messages %q, want %q", it.N, sent, want)
+		}
+		one.sentLogJSON.Messages = len(sent)
+		if one.sentLogJSON != it {
+			t.Fatalf("log %d --json %+v, want %+v", it.N, one.sentLogJSON, it)
+		}
+	}
+	if got := list("--agent", "claude"); !slices.Equal(got, items) {
+		t.Fatalf("log --json --agent claude %+v", got)
+	}
+	if got := list("--agent", "codex"); got == nil || len(got) != 0 {
+		t.Fatalf("no match: %+v, want an empty array", got)
+	}
+	if code, _, _ := runCLI("log", "1", "--copy", "1", "--json"); code != 2 {
+		t.Fatalf("log --copy --json: exit %d, want 2", code)
+	}
+}
+
+// With nothing sent, log --json is an empty array, not a sentence.
+func TestCLILogJSONEmpty(t *testing.T) {
+	testStore(t)
+	if code, out, errOut := runCLI("log", "--json"); code != 0 || out != "[]\n" || errOut != "" {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
 	}
 }

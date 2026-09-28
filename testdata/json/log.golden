@@ -1,0 +1,26 @@
+[
+  {
+    "format": 1,
+    "n": 1,
+    "id": "20260928-173000-77",
+    "agent": "claude",
+    "agent_session": "",
+    "folder": "/work",
+    "started": "2026-09-28T17:30:07+02:00",
+    "updated": "2026-09-28T17:31:07+02:00",
+    "messages": 1,
+    "first_line": "éxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+    "format": 1,
+    "n": 2,
+    "id": "20260928-170000-4242",
+    "agent": "claude",
+    "agent_session": "0b1c2d3e-4f50-4a6b-8c9d-0e1f2a3b4c5d",
+    "folder": "/work/app",
+    "started": "2026-09-28T17:00:07+02:00",
+    "updated": "2026-09-28T17:41:07+02:00",
+    "messages": 3,
+    "first_line": "carry on"
+  }
+]
