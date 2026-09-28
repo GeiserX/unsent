@@ -423,6 +423,14 @@ func seedJSON(t *testing.T) *store {
 	if err := st.keepVersion(version); err != nil {
 		t.Fatal(err)
 	}
+	// The copy's file name is its id; fix the time keepVersion put in it.
+	names, _ := filepath.Glob(filepath.Join(st.dir, "history", "v-"+version.ID+"-*.json"))
+	if len(names) != 1 {
+		t.Fatalf("version files %v", names)
+	}
+	if err := os.Rename(names[0], filepath.Join(st.dir, "history", "v-"+version.ID+"-20260928-182007.000000.json")); err != nil {
+		t.Fatal(err)
+	}
 	return st
 }
 
@@ -504,6 +512,65 @@ func TestCLIJSONNumbersAndFilters(t *testing.T) {
 	}
 	if code, _, _ := runCLI("restore", "--json"); code != 2 {
 		t.Fatalf("restore --json: exit %d, want 2 (unknown option)", code)
+	}
+}
+
+// A save that lost text out of sight kept the long text as a version, and
+// the window then closed: the orphan holds the short text. Both versions
+// and the orphan are listed, each with its own n and id, show reaches the
+// lost text, and restoring a version leaves the orphan in place.
+func TestCLIListsVersionsOfAnOrphan(t *testing.T) {
+	st := testStore(t)
+	r := newRecord([]string{"claude"}, "/work")
+	r.ID, r.Ended = "sess", time.Now()
+	for _, d := range []string{"the long text\nthat scrolled away", "the long text\nthat scrolled away\nand more"} {
+		r.Draft = d
+		if err := st.keepVersion(r); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Millisecond) // version file names carry the time
+	}
+	r.Draft = "short"
+	if err := st.write(r); err != nil {
+		t.Fatal(err)
+	}
+	_, out, _ := runCLI("list", "--all", "--json")
+	var items []draftJSON
+	if err := json.Unmarshal([]byte(out), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 || items[0].Kind != "orphan" || items[1].Kind != "version" || items[2].Kind != "version" {
+		t.Fatalf("list --all --json: %s", out)
+	}
+	ids := map[string]bool{}
+	for _, it := range items {
+		ids[it.ID] = true
+	}
+	if len(ids) != 3 {
+		t.Fatalf("ids not unique: %s", out)
+	}
+	for _, it := range items[1:] {
+		if _, text, _ := runCLI("show", strconv.Itoa(it.N)); !strings.HasPrefix(text, "the long text\nthat scrolled away") {
+			t.Fatalf("show %d: %q", it.N, text)
+		}
+	}
+	bin := t.TempDir()
+	os.WriteFile(filepath.Join(bin, "pbcopy"), []byte("#!/bin/sh\n/bin/cat >/dev/null\n"), 0o755)
+	os.WriteFile(filepath.Join(bin, "wl-copy"), []byte("#!/bin/sh\n/bin/cat >/dev/null\n"), 0o755)
+	t.Setenv("PATH", bin)
+	if code, _, errOut := runCLI("restore", strconv.Itoa(items[1].N)); code != 0 {
+		t.Fatalf("restore: exit %d, %q", code, errOut)
+	}
+	if !isDraftFile(st, r) {
+		t.Fatal("restoring a version removed its session's orphan")
+	}
+	// While the session runs, its versions stay out of the list.
+	if err := st.hold(r); err != nil {
+		t.Fatal(err)
+	}
+	defer st.release()
+	if _, out, _ := runCLI("list", "--all"); strings.Contains(out, "earlier version") {
+		t.Fatalf("a live session's versions are listed:\n%s", out)
 	}
 }
 

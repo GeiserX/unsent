@@ -63,6 +63,10 @@ type record struct {
 	// Version marks a safety copy: an earlier version of a live draft, kept
 	// because a later save lost text out of sight.
 	Version bool `json:"version,omitempty"`
+	// session is, for a safety copy load read, the id of the session it
+	// was kept from: the id its file holds. load gives the copy its file
+	// name as ID, so every copy is a draft of its own.
+	session string
 	// RestoreTries counts the restores of this orphan into its reopened
 	// session that were not read back (see restore.go).
 	RestoreTries int `json:"restore_tries,omitempty"`
@@ -394,6 +398,10 @@ func (s *store) load(withHistory bool) []*record {
 			var r record
 			if json.Unmarshal(data, &r) != nil || strings.TrimSpace(r.Draft) == "" {
 				continue
+			}
+			if r.Version {
+				r.session = r.ID
+				r.ID = strings.TrimSuffix(filepath.Base(n), ".json")
 			}
 			out = append(out, &r)
 		}

@@ -160,12 +160,21 @@ func buildVersion() string {
 }
 
 // candidates are the drafts the commands work on, newest first: drafts left
-// behind, then (with all) drafts that were cleared or replaced.
+// behind, then (with all) drafts that were cleared or replaced, and the
+// earlier versions of sessions that ended. A version is listed even while
+// its session's draft is still an orphan: that draft may be the one that
+// lost the text the version holds.
 func candidates(st *store, all bool) []*record {
 	out := st.orphans()
 	if all {
 		for _, r := range st.load(true) {
-			if !contains(out, r) && !st.alive(r) && !isDraftFile(st, r) {
+			switch {
+			case contains(out, r):
+			case r.Version:
+				if !st.alive(&record{ID: r.session}) {
+					out = append(out, r)
+				}
+			case !st.alive(r) && !isDraftFile(st, r):
 				out = append(out, r)
 			}
 		}
