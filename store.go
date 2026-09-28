@@ -104,7 +104,21 @@ func stateDir() (string, error) {
 	return filepath.Join(home, ".local", "state", "unsent"), nil
 }
 
+// openStore opens the store with the shell logs imported: every command
+// that reads the store sees the shells' lines too.
 func openStore() (*store, error) {
+	s, err := makeStore()
+	if err != nil {
+		return nil, err
+	}
+	s.importShells()
+	return s, nil
+}
+
+// makeStore makes the store's folders, private, and imports nothing: wrap
+// learns whether the store can open before it starts the agent, and
+// imports once the agent runs.
+func makeStore() (*store, error) {
 	dir, err := stateDir()
 	if err != nil {
 		return nil, err
@@ -118,10 +132,7 @@ func openStore() (*store, error) {
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return nil, err
 	}
-	s := &store{dir: dir}
-	// Every command that reads the store sees the shells' lines too.
-	s.importShells()
-	return s, nil
+	return &store{dir: dir}, nil
 }
 
 func (s *store) draftPath(id string) string {

@@ -67,14 +67,14 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		return handOver(bin, args)
 	}
 
-	st, err := openStore()
+	// Only what decides whether unsent can run the agent comes before it
+	// starts: a launcher that execs unsent and watches that pid should see
+	// the agent's child at once. The store's folders are made here and read
+	// only once the agent runs.
+	st, err := makeStore()
 	if err != nil {
 		return broken("cannot open the draft folder", err)
 	}
-	cwd, _ := os.Getwd()
-	cwd = realPath(cwd)
-	fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
-
 	cmd := exec.Command(bin, args[1:]...)
 	cols, rows := termSize(in)
 	ptmx, err := startPty(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
@@ -82,6 +82,15 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		return broken("cannot start a pseudo-terminal", err)
 	}
 	defer ptmx.Close()
+
+	// The agent runs. Its output waits in the pseudo-terminal until the
+	// reader below starts, so what unsent prints until then still comes
+	// before the agent's first paint, as when this ran before the start.
+	// The import can wait on another unsent's import, and prunes history.
+	st.importShells()
+	cwd, _ := os.Getwd()
+	cwd = realPath(cwd)
+	fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
 
 	s := &session{
 		rec:    newRecord(args, cwd),

@@ -72,6 +72,10 @@ func fakeAgent() {
 		fmt.Printf("%s (Fake Agent)\n", v)
 		return
 	}
+	// UNSENT_FAKE_STARTED names a file the agent creates as it starts.
+	if f := os.Getenv("UNSENT_FAKE_STARTED"); f != "" {
+		os.WriteFile(f, nil, 0o600)
+	}
 	// UNSENT_FAKE_HUP makes the agent hang itself up at start: it lives on
 	// only if it was started with the hang-up ignored.
 	if os.Getenv("UNSENT_FAKE_HUP") == "1" {
@@ -713,6 +717,75 @@ func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
 	}
 }
 
+// A launcher that execs unsent and watches that pid sees the agent start at
+// once: the slow work waits until the agent runs. The shell import, which
+// waits while another unsent imports, holds up nothing, and the notice
+// still reaches the terminal before the agent's first paint.
+func TestWrapStartsTheAgentBeforeTheSlowWork(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("UNSENT_HOME", home)
+	work := realPath(t.TempDir())
+	t.Chdir(work)
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedAs(t, st, "left", "claude", work, "a draft left behind", 5)
+	notice := strings.TrimSuffix(orphanNotice(st, work, "claude"), "\n")
+	if notice == "" {
+		t.Fatal("no notice for the seeded draft")
+	}
+	// A shell log gives the import something to do (another host's, which it
+	// leaves in place), and the test holds the import lock as another
+	// unsent importing would.
+	shell := filepath.Join(home, "shell")
+	if err := os.MkdirAll(shell, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(shell, "zsh-elsewhere-1-1.log"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.OpenFile(filepath.Join(shell, ".import.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	started := filepath.Join(t.TempDir(), "started")
+	whileLocked := make(chan bool, 1)
+	go func() {
+		defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+		for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Stat(started); err == nil {
+				whileLocked <- true
+				return
+			}
+		}
+		whileLocked <- false
+	}()
+
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	code, shown := unsentClaude(t, []string{self, "claude"}, bin, []string{"UNSENT_FAKE_STARTED=" + started}, nil)
+	if !<-whileLocked {
+		t.Fatal("the agent started only once the shell import could run; it should start first")
+	}
+	if code != 3 {
+		t.Fatalf("exit %d, want the agent's 3", code)
+	}
+	if i, box := strings.Index(shown, notice), strings.Index(shown, "❯"); i < 0 || box < i {
+		t.Fatalf("terminal %q: want the notice %q before the agent's box", shown, notice)
+	}
+}
+
 // A draft saver that cannot run never costs the session: with the draft
 // folder unwritable, or no pseudo-terminal to be had, unsent says so in one
 // line and hands over, so the agent runs to the end on the terminal and its
@@ -1111,7 +1184,9 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 	if said := agent(3, `exit 3`); said != line+line {
 		t.Fatalf("stderr %q, want the notice before and after a failed exit", said)
 	}
-	if said := agent(0, `rm "$1"`, st.draftPath("left")); said != line {
+	// The agent's output waits in the pseudo-terminal until the notice is
+	// out, so a write larger than its buffer ends only after that.
+	if said := agent(0, `head -c 262144 /dev/zero; rm "$1"`, st.draftPath("left")); said != line {
 		t.Fatalf("stderr %q, want the notice only before: the draft was restored meanwhile", said)
 	}
 }
