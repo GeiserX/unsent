@@ -731,8 +731,8 @@ func TestWrapRestoreOnReopen(t *testing.T) {
 		argv       []string
 		start, nxt string
 		keys       []string
-		// idle waits in the first conversation long enough for its own
-		// try, as a new chat left alone does, before the keys.
+		// idle waits in the first conversation until it had its own try,
+		// as a new chat left alone does, before the keys.
 		idle bool
 	}{
 		{"--resume <id>", []string{"claude", "--resume", "conv-a"}, "", "", nil, false},
@@ -750,16 +750,16 @@ func TestWrapRestoreOnReopen(t *testing.T) {
 			if c.argv[0] == "--as" {
 				command = c.argv[2]
 			}
-			_, st, screen, stderr := runWrappedIn(t, home, command, c.argv, func(type_ func(string)) {
+			_, st, screen, stderr := runWrappedWith(t, home, command, c.argv, func(w *wrapRun) {
 				if c.idle {
-					time.Sleep(6 * saveInterval)
+					w.waitDecided()
 				}
 				for _, k := range c.keys {
-					type_(k)
+					w.type_(k)
 				}
 				waitFor(t, "the restore to read back", func() bool { return inHistory(st, "left in conv a\nsecond line") })
-				time.Sleep(2 * saveInterval) // the line under the box
-				type_("\x04")
+				w.waitShown("unsent: put back your draft from") // the line under the box
+				w.type_("\x04")
 			})
 			if orphanAt(st, "old-a") != nil {
 				t.Fatal("the orphan is still there")
@@ -789,10 +789,12 @@ func TestWrapRestoreOnTheMainScreen(t *testing.T) {
 	quickRestore(t)
 	t.Setenv("UNSENT_FAKE_MAIN_SCREEN", "1")
 	home, st := wrapWithOrphan(t, "back on the main screen")
-	_, st, screen, stderr := runWrappedIn(t, home, "claude", []string{"claude", "--resume", "conv-a"}, func(type_ func(string)) {
+	_, st, screen, stderr := runWrappedWith(t, home, "claude", []string{"claude", "--resume", "conv-a"}, func(w *wrapRun) {
 		waitFor(t, "the restore to read back", func() bool { return inHistory(st, "back on the main screen") })
-		time.Sleep(2 * saveInterval)
-		type_("\x04")
+		// By the next save the restore's line was drawn, if it were going
+		// to be.
+		w.waitSave()
+		w.type_("\x04")
 	})
 	if strings.Contains(screen, "unsent: put back") || !strings.Contains(stderr, "unsent: put back your draft from") {
 		t.Fatalf("screen %q, stderr %q", screen, stderr)
@@ -805,9 +807,9 @@ func TestWrapNoRestoreThroughALauncherWithAPrompt(t *testing.T) {
 	quickRestore(t)
 	home, _ := wrapWithOrphan(t, "left in conv a")
 	t.Setenv("UNSENT_FAKE_SESSION", "conv-a")
-	_, st, _, stderr := runWrappedIn(t, home, "launcher", []string{"--as", "claude", "launcher", "fix the build"}, func(type_ func(string)) {
-		time.Sleep(6 * saveInterval)
-		type_("\x04")
+	_, st, _, stderr := runWrappedWith(t, home, "launcher", []string{"--as", "claude", "launcher", "fix the build"}, func(w *wrapRun) {
+		w.waitDecided()
+		w.type_("\x04")
 	})
 	if o := orphanAt(st, "old-a"); o == nil || o.RestoreTries != 0 || strings.Contains(stderr, "put back") {
 		t.Fatalf("restored through a launcher given a prompt: %+v, %q", o, stderr)
@@ -866,8 +868,9 @@ var noRestoreCases = []struct {
 	{"a prompt argument", "conv-a", []string{"claude", "fix the build"}, nil},
 }
 
-// runNoRestore runs one of noRestoreCases long enough for a restore to fire
-// if it were going to, and reports whether the draft was pasted.
+// runNoRestore runs one of noRestoreCases until the session the agent ends
+// in had its one try at a restore, or cannot have one, and reports whether
+// the draft was pasted.
 func runNoRestore(t *testing.T, c struct {
 	name, start string
 	argv, keys  []string
@@ -875,13 +878,12 @@ func runNoRestore(t *testing.T, c struct {
 	t.Helper()
 	home, _ := wrapWithOrphan(t, "left in conv a")
 	t.Setenv("UNSENT_FAKE_SESSION", c.start)
-	_, st, screen, stderr := runWrappedIn(t, home, "claude", c.argv, func(type_ func(string)) {
+	_, st, screen, stderr := runWrappedWith(t, home, "claude", c.argv, func(w *wrapRun) {
 		for _, k := range c.keys {
-			type_(k)
+			w.type_(k)
 		}
-		// Three empty reads at the 0.4 s tick, and margin.
-		time.Sleep(6 * saveInterval)
-		type_("\x04")
+		w.waitDecided()
+		w.type_("\x04")
 	})
 	o := orphanAt(st, "old-a")
 	return o == nil || o.RestoreTries != 0 || strings.Contains(screen, "left in conv a") || strings.Contains(stderr, "put back"), stderr
@@ -907,10 +909,12 @@ func TestWrapRestoredDraftNeverSubmits(t *testing.T) {
 	verifyWait = time.Hour
 	t.Cleanup(func() { verifyWait = old })
 	home, st := wrapWithOrphan(t, "first\x1b[201~\rsecond")
-	_, st, screen, _ := runWrappedIn(t, home, "claude", []string{"claude", "--resume", "conv-a"}, func(type_ func(string)) {
+	_, st, screen, _ := runWrappedWith(t, home, "claude", []string{"claude", "--resume", "conv-a"}, func(w *wrapRun) {
 		waitFor(t, "the paste", func() bool { return orphanAt(st, "old-a") == nil })
-		time.Sleep(3 * saveInterval)
-		type_("\x04")
+		// The paste drawn in the box, and a save that read it.
+		w.waitShown("second")
+		w.waitSave()
+		w.type_("\x04")
 	})
 	if logs := st.sentLogs(); len(logs) != 0 {
 		t.Fatalf("sent: %+v", logs[0].messages)

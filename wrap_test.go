@@ -66,6 +66,14 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	os.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	// A binary built with -race sleeps a second before it exits, so that a
+	// race report another goroutine is printing can finish. Every fake
+	// agent and every unsent this binary starts is one, and a test waits
+	// for each to exit: 100 ms still lets a report finish, and saves most
+	// of that second per run.
+	if raceEnabled {
+		os.Setenv("GORACE", strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=100"))
+	}
 	code := m.Run()
 	os.RemoveAll(cfg)
 	os.Exit(code)
@@ -340,6 +348,59 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 // can share one.
 func runWrappedIn(t *testing.T, home, command string, argv []string, script func(type_ func(string))) (code int, st *store, screen, stderr string) {
 	t.Helper()
+	return runWrappedWith(t, home, command, argv, func(w *wrapRun) { script(w.type_) })
+}
+
+// wrapRun is a wrapped run in progress, as its script sees it: type_ types
+// keys, and the waits end on what the wrapper and the agent did.
+type wrapRun struct {
+	t     *testing.T
+	type_ func(string)
+	// screen is everything the terminal showed so far.
+	screen func() string
+	// saved holds when the last timed save to end began, and decided when
+	// the tick began whose restore try left this session's restore decided,
+	// in Unix nanoseconds.
+	saved, decided *atomic.Int64
+}
+
+// waitShown waits for text on the terminal.
+func (w *wrapRun) waitShown(text string) {
+	w.t.Helper()
+	waitFor(w.t, fmt.Sprintf("%q on the screen", text), func() bool { return strings.Contains(w.screen(), text) })
+}
+
+// waitSave waits for a timed save that began at least 100 ms from now to
+// end, by when the wrapper has what the terminal shows now on its shadow
+// screen, and the tick before it has drawn any line it queued.
+func (w *wrapRun) waitSave() {
+	w.t.Helper()
+	after := time.Now().Add(100 * time.Millisecond).UnixNano()
+	waitFor(w.t, "a timed save", func() bool { return w.saved.Load() > after })
+}
+
+// waitDecided waits for a tick that begins from now on to leave the
+// restore decided for the session the agent is in, as it read the session
+// then: this run cannot restore, or the session had its one try. From then
+// on nothing more is put back into it, so a check that no restore came can
+// end there.
+func (w *wrapRun) waitDecided() {
+	w.t.Helper()
+	after := time.Now().UnixNano()
+	waitFor(w.t, "the restore's decision", func() bool { return w.decided.Load() > after })
+}
+
+// restoreDecided reports whether s restores nothing more into the session
+// the agent is in. It runs on the save loop's goroutine, which alone
+// touches s.rs and s.ids.
+func restoreDecided(s *session) bool {
+	return !s.rs.on || s.broken.Load() || s.rs.done && s.rs.id == s.ids.id
+}
+
+// runWrappedWith is runWrappedIn whose script can wait on the run's
+// events.
+func runWrappedWith(t *testing.T, home, command string, argv []string, script func(w *wrapRun)) (code int, st *store, screen, stderr string) {
+	t.Helper()
 	t.Setenv("UNSENT_HOME", home)
 	t.Setenv("UNSENT_FAKE_AGENT", "1")
 	bin := t.TempDir()
@@ -389,13 +450,22 @@ func runWrappedIn(t *testing.T, home, command string, argv []string, script func
 	oldIn, oldOut := os.Stdin, os.Stdout
 	os.Stdin, os.Stdout = term, term
 	defer func() { os.Stdin, os.Stdout = oldIn, oldOut }()
-	// saved holds when the last timed save to end began.
-	var saved atomic.Int64
+	// The restore state a save finds is what the tick before it left: that
+	// tick's try ran after its save, and read the session id then. So a
+	// decision counts from when that earlier save began, never from this
+	// one: a session the agent switched to meanwhile (/clear) is not read
+	// yet. prev is touched only by the save loop's goroutine.
+	var saved, decided atomic.Int64
+	var prev int64
 	oldSave := timedSave
 	timedSave = func(s *session) {
-		began := time.Now()
+		began := time.Now().UnixNano()
+		if restoreDecided(s) {
+			decided.Store(prev)
+		}
+		prev = began
 		oldSave(s)
-		saved.Store(began.UnixNano())
+		saved.Store(began)
 	}
 	defer func() { timedSave = oldSave }()
 	exit := make(chan int, 1)
@@ -410,7 +480,13 @@ func runWrappedIn(t *testing.T, home, command string, argv []string, script func
 	// terminal, by when the wrapper has it on its shadow screen too. A key
 	// the agent draws nothing for, such as Ctrl+Z, waits three save
 	// intervals.
-	script(func(s string) {
+	w := &wrapRun{t: t, saved: &saved, decided: &decided}
+	w.screen = func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return string(shown)
+	}
+	w.type_ = func(s string) {
 		mu.Lock()
 		before := len(shown)
 		mu.Unlock()
@@ -428,7 +504,8 @@ func runWrappedIn(t *testing.T, home, command string, argv []string, script func
 				return
 			}
 		}
-	})
+	}
+	script(w)
 	select {
 	case code = <-exit:
 	case <-time.After(10 * time.Second):
