@@ -273,6 +273,55 @@ The line under the box replaces Claude Code's footer row. Typing after it made C
 
 **On the main screen.** With a `settings.json` holding only a theme, the same binary and environment, at 80x24, Claude Code draws on the main screen: six lines printed before `unsent claude --resume <id>` and unsent's notice stay above the banner, and the box sits lower on the terminal than on unsent's shadow screen, which starts blank. A row number from the shadow screen then names another row of the terminal (on the box's row, in a run before the fix). So unsent draws the line under the box only while the agent is on the alternate screen, and cuts it to the width; on the main screen the restore went in, nothing was drawn over the box, and after exit the terminal read `unsent: put back your draft from 10:30 today, not sent` [measured, one run each]. On this renderer `/exit` and Enter left `/exit` behind as a draft: the exit is not the no-box screen the fullscreen renderer leaves [measured, `drafts/` after the run; why the last read still found the box is not traced].
 
+## 12. Keyboard protocols in real terminals (measured 2026-09-28)
+
+**Environment.** Claude Code 2.1.283 (the binary copied from the MacBook) on a Mac mini with macOS 26.6.1, under `unsent capture claude`, at 120x40. The environment was the one of section 11: `env -i`, scratch `HOME` and `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `HTTPS_PROXY` and `HTTP_PROXY` on a closed local port, `CLAUDE_CODE_MAX_RETRIES=0`, `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`. The terminal's `TERM`, `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `COLORTERM`, `TERMINFO` and `TMUX` were passed through, since Claude Code picks its keyboard mode from them. The config was a copy of a configured install's `settings.json`, its one enabled plugin (Warp's notification plugin) with the install path rewritten, and an empty `CLAUDE.md`, with no credentials. The status line was a stub, and the `SessionStart` hook scripts did not exist on the mini. Terminals: tmux 3.6b with `set -s extended-keys on` and `set -as terminal-features 'xterm*:extkeys'`, driven by `send-keys` with no client attached; Ghostty 1.3.1 with every setting at its default (`--config-default-files=false`), typed at through System Events. Warp was not measured (below). The logs, trimmed to input and to mode and protocol sequences, are in [`testdata/keys/`](../../testdata/keys/README.md), whose README gives the key order.
+
+**What Claude Code pushes, and when.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| With `TERM_PROGRAM=tmux` and `TMUX` set (tmux) or `TERM_PROGRAM=ghostty` (Ghostty), Claude Code writes `ESC[<u ESC[>5u ESC[>4;2m` 0.25 to 0.46 s after start, before its first frame: a kitty pop, kitty flags 5 (disambiguate plus report alternate keys), and modifyOtherKeys level 2. It writes the same three again right after `ESC[?1049h`, and again with the first key typed | measured | `testdata/keys/tmux-extkeys/keys.txt`, `testdata/keys/ghostty/keys.txt` |
+| The push comes before the kitty query `ESC[?u`, so it does not wait for an answer. Ghostty answered `ESC[?5u` (flags 5 on). tmux 3.6b did not answer the query | measured | same |
+| With only `TERM=tmux-256color` (no `TMUX`, no `TERM_PROGRAM`) Claude Code sends the `ESC[?u` query and pushes nothing. That is why section 4 saw no push under tmux: `env -i` had removed `TMUX` | measured | `testdata/keys/tmux-extkeys/no-tmux-env.txt` |
+| The gate is a list of terminals, `["iTerm.app","kitty","WezTerm","ghostty","tmux","windows-terminal","WarpTerminal"]`, checked for the `extendedKeys` capability | source | `strings` of the 2.1.283 binary |
+| At Ctrl+Z and at exit it pops: `ESC[<u`, `ESC[>4m` (twice), with mouse, focus and bracketed paste turned off | measured | same |
+
+**How each key arrived.**
+
+| Key | tmux 3.6b, extended keys on | Ghostty 1.3.1 |
+| --- | --- | --- |
+| Ctrl+W | `ESC[27;5;119~` | `ESC[119;5u` |
+| Ctrl+U | `ESC[27;5;117~` | `ESC[117;5u` |
+| Ctrl+K | `ESC[27;5;107~` | `ESC[107;5u` |
+| Alt+Backspace | `ESC[27;3;127~` | `0x7f`: Option is not Alt under Ghostty's default `macos-option-as-alt`, so this is a plain Backspace |
+| Ctrl+D | `ESC[27;5;100~` | `ESC[100;5u` |
+| Shift+Enter | `ESC[27;2;13~` | `ESC[13;2u` |
+| Ctrl+Z | `ESC[27;5;122~` | `ESC[122;5u` |
+| letters, spaces | plain bytes | plain bytes |
+
+All [measured]. tmux sends modifyOtherKeys form even though it did not answer the kitty query; Ghostty sends kitty CSI-u. With no push, the same keys arrived as `0x17`, `0x15`, `0x0b`, `ESC 0x7f`, `0x04`, `0x0d` and `0x1a` [measured, `no-tmux-env.txt`]. There Shift+Enter was a plain Enter and sent the box to the closed port, so later runs pressed Ctrl+U first to leave the box empty.
+
+**Ctrl+Z.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| Under the push, Ctrl+Z never reached unsent as the lone byte `0x1a`, in either terminal, so unsent did not suspend | measured | `keys.txt` of both |
+| Claude Code took it: it popped the protocols, left the alternate screen and printed `Claude Code has been suspended. Run `fg` to bring Claude Code back.` and `Note: ctrl + z now suspends Claude Code, ctrl + _ undoes input.` | measured | screen after the key, in both |
+| It did not stop. `ps` showed Claude Code `Ss+` and unsent `S+`, and the shell never got the terminal back. `fg` and Enter went to Claude Code and did nothing. The next Ctrl+C arrived as `0x03`, the flags being popped, and ended Claude Code, and unsent with it | measured | `ps`, `keys.txt` |
+| Why it did not stop: Claude Code leads its own session on unsent's pseudo-terminal, so its process group has no parent in that session, and the kernel drops a stop signal to such a group | guess | |
+| With no push, `0x1a` arrived and unsent suspended itself and Claude Code, and the shell printed `zsh: suspended` | measured | `no-tmux-env.txt`, screen |
+
+So the case 2.8 feared happens in both terminals: the session looks suspended, and it is stuck until a Ctrl+C ends it [measured]. That Ctrl+C ends Claude Code, so a draft in the box then would be left only in unsent's last save [guess: the box was empty at Ctrl+Z in these runs].
+
+**Other input that is not a key** [measured, `ghostty/keys.txt`]. Ghostty sent a focus report `ESC[I` at start, and answered Claude Code's queries on input: XTVERSION (`ESC P>|ghostty 1.3.1 ESC \`), `ESC[?5u`, DA1 twice, DECRPM for modes 2026 and 1016 (`ESC[?2026;2$y`, `ESC[?1016;2$y`), a kitty graphics reply (`ESC _Gi=31;OK ESC \`) and a cell size report (`ESC[6;17;8t`). tmux answered with XTVERSION and DA1 only.
+
+**Synchronized output depends on the terminal.** Claude Code asks `ESC[?2026$p` at start. Ghostty answered it and got every frame wrapped in `ESC[?2026h` … `ESC[?2026l`. tmux 3.6b did not answer, and the whole tmux run has no such mark [measured, both captures, counted in the raw logs]. The CLAUDE.md fact that every redraw after a key is wrapped was measured on tmux 3.7c.
+
+**Warp: not measured.** Warp 0.2026.07.29.09.05.02 had never run on the mini. Its first-run screens (Get started, Customize, Choose a theme) took Enter, but the last one, "Create an account", has Enter on Continue and only a mouse click reaches Skip. A System Events `click at` returned Warp's text area and did not press Skip. A permission prompt from another process then took the keyboard focus, and the run was stopped rather than type with that prompt in front. No Warp shell was reached, so there are no Warp bytes. Warp is on the push list, so the likely outcome is a push as in Ghostty; that is a guess until the run is done.
+
+**What this section could not measure.** Warp. iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
+
 ## Risks
 
 - `pastePlaceholder` misses `[...Truncated text #N +M lines...]`, `[Image #N]`, `[Audio #N]`. A box value over 10,000 characters is shown with its middle collapsed [source]; if that text was typed or came back from `$EDITOR`, unsent's paste tracker never saw it as a paste. The previous full draft is still archived by `keepOld` (the new text shares only 1,000 characters with it, so `similar` fails and it goes to history) [source, `wrap.go:538`], but the current draft saves with the literal placeholder [guess].
@@ -284,7 +333,7 @@ The line under the box replaces Claude Code's footer row. Typing after it made C
 
 ## Open questions
 
-1. Does the main REPL push kitty keyboard / modifyOtherKeys in Ghostty, kitty, WezTerm, iTerm2? Measure raw output outside tmux. Highest priority for `deleteKeys`.
+1. Does the main REPL push kitty keyboard / modifyOtherKeys in Ghostty, kitty, WezTerm, iTerm2? Measure raw output outside tmux. Highest priority for `deleteKeys`. Answered for Ghostty and tmux (yes, from start; section 12); Warp, kitty, WezTerm and iTerm2 are still open.
 2. When does the dim `Try "…"` hint show? Needs the real config (or decoding `be`).
 3. Does the `History n/m` label stay after editing a recalled entry?
 4. Does the box ever jump on large moves (start/end of buffer, mouse click) as CLAUDE.md says? Needs a per-step capture.
