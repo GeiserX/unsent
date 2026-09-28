@@ -208,6 +208,21 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 
 Claude Code did not put back the draft left in the box when the window closed: the resumed box was empty [measured, `cap-s2-resume-id.txt`].
 
+**Re-measured on 2.1.283 (2026-09-28).** A v0.5.1 run saw a prompt interrupted with Esc come back in the box on resume. The setup was the one above, with the 2.1.283 binary and 120x40. Each conversation was opened twice after its window was closed with tmux `kill-session`: once with `claude --resume <id>` alone, and once through `unsent claude --resume <id>`. Most runs set `CLAUDE_CODE_MAX_RETRIES=1`, so a send fails within a second; run (a) kept the default ten retries.
+
+| Case | Box at the close | Claude Code alone, 8 s after resume | Through unsent | Sent log | Tag |
+| --- | --- | --- | --- | --- | --- |
+| (a) one failed send, then a second message, Enter, Esc 1.5 s later while it retried | the second message: Esc put it back in the box | empty | empty on the first frame (0.4 s), then unsent pasted the second message; the row under the box read `unsent: put back your draft from 22:16 today, not sent` | both messages, the second at its Enter | measured |
+| (a) the same, Esc 47 ms after Enter | the second message | empty | empty, nothing pasted: unsent had no draft for the conversation | both messages, the second written at the close | measured, 4 of 5 runs; debug log for one |
+| (b) two sends that failed, no Esc | empty | empty | empty, nothing pasted (no draft) | both messages | measured |
+| (b) one send, window closed while it was still retrying | empty (the message sat above the box) | empty | not run; unsent had no draft | the message | measured |
+| (c) one failed send, then a draft typed and never sent | the draft | empty | empty on the first frame, then pasted, with the line under the box | the send only | measured |
+| (c) a new chat with only a typed draft | the draft | `No conversation found with session ID: <id>` | not run | none | measured |
+
+So 2.1.283 behaves as 2.1.282: Claude Code never puts anything back in a resumed box [measured]. What came back in the v0.5.1 run was unsent's restore. Esc during a send puts the message back in the live box, unsent saves it there as a draft, and the draft left at the close is restored on resume. An Esc interrupt also leaves the message in the transcript as a `user` entry and a `{"type":"last-prompt","lastPrompt":"…"}` line, and in `history.jsonl` [measured, `grep` of the transcript].
+
+The fast Esc is a bug in unsent, not a Claude Code fact. Claude Code drew its answer to Enter 21 ms after the key and put the text back 141 ms after it, so no 0.4 s save saw the box empty. unsent's paste tracker keeps a lone Esc at the end of a read as the possible start of `ESC[200~` (`pasteTracker.feed`), so the key log never saw the Esc and the submit stayed armed. The window close leaves Claude Code's exit screen, which has no box, and `session.finish` took that for the `/exit` case: it wrote the draft to the sent log and removed it from `drafts/`. With `UNSENT_ON_SEND=delete` the draft left no trace in unsent's store at all; only Claude Code's own transcript and `history.jsonl` still held it [measured, one run]. When a Right arrow followed the Esc, the draft was kept and restored [measured, one run]. That the held Esc is the cause is [guess from the code and that control run]; it is not fixed here.
+
 **SessionStart hook.** With a `SessionStart` command hook in the scratch `settings.json` that logs its stdin:
 
 - `--resume <id>`, `-c` and a picker choice each fired it once with `{"session_id":<the resumed id>,"transcript_path":…,"cwd":…,"hook_event_name":"SessionStart","source":"resume"}`. A new chat fired it with `"source":"startup"` and a `model` field. The picker's fresh id fired nothing before the choice [measured, `hook-log.jsonl`].
