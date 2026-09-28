@@ -907,6 +907,112 @@ add-zle-hook-widget line-finish _mine_finish
 	}
 }
 
+// zshUsersHooks are hooks of the user's, set before the block, that write
+// each widget's name to $HOME/mine and return 0. Ours run first, and the
+// dispatcher stops at the first widget that returns non-zero, so ours must
+// return 0 on every path for these to run.
+const zshUsersHooks = `autoload -Uz add-zle-hook-widget
+function _mine { print -rn -- "$WIDGET " >>$HOME/mine; return 0 }
+zle -N zle-line-init _mine
+zle -N _mine_redraw _mine
+zle -N _mine_finish _mine
+add-zle-hook-widget line-pre-redraw _mine_redraw
+add-zle-hook-widget line-finish _mine_finish
+`
+
+// minesRan waits for the user's widgets in want to have written to
+// $HOME/mine.
+func minesRan(s *zshSession, want ...string) error {
+	f := filepath.Join(s.home, "mine")
+	var ran string
+	if err := s.await(zshStall, func() bool {
+		b, _ := os.ReadFile(f)
+		ran = string(b)
+		for _, w := range want {
+			if !strings.Contains(ran, w+" ") {
+				return false
+			}
+		}
+		return true
+	}); err != nil {
+		return fmt.Errorf("the user's hooks %q did not all run (%v); they wrote %q", want, err, ran)
+	}
+	return nil
+}
+
+// scenarioUsersHooksWithoutUnsent runs the user's hooks with no unsent on
+// PATH, where every _unsent_put fails: typing, Enter and the next prompt
+// must still run the user's line-pre-redraw, line-finish and line-init.
+func scenarioUsersHooksWithoutUnsent(t *testing.T, hooks string) error {
+	home := t.TempDir()
+	hookFile := filepath.Join(home, "hooks.zsh")
+	if err := os.WriteFile(hookFile, []byte(zshUsersHooks+hooks), 0o644); err != nil {
+		return err
+	}
+	env := []string{"HOME=" + home, "ZDOTDIR=" + home, "PATH=/usr/bin:/bin", "TERM=xterm", "PS1=" + zshPrompt}
+	s := openZsh(t, exec.Command(testZsh(t), "-f", "-i"), env, home, filepath.Join(home, ".local", "state", "unsent", "shell"))
+	s.prompt(0, zshStart)
+	n := s.outLen()
+	s.send("source " + hookFile + "\r")
+	s.prompt(n, zshStart)
+	if err := os.WriteFile(filepath.Join(home, "mine"), nil, 0o644); err != nil {
+		return err
+	}
+	s.echo("echo hi", "echo hi")
+	if err := minesRan(s, "_mine_redraw"); err != nil {
+		return err
+	}
+	s.send("\r")
+	if err := minesRan(s, "_mine_redraw", "_mine_finish", "zle-line-init"); err != nil {
+		return err
+	}
+	if logs := s.logs(); len(logs) != 0 {
+		return fmt.Errorf("a shell with no unsent on PATH wrote logs %v", logs)
+	}
+	return nil
+}
+
+// scenarioUsersHooksOnACursorMove moves the cursor over a saved line, a
+// redraw whose text is unchanged, so ours writes nothing: the user's
+// line-pre-redraw, the kind a syntax highlighter uses, must still run.
+func scenarioUsersHooksOnACursorMove(t *testing.T, hooks string) error {
+	s := startZsh(t, zshUsersHooks+hooks, true)
+	s.line("abc")
+	if err := os.WriteFile(filepath.Join(s.home, "mine"), nil, 0o644); err != nil {
+		return err
+	}
+	s.send("\x1b[D")
+	return minesRan(s, "_mine_redraw")
+}
+
+// TestZshHooksLetTheUsersHooksRun runs the user's hooks after ours with no
+// unsent on PATH and on a cursor move, then again with each of our
+// widgets returning non-zero on that path, where the check must go red.
+func TestZshHooksLetTheUsersHooksRun(t *testing.T) {
+	for _, c := range []struct {
+		name, from, to string
+		scenario       func(*testing.T, string) error
+	}{
+		{"line fails", "    _unsent_put $1 \"$t\" && (( ++_unsent_n ))\n    return 0\n", "    _unsent_put $1 \"$t\" && (( ++_unsent_n ))\n", scenarioUsersHooksWithoutUnsent},
+		{"init fails", "      _unsent_put i \"$PWD\"\n    fi\n    return 0\n", "      _unsent_put i \"$PWD\"\n    fi\n", scenarioUsersHooksWithoutUnsent},
+		{"unchanged redraw fails", `[[ $1 == b && $t == "$_unsent_last" ]] && return 0`, `[[ $1 == b && $t == "$_unsent_last" ]] && return 1`, scenarioUsersHooksOnACursorMove},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if err := c.scenario(t, zshHooks); err != nil {
+				t.Fatal(err)
+			}
+			hooks := strings.Replace(zshHooks, c.from, c.to, 1)
+			if hooks == zshHooks {
+				t.Fatal("the mutation found nothing to change")
+			}
+			err := c.scenario(t, hooks)
+			if err == nil || !strings.Contains(err.Error(), "did not all run") {
+				t.Fatalf("the check did not fail with our widget returning non-zero: %v", err)
+			}
+		})
+	}
+}
+
 // scenarioListHupTrap hangs up a shell whose rc file set trap '...' HUP
 // before the hooks: the user's command runs, the shell stays, and the
 // hooks write no h record over the user's trap.
