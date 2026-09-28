@@ -172,6 +172,63 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 7. The kitty/modifyOtherKeys push reaching the main REPL in the user's terminal (code exists, section 4).
 8. User keybinding remaps.
 
+## 10. Sessions, resume and a restored paste (measured 2026-09-28)
+
+**Environment.** Claude Code 2.1.282 (the binary copied from the MacBook) on a Mac mini, in a scratch folder `/Volumes/Data/unsent-spec.Gni2/` with a private tmux server (`tmux -L unsent-spec -f /dev/null`, 120x40), started by `start.sh` under `env -i` with a scratch `HOME`, a scratch `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL=http://127.0.0.1:9`. Onboarding, the key dialog and the trust dialog were pre-answered in the scratch `.claude.json`. A send fails on the spot with `Connection refused ... (ECONNREFUSED)` and retries until Esc, so nothing left the box and no model replied. Every session id below is from this throwaway config.
+
+**Where the running session's id lives.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| At start, before any key, Claude Code writes `$CLAUDE_CONFIG_DIR/sessions/<pid>.json`: `{"pid":81545,"sessionId":"fe24d118-…","cwd":…,"startedAt":…,"procStart":…,"version":"2.1.282","kind":"interactive","entrypoint":"cli","status":"idle",…}`. Next to it sits `<pid>.<hash>.key`, a peer token unsent must never read | measured | `find cfg`, `cat cfg/sessions/81545.json` |
+| `pid` in the file is the pid of the process unsent would start (`start.sh` ends in `exec`), so the file is found by the child's pid alone | measured | `ps -o pid,ppid,command -p 81545` |
+| The process holds neither this file nor the transcript open: `lsof -p <pid>` lists only the working directory inside the scratch tree | measured | `lsof -p 81545`, before and after a send |
+| The file lives under the config home: the binary has `function Gj(){return _(we(),"sessions")}`. That it is `~/.claude/sessions/` when `CLAUDE_CONFIG_DIR` is unset follows from the other config files and was not run | source; guess for the default | `strings` of the 2.1.282 binary |
+| A window close (tmux `kill-session`, so SIGHUP) removes both files. After `kill -9` they stay, and the next Claude Code start removed the stale pair | measured | `ls cfg/sessions` after each |
+
+**The transcript.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| No transcript exists until the first send. The first send creates `$CLAUDE_CONFIG_DIR/projects/<cwd with / and . as ->/<sessionId>.jsonl` (`projects/-Volumes-Data-unsent-spec-Gni2-work/fe24d118-….jsonl`), even though the request failed. No model reply is needed | measured | `find cfg` before and after the send |
+| Every transcript line carries the same `sessionId`, and the send's `history.jsonl` entry carries it too, as section 6 says | measured | `history.jsonl` tail, a parse of the transcript |
+| Typing a draft without sending writes no transcript and no `history.jsonl` entry | measured | `find cfg -newer` after typing |
+
+**Resume, every way we could open it.**
+
+| How it was opened | `sessionId` in `sessions/<new pid>.json` | Tag |
+| --- | --- | --- |
+| `claude --resume fe24d118-…` | `fe24d118-…`, the same id. New messages append to the same transcript (16 lines at resume, 20 after one more send, one `sessionId` in the file) | measured |
+| `claude -c` | the same id as the newest conversation | measured |
+| `claude --resume` with no id (the picker) | while the picker is open, a fresh id that matches no conversation. After Down and Enter, the chosen id. A 20 ms poll saw the file change and the box appear in the same poll, 67 ms after Enter. The box is not drawn while the picker is open | measured, `cap-s5-picker.txt` |
+| `/resume` typed in a running session | the same pid switches to the chosen id | measured |
+| `/clear` | the same pid gets a new id, and its transcript is created at once (5 lines, no message) | measured |
+| `claude --resume <id> --fork-session` | a new id | measured |
+| `claude --resume <id>` of a session that typed but never sent | Claude Code prints `No conversation found with session ID: <id>` and exits. Such a session is not in the picker either | measured |
+
+Claude Code did not put back the draft left in the box when the window closed: the resumed box was empty [measured, `cap-s2-resume-id.txt`].
+
+**SessionStart hook.** With a `SessionStart` command hook in the scratch `settings.json` that logs its stdin:
+
+- `--resume <id>`, `-c` and a picker choice each fired it once with `{"session_id":<the resumed id>,"transcript_path":…,"cwd":…,"hook_event_name":"SessionStart","source":"resume"}`. A new chat fired it with `"source":"startup"` and a `model` field. The picker's fresh id fired nothing before the choice [measured, `hook-log.jsonl`].
+- The binary's schema lists `source` as `startup`, `resume`, `clear`, `compact` or `fork`, and the hook's output as `additionalContext`, `initialUserMessage`, `sessionTitle`, `watchPaths` and `reloadSkills` [source]. `initialUserMessage` would send a message, so unsent must never use it [guess from the name].
+- A hook that prints `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"UNSENT-NOTE-TEST"}}` drew nothing on screen. After the next send, the transcript held it as an `attachment` of type `hook_additional_context` [measured]. That the model reads it on that turn is [docs].
+
+**A long draft pasted back.** Drafts made with `python3`: 1,391 characters with 7 line breaks and accented text (`draft-multi.txt`), and a 900-character single line (`draft-one.txt`). Each went in as one bracketed paste with `tmux paste-buffer -p`, then Ctrl+G ran a copy script as `$EDITOR`:
+
+| Case | Box | Ctrl+G copy vs the draft | Tag |
+| --- | --- | --- | --- |
+| Resumed session, 1,391 characters, LF inside the paste (`-r`) | `❯ [Pasted text #1 +7 lines]`, footer `paste again to expand` | byte-identical (`cmp`) | measured, `cap-s7-paste-lf.txt` |
+| Same session, same draft, CR inside the paste (tmux default) | `[Pasted text #2 +7 lines]` | byte-identical; the CRs came back as LF | measured |
+| Same session, 900-character line | `[Pasted text #3]` | byte-identical, and again after a second Ctrl+G round trip; the box keeps the placeholder after each | measured |
+| New session, 1,391 characters pasted on the first frame that showed the empty box (0.21 s after start, 50 ms poll) | `[Pasted text #1 +7 lines]` | byte-identical | measured, `editor-copy-1.txt` |
+
+The copies of the three resumed-session rows were overwritten by the new-session run; the `cmp` results above are what was seen. One run each, on a clean config.
+
+So: the placeholder loses no text. Claude Code holds the exact draft, and Ctrl+G opens all of it in `$EDITOR`. A paste on the first frame of the box was not dropped in this clean environment; the maintainer's config, with plugins and hooks, was not tried.
+
+**What this section could not measure.** Whether a session started through `npx` or a launcher that does not `exec` puts a different pid in the file than unsent's child (only `exec` was run). The default location without `CLAUDE_CONFIG_DIR`. Whether the model acts on `additionalContext` as the docs say, because no model replied. Two terminals resuming one session at the same time.
+
 ## Risks
 
 - `pastePlaceholder` misses `[...Truncated text #N +M lines...]`, `[Image #N]`, `[Audio #N]`. A box value over 10,000 characters is shown with its middle collapsed [source]; if that text was typed or came back from `$EDITOR`, unsent's paste tracker never saw it as a paste. The previous full draft is still archived by `keepOld` (the new text shares only 1,000 characters with it, so `similar` fails and it goes to history) [source, `wrap.go:538`], but the current draft saves with the literal placeholder [guess].
@@ -191,6 +248,8 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 6. Why does Ctrl+L not clear despite `chat:clearInput`?
 7. Does Up restore the pasted text of a cleared placeholder draft (in-memory or `paste-cache`), given `history.jsonl` stores `pastedContents: {}`?
 8. Is the composer API reachable over the per-session socket?
+9. Does a launcher that does not `exec` the agent, or `npx`, leave a different pid in `sessions/<pid>.json` than the process unsent started? (section 10)
+10. Where is `sessions/` when `CLAUDE_CONFIG_DIR` is unset? (section 10)
 
 ## Verification notes
 
@@ -214,4 +273,4 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 - Replaced the lane's "drift" list with a graded table against CLAUDE.md.
 - Removed the lane's "Heads-up" about a relayed user request ("why do you care about the context or weekly? … delete that warning"). It is unrelated to this profile; the lane did not act on it, and the orchestrator should handle it on the main thread.
 
-**Not done (rules of this task).** No agent CLI was launched, so nothing was re-measured live; all checks are against the lane's own captures, the binary's strings and unsent's source.
+**Not done (rules of this task).** No agent CLI was launched in this verification pass (section 10 is a later live run), so nothing here was re-measured live; all checks are against the lane's own captures, the binary's strings and unsent's source.
