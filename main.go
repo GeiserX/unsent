@@ -543,8 +543,14 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 			return 0
 		}
 		for _, i := range shown {
+			// The row previews the last message's first raw line, as it did
+			// before log --json; first_line is the JSON's own field.
 			l, j := logs[i], sentJSONOf(logs[i], i+1)
-			fmt.Fprintf(stdout, "%3d  %s  %-*s  %s  %-24s  %4d sent  %s\n", j.N, j.ID, width, j.Agent, when(l.Started), shortPath(l.Cwd, 24), j.Messages, preview(j.FirstLine, 40))
+			last := ""
+			if n := len(l.messages); n > 0 {
+				last, _, _ = strings.Cut(l.messages[n-1].Text, "\n")
+			}
+			fmt.Fprintf(stdout, "%3d  %s  %-*s  %s  %-24s  %4d sent  %s\n", j.N, j.ID, width, j.Agent, when(l.Started), shortPath(l.Cwd, 24), j.Messages, preview(last, 40))
 		}
 		return 0
 	}
@@ -614,6 +620,7 @@ type sentLogJSON struct {
 	Updated      string `json:"updated"`    // the last send
 	Messages     int    `json:"messages"`   // how many
 	FirstLine    string `json:"first_line"` // of the last message
+	Dropped      int    `json:"dropped"`    // oldest messages trimmed away
 }
 
 // sentShowJSON is one session as log <session> --json prints it: the
@@ -641,7 +648,7 @@ type sentResumeJSON struct {
 func sentJSONOf(l *sentLog, n int) sentLogJSON {
 	j := sentLogJSON{
 		Format: sentJSONFormat, N: n, ID: l.Session, Agent: l.Agent, AgentSession: l.AgentSession,
-		Folder: l.Cwd, Started: rfc3339(l.Started), Messages: len(l.messages),
+		Folder: l.Cwd, Started: rfc3339(l.Started), Messages: len(l.messages), Dropped: l.Dropped,
 	}
 	if k := len(l.messages); k > 0 {
 		j.Updated, j.FirstLine = rfc3339(l.messages[k-1].Time), firstLine(l.messages[k-1].Text)

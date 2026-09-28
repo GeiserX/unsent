@@ -612,6 +612,23 @@ func seedSentJSON(t *testing.T) *store {
 	if err := later.logSentAt(resumed, at(41)); err != nil {
 		t.Fatal(err)
 	}
+	// The conversation's log was trimmed once: its header counts the
+	// messages that went, as trimSent writes it.
+	path := st.sentPath("claude-" + conv)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	head, rest, _ := strings.Cut(string(data), "\n")
+	var h sentHeader
+	if err := json.Unmarshal([]byte(head), &h); err != nil {
+		t.Fatal(err)
+	}
+	h.Dropped = 3
+	line, _ := json.Marshal(h)
+	if err := os.WriteFile(path, []byte(string(line)+"\n"+rest), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	run := testRecord("20260928-173000-77", "claude", "/work", at(30))
 	run.Draft = "é" + strings.Repeat("x", firstLineMax+5) + "\nrest"
 	if err := st.logSentAt(run, at(31)); err != nil {
@@ -681,7 +698,22 @@ func TestCLILogJSONAgreesWithPlain(t *testing.T) {
 		if err := json.Unmarshal([]byte(out), &one); err != nil || errOut != "" {
 			t.Fatalf("log %d --json: %v %q\n%s", it.N, err, errOut, out)
 		}
+		// The session named by unsent's id, or by the agent's, is the same
+		// object as the one named by its number.
+		names := []string{it.ID}
+		if it.AgentSession != "" {
+			names = append(names, it.AgentSession)
+		}
+		for _, name := range names {
+			if code, byName, errOut := runCLI("log", name, "--json"); code != 0 || errOut != "" || byName != out {
+				t.Fatalf("log %s --json: exit %d, %q\n%s\nwant\n%s", name, code, errOut, byName, out)
+			}
+		}
 		_, text, _ := runCLI("log", strconv.Itoa(it.N))
+		if dropped := fmt.Sprintf("(%d earlier messages were dropped", it.Dropped); strings.Contains(text, "earlier messages were dropped") != (it.Dropped > 0) ||
+			it.Dropped > 0 && !strings.Contains(text, dropped) {
+			t.Fatalf("log %d --json says dropped %d, the plain print:\n%s", it.N, it.Dropped, text)
+		}
 		var sent []string
 		at := 0 // where in the plain print the entry before ends
 		for _, m := range one.Messages {
@@ -719,6 +751,41 @@ func TestCLILogJSONAgreesWithPlain(t *testing.T) {
 	}
 	if code, _, _ := runCLI("log", "1", "--copy", "1", "--json"); code != 2 {
 		t.Fatalf("log --copy --json: exit %d, want 2", code)
+	}
+	// A run that started a second conversation's log makes its id name two
+	// logs: --json prints nothing and the choices go to stderr.
+	other := testRecord(items[1].ID, "claude", "/work/app", time.Now())
+	other.AgentSession, other.Draft = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", "elsewhere"
+	if err := st.logSentAt(other, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := runCLI("log", items[1].ID, "--json")
+	if code != 2 || out != "" || !strings.Contains(errOut, "started 2 conversations") || !strings.Contains(errOut, other.AgentSession) {
+		t.Fatalf("ambiguous id: exit %d, %q, %q", code, out, errOut)
+	}
+}
+
+// The plain row previews the last message's first raw line, collapsed to
+// one line of 40 characters: a message opening on a blank line previews
+// as nothing, and a wide gap inside the line stays one space.
+func TestCLILogPlainPreview(t *testing.T) {
+	st := testStore(t)
+	for _, c := range []struct{ text, row string }{
+		{"\n   hello there\nmore", "   1 sent  \n"},
+		{"a" + strings.Repeat(" ", 150) + "b\nnext", "   1 sent  a b\n"},
+	} {
+		r := testRecord("20260928-180000-1", "claude", "/work", time.Now())
+		r.Draft = c.text
+		if err := st.logSent(r); err != nil {
+			t.Fatal(err)
+		}
+		_, out, _ := runCLI("log")
+		if !strings.HasSuffix(out, c.row) || strings.Count(out, "\n") != 1 {
+			t.Fatalf("message %q: row %q, want it to end %q", c.text, out, c.row)
+		}
+		if code, _, errOut := runCLI("forget", "--log", r.ID); code != 0 {
+			t.Fatalf("forget: exit %d, %q", code, errOut)
+		}
 	}
 }
 
