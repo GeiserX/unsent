@@ -56,6 +56,10 @@ Usage:
                              you type it, for an rc file you keep by hand:
                              eval "$(unsent init zsh)"; unsent setup zsh
                              already writes them
+  unsent hook claude         print a Claude Code SessionStart hook for your
+                             settings.json: reopening a conversation that left
+                             a draft then tells Claude about it, to ask you
+                             before it goes on; unsent never edits the file
   unsent status [zsh|bash]   which agents this shell runs through unsent,
                              which profile each gets, what skips the wrapper,
                              whether the command line is saved, and the
@@ -123,6 +127,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdStatus(args[1:], stdout, stderr)
 	case "init":
 		return cmdInit(args[1:], stdout, stderr)
+	case "hook":
+		return cmdHook(args[1:], os.Stdin, stdout, stderr)
 	case "--as":
 		if len(args) < 3 {
 			fmt.Fprint(stderr, usage)
@@ -430,22 +436,27 @@ func jsonOf(st *store, r *record, n int) draftJSON {
 	case isDraftFile(st, r):
 		kind = "orphan"
 	}
-	first := ""
-	for l := range strings.SplitSeq(r.Draft, "\n") {
-		if l = strings.TrimSpace(l); l != "" {
-			first = l
-			break
-		}
-	}
-	if c := []rune(first); len(c) > firstLineMax {
-		first = string(c[:firstLineMax])
-	}
 	return draftJSON{
 		Format: draftFormat, N: n, ID: r.ID, Kind: kind,
 		Agent: r.agent(), AgentSession: r.AgentSession, Folder: r.Cwd,
 		Started: rfc3339(r.Started), Updated: rfc3339(r.Updated), Ended: rfc3339(r.Ended),
-		Lines: strings.Count(r.Draft, "\n") + 1, Bytes: len(r.Draft), FirstLine: first,
+		Lines: strings.Count(r.Draft, "\n") + 1, Bytes: len(r.Draft), FirstLine: firstLine(r.Draft),
 	}
+}
+
+// firstLine is a draft's first line with text, trimmed and cut to
+// firstLineMax characters: list --json's first_line, and what the Claude
+// Code hook's note quotes.
+func firstLine(draft string) string {
+	for l := range strings.SplitSeq(draft, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			if c := []rune(l); len(c) > firstLineMax {
+				return string(c[:firstLineMax])
+			}
+			return l
+		}
+	}
+	return ""
 }
 
 func rfc3339(t time.Time) string {

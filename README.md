@@ -96,6 +96,14 @@ For a script, a launcher or an agent looking for a lost prompt, `unsent list --j
 
 Fields are only ever added. A renamed or retyped field bumps `format`.
 
+### A note for Claude Code when you reopen a conversation
+
+```sh
+unsent hook claude    # prints a SessionStart hook for Claude Code's settings.json
+```
+
+It prints the JSON to add to `~/.claude/settings.json` (or `settings.json` in `$CLAUDE_CONFIG_DIR`), next to any hooks you already have. `unsent` never edits that file. When you reopen a conversation that left a draft, the hook gives Claude one line to read with your next message: `unsent` kept a draft for this conversation, from when, how many lines, and its first line, and Claude should ask you whether to continue with it, not act on it. That first line, cut to 100 characters, goes to Claude with whatever you send next; the rest of the draft never does. Nothing is drawn on screen and nothing is sent for you. A new chat, `/clear`, a compact, a fork or a conversation with no draft gets no note. `UNSENT_NOTICE=0` leaves the note on, since installing the hook is how you asked for it. The hook names `unsent` by its full path, so run `unsent hook claude` again if `unsent` moves.
+
 ## Your half-typed zsh command line survives too
 
 A long command typed at the zsh prompt and not yet run is lost the same way: the window closes, or Ctrl+C clears it. `unsent setup zsh` also saves that line as you type it, with a few zsh builtins in the same block, so no process starts with the shell and nothing wraps it.
