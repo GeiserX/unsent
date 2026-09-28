@@ -71,7 +71,16 @@ import (
 //
 // The hooks' functions run under emulate -L zsh, and add-zle-hook-widget
 // is loaded under zsh emulation, because its own dispatcher fails under a
-// user's sh_glob. TRAPHUP is set when the first log opens, so it wraps a
+// user's sh_glob. That dispatcher runs a hook's widgets in the order of the
+// numbers in its widgets style ("<n>:<widget>" under the zle-<hook>
+// context, 0 for a zle-<hook> widget the user defined directly) and stops
+// at the first that returns non-zero, so a user's hook registered before
+// the block that fails would silently keep ours from running. The block
+// gives each of its widgets 0 and moves every other one up by 1, keeping
+// their order; ours all return 0, so the user's still run after them, and
+// a hook added later gets the next number and runs after ours too. A style
+// in any other form is left alone, as zsh says its implementation may
+// change. TRAPHUP is set when the first log opens, so it wraps a
 // TRAPHUP function the rc file defined after the hooks too. A list-form
 // HUP trap (trap '...' HUP, or an empty one that ignores HUP) is left alone,
 // because a TRAPHUP function would replace it; the last redraw's record
@@ -191,9 +200,21 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
   }
   function _unsent_redraw { _unsent_line b }
   function _unsent_finish { _unsent_line s }
-  add-zle-hook-widget line-init _unsent_init
-  add-zle-hook-widget line-pre-redraw _unsent_redraw
-  add-zle-hook-widget line-finish _unsent_finish
+  () {
+    emulate -L zsh
+    local h w e
+    local -a l n
+    for h w; do
+      add-zle-hook-widget $h $w || continue
+      zstyle -a zle-$h widgets l || continue
+      n=(0:$w)
+      for e in $l; do
+        [[ $e == [0-9]*:?* && ${e%%:*} != *[^0-9]* ]] || continue 2
+        [[ ${e#*:} == $w ]] || n+=($(( ${e%%:*} + 1 )):${e#*:})
+      done
+      (( ${#n} == ${#l} )) && zstyle zle-$h widgets $n
+    done
+  } line-init _unsent_init line-pre-redraw _unsent_redraw line-finish _unsent_finish
 fi
 `
 

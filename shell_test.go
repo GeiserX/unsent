@@ -864,6 +864,49 @@ func TestZshHooksUnderUserOptions(t *testing.T) {
 	}
 }
 
+// TestZshHooksRunBeforeAUsersFailingHook registers hooks of the user's
+// before the block that return 1: a zle-line-init widget defined directly
+// and line-pre-redraw and line-finish widgets added with
+// add-zle-hook-widget. zsh's dispatcher stops at the first widget that
+// fails, so the block must put its own first: every record still comes,
+// and the user's widgets still run. It runs again under the options of
+// TestZshHooksUnderUserOptions, set after the user's hooks. There the user
+// loads add-zle-hook-widget under zsh emulation as the block does: loaded
+// plainly, its dispatcher fails under sh_glob for every widget, the
+// user's own included, and prints that at each key.
+func TestZshHooksRunBeforeAUsersFailingHook(t *testing.T) {
+	const mine = `
+function _mine { print -rn -- "$WIDGET " >>$HOME/mine; return 1 }
+zle -N zle-line-init _mine
+zle -N _mine_redraw _mine
+zle -N _mine_finish _mine
+add-zle-hook-widget line-pre-redraw _mine_redraw
+add-zle-hook-widget line-finish _mine_finish
+`
+	for _, c := range []struct{ name, load, opts string }{
+		{"plain", "autoload -Uz add-zle-hook-widget", ""},
+		{"user options", "emulate zsh -c 'autoload -Uz add-zle-hook-widget'", "setopt no_unset ksh_arrays sh_word_split sh_glob no_hash_list_all\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s := startZsh(t, c.load+mine+c.opts+zshHooks, true)
+			from := len(s.records())
+			s.line("echo ran")
+			s.send("\r")
+			s.waitFor("s then i after Enter", func(r []zrec) bool { return s.index(r, s.index(r, from, "s", "echo ran"), "i", "") >= 0 })
+			f := filepath.Join(s.home, "mine")
+			var ran string
+			s.until(zshStall, func() bool {
+				b, _ := os.ReadFile(f)
+				ran = string(b)
+				return strings.Contains(ran, "zle-line-init ") && strings.Contains(ran, "_mine_redraw ") && strings.Contains(ran, "_mine_finish ")
+			}, func() string { return fmt.Sprintf("the user's hooks ran: %q", ran) })
+			if err := scenarioCtrlC(s); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 // scenarioListHupTrap hangs up a shell whose rc file set trap '...' HUP
 // before the hooks: the user's command runs, the shell stays, and the
 // hooks write no h record over the user's trap.

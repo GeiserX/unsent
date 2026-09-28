@@ -101,7 +101,19 @@ if (( ! ${+_unsent_fd} )) && [[ -o interactive ]] &&
   }
   function _unsent_redraw { _unsent_line b }
   function _unsent_finish { _unsent_line s }
-  add-zle-hook-widget line-init _unsent_init
-  add-zle-hook-widget line-pre-redraw _unsent_redraw
-  add-zle-hook-widget line-finish _unsent_finish
+  () {
+    emulate -L zsh
+    local h w e
+    local -a l n
+    for h w; do
+      add-zle-hook-widget $h $w || continue
+      zstyle -a zle-$h widgets l || continue
+      n=(0:$w)
+      for e in $l; do
+        [[ $e == [0-9]*:?* && ${e%%:*} != *[^0-9]* ]] || continue 2
+        [[ ${e#*:} == $w ]] || n+=($(( ${e%%:*} + 1 )):${e#*:})
+      done
+      (( ${#n} == ${#l} )) && zstyle zle-$h widgets $n
+    done
+  } line-init _unsent_init line-pre-redraw _unsent_redraw line-finish _unsent_finish
 fi
