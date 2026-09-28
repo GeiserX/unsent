@@ -384,9 +384,10 @@ type session struct {
 	prof *profile
 	// ids follows the agent's own session id, nil when the profile reads
 	// none; seen is the id the save read, while it reads the screen of
-	// now, and "" while it reads the screens keys were typed into.
+	// now ("" for none), and nil while it reads the screens keys were
+	// typed into.
 	ids  *sessionTracker
-	seen string
+	seen *string
 }
 
 // input notes one chunk of keys on its way to the agent: the pastes in it,
@@ -548,7 +549,7 @@ func (s *session) save() {
 	// the switch, and a /clear or a picker choice sent from one of them
 	// belongs to the session it was typed in.
 	seen := s.ids.current()
-	s.seen = ""
+	s.seen = nil
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		os.WriteFile(filepath.Join(dir, "screen.txt"), []byte(scr.String()), 0o600)
 	}
@@ -573,7 +574,7 @@ func (s *session) save() {
 	if answered {
 		// Until the agent draws something after a submit key, the screen is
 		// the one that key was typed into, already read above.
-		s.seen = seen
+		s.seen = &seen
 		s.look(scr)
 	}
 }
@@ -638,7 +639,7 @@ func (s *session) look(scr *screen) bool {
 		// above it) is not the agent's answer to a submit key yet. A send
 		// still to come goes to the session it was typed in.
 		s.armed = armed
-		if !armed && s.follow() && s.rec.Draft != "" {
+		if !armed && s.follow(false) && s.rec.Draft != "" {
 			if err := s.store.write(s.rec); err != nil {
 				s.store.warn(err)
 			}
@@ -663,7 +664,7 @@ func (s *session) look(scr *screen) bool {
 	}
 	// The old draft went where its session's drafts go; the new one is in
 	// the session the agent is in now.
-	s.follow()
+	s.follow(true)
 	if draft == "" {
 		s.pastes.reset()
 		s.store.dropVersions(s.rec)
@@ -681,16 +682,23 @@ func (s *session) look(scr *screen) bool {
 
 // follow moves the record to the session this save read, when the agent
 // changed session (a picker choice, /resume, /clear), and reports whether
-// it did. A read that found no id leaves the record where it was.
-func (s *session) follow() bool {
-	if s.seen == "" || s.seen == s.rec.AgentSession {
+// it did. A read that found no id leaves the record where it was, unless
+// the draft changed (changed) after the session ended: that text was
+// typed after it, so it gets no session until the next one is read, and a
+// restore never takes it into the conversation that ended.
+func (s *session) follow(changed bool) bool {
+	if s.seen == nil || *s.seen == s.rec.AgentSession || *s.seen == "" && !changed {
 		return false
 	}
-	s.rec.joined = s.rec.Started
-	if s.rec.AgentSession != "" {
+	switch {
+	case *s.seen == "":
+	case s.rec.joined.IsZero():
+		// The run's first session: it was in it from the start.
+		s.rec.joined = s.rec.Started
+	default:
 		s.rec.joined = time.Now()
 	}
-	s.rec.AgentSession = s.seen
+	s.rec.AgentSession = *s.seen
 	return true
 }
 

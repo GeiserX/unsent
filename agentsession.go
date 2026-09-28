@@ -29,8 +29,11 @@ var sessionIDRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 // sessionTracker follows the session the agent unsent started is in. One
 // process can change session while it runs (Claude Code's resume picker,
 // /resume, /clear), so it is asked again at every save. It keeps the last
-// id it read when a read finds nothing, since the agent removes its file on
-// its way out.
+// id it read when the file of the process unsent started goes, since the
+// agent removes it on its way out. A descendant's file going while that
+// process has none is the end of the descendant's session: a launcher that
+// does not exec the agent can start another one, in another conversation,
+// so the tracker forgets the id and looks for the next one at once.
 type sessionTracker struct {
 	src   *sessionSource
 	root  int       // the pid unsent started
@@ -53,7 +56,7 @@ func newSessionTracker(src *sessionSource, root int, since time.Time) *sessionTr
 }
 
 // current reads the session id afresh and returns it, or the last one read
-// when this read finds none.
+// when this read finds none, or "" once the session it named has ended.
 func (t *sessionTracker) current() string {
 	if t == nil {
 		return ""
@@ -62,6 +65,9 @@ func (t *sessionTracker) current() string {
 	if !found && t.pid != t.root {
 		t.pid = t.root
 		id, found = t.src.read(t.root, t.since)
+		if !found {
+			t.id, t.next, t.wait = "", t.now(), 2*time.Second
+		}
 	}
 	if !found && !t.now().Before(t.next) {
 		// No file for the pid unsent started: a launcher that does not exec

@@ -379,8 +379,9 @@ func (s *store) logSentAt(r *record, when time.Time) error {
 
 // trimSent drops a sent log's oldest messages until it fits in
 // sentMaxBytes, keeping at least the newest, and counts them in the header.
-// A resume line goes with the messages before it; lines of a kind this
-// build does not know stay.
+// A resume line stays while a message of the run it marks is kept, and goes
+// once the next resume line comes before the first message kept; lines of
+// a kind this build does not know stay.
 func trimSent(path string) error {
 	l, err := readSent(path)
 	if err != nil {
@@ -393,43 +394,80 @@ func trimSent(path string) error {
 	body := bytes.Split(bytes.TrimSuffix(data, []byte("\n")), []byte("\n"))[1:]
 	h, _ := json.Marshal(l.sentHeader)
 	size, left := len(h)+1, 0
-	for _, b := range body {
+	kinds := make([]sentLineKind, len(body))
+	for i, b := range body {
 		size += len(b) + 1
-		if isMessage(b) {
+		if kinds[i] = sentKind(b); kinds[i] == sentLineMessage {
 			left++
 		}
 	}
-	cut, drop := 0, 0
-	for cut < len(body) && size > sentMaxBytes {
-		if isMessage(body[cut]) {
-			if left == 1 {
-				break
-			}
-			left--
-			drop++
-		}
-		size -= len(body[cut]) + 1
-		cut++
+	keep := make([]bool, len(body))
+	for i := range keep {
+		keep[i] = true
 	}
-	if drop == 0 {
+	drop := func(i int) {
+		keep[i] = false
+		size -= len(body[i]) + 1
+	}
+	// cut is the first message kept; resume is the last resume line before
+	// it, or -1.
+	cut, resume, dropped := 0, -1, 0
+	settle := func() {
+		for ; cut < len(body) && kinds[cut] != sentLineMessage; cut++ {
+			if kinds[cut] == sentLineResume {
+				if resume >= 0 {
+					// Every message of the run it marks is gone.
+					drop(resume)
+				}
+				resume = cut
+			}
+		}
+	}
+	settle()
+	for size > sentMaxBytes && left > 1 {
+		drop(cut)
+		cut++
+		left--
+		dropped++
+		settle()
+	}
+	if dropped == 0 {
 		return nil
 	}
-	l.Dropped += drop
+	l.Dropped += dropped
 	h, _ = json.Marshal(l.sentHeader)
 	out := append(h, '\n')
-	for _, b := range body[cut:] {
-		out = append(append(out, b...), '\n')
+	for i, b := range body {
+		if keep[i] {
+			out = append(append(out, b...), '\n')
+		}
 	}
 	return writeFileDurable(path, out)
 }
 
-// isMessage reports whether a sent log line is a message (see readSent).
-func isMessage(line []byte) bool {
+// sentLineKind is what one line after a sent log's header holds.
+type sentLineKind int
+
+const (
+	sentLineOther sentLineKind = iota // a later build's, or cut short
+	sentLineMessage
+	sentLineResume
+)
+
+// sentKind tells a sent log line's kind the way readSent does.
+func sentKind(line []byte) sentLineKind {
 	var m struct {
 		sentMessage
 		sentResume
 	}
-	return json.Unmarshal(line, &m) == nil && m.Resumed.IsZero() && !m.Time.IsZero()
+	switch {
+	case json.Unmarshal(line, &m) != nil:
+	case !m.Resumed.IsZero():
+		return sentLineResume
+	case !m.Time.IsZero():
+		return sentLineMessage
+	}
+	return sentLineOther
 }
 
 // pruneSent deletes sent logs not written for sentMaxAge, then the oldest

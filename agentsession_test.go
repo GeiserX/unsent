@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -552,5 +554,201 @@ func TestWrapSentLogPerConversation(t *testing.T) {
 	rs := st.orphans()
 	if len(rs) != 1 || rs[0].Draft != "left in b" || rs[0].AgentSession != "conv-b" {
 		t.Fatalf("orphans %+v", rs)
+	}
+}
+
+// launcherIDs gives a session, or returns, a tracker for a launcher (pid
+// 100) that does not exec the agent: files maps each agent pid below it to
+// the id its file names, and the clock moves only by hand.
+func launcherIDs(t *testing.T, files map[int]string, now *time.Time) *sessionTracker {
+	t.Helper()
+	old := processParents
+	processParents = func() map[int]int { return map[int]int{100: 1, 201: 100, 202: 100} }
+	t.Cleanup(func() { processParents = old })
+	tr := newSessionTracker(&sessionSource{
+		read: func(pid int, _ time.Time) (string, bool) { id, ok := files[pid]; return id, ok },
+		pids: func() []int { return slices.Sorted(maps.Keys(files)) },
+	}, 100, *now)
+	tr.now = func() time.Time { return *now }
+	return tr
+}
+
+// The descendant whose file named the session goes while the launcher
+// runs on: that session ended. The tracker never gives its id again, and
+// finds the next agent's without waiting out the backoff the launcher's
+// own screen built up.
+func TestSessionTrackerDescendantEnds(t *testing.T) {
+	now := time.Now()
+	files := map[int]string{}
+	tr := launcherIDs(t, files, &now)
+	for range 6 { // the launcher's screen: the wait grows to a minute
+		if id := tr.current(); id != "" {
+			t.Fatalf("no agent yet: %q", id)
+		}
+		now = now.Add(time.Minute)
+	}
+	files[201] = "conv-of-d"
+	if id := tr.current(); id != "conv-of-d" {
+		t.Fatalf("first agent: %q", id)
+	}
+	delete(files, 201)
+	if id := tr.current(); id != "" {
+		t.Fatalf("its file gone, the launcher still running: %q", id)
+	}
+	files[202] = "conv-of-d2"
+	if id := tr.current(); id != "" {
+		t.Fatalf("before the next look: %q", id)
+	}
+	now = now.Add(2 * time.Second)
+	if id := tr.current(); id != "conv-of-d2" {
+		t.Fatalf("2 s later: %q", id)
+	}
+}
+
+// Through a session: the draft left in the ended agent's box stays in its
+// conversation, and text typed after that gets no session until the next
+// agent's id is read, so a restore never takes it into the conversation
+// that ended.
+func TestSessionDescendantEndsMidRun(t *testing.T) {
+	s := newSendSession(t, &claude)
+	now := time.Now()
+	files := map[int]string{201: "conv-of-d"}
+	s.ids = launcherIDs(t, files, &now)
+	onDisk := func() record {
+		var rec record
+		data, _ := os.ReadFile(s.store.draftPath(s.rec.ID))
+		json.Unmarshal(data, &rec)
+		return rec
+	}
+	s.draw("typed in d")
+	s.save()
+	delete(files, 201) // the agent exits, its box still on screen
+	s.draw("typed in d")
+	s.save()
+	if rec := onDisk(); rec.AgentSession != "conv-of-d" || rec.Draft != "typed in d" {
+		t.Fatalf("left in d: %q %q", rec.AgentSession, rec.Draft)
+	}
+	files[202] = "conv-of-d2" // the next agent, not read yet
+	s.draw("")
+	s.save()
+	s.draw("typed in d2")
+	s.save()
+	if rec := onDisk(); rec.AgentSession != "" || rec.Draft != "typed in d2" {
+		t.Fatalf("typed before its id was read: %q %q", rec.AgentSession, rec.Draft)
+	}
+	for _, r := range s.store.load(true) {
+		if r.Draft == "typed in d" && r.AgentSession != "conv-of-d" {
+			t.Fatalf("history of d: %q", r.AgentSession)
+		}
+	}
+	now = now.Add(2 * time.Second)
+	s.draw("typed in d2")
+	s.save()
+	if rec := onDisk(); rec.AgentSession != "conv-of-d2" {
+		t.Fatalf("once read: %q", rec.AgentSession)
+	}
+}
+
+// Messages sent in one conversation in one run, and a run that goes to
+// another conversation and back, as /resume there and back does: the log
+// says the run resumed only when it came back.
+func TestSessionResumeLinesInOneRun(t *testing.T) {
+	s := newSendSession(t, &claude)
+	id := "conv-a"
+	fakeIDs(s.session, &id)
+	send := func(text string) {
+		t.Helper()
+		s.draw(text)
+		s.save()
+		s.input([]byte("\r"))
+		s.draw("")
+		s.save()
+	}
+	send("one")
+	send("two")
+	id = "conv-b"
+	send("in b")
+	id = "conv-a"
+	send("back in a")
+	a, err := readSent(s.store.sentPath("claude-conv-a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var texts []string
+	for _, m := range a.messages {
+		texts = append(texts, m.Text)
+	}
+	if !slices.Equal(texts, []string{"one", "two", "back in a"}) || len(a.resumes) != 1 || a.resumes[0].after != 2 ||
+		a.resumes[0].Session != s.rec.ID {
+		t.Fatalf("conv-a: %q, resumes %+v", texts, a.resumes)
+	}
+	b, err := readSent(s.store.sentPath("claude-conv-b"))
+	if err != nil || len(b.messages) != 1 || len(b.resumes) != 0 {
+		t.Fatalf("conv-b: %+v %v", b, err)
+	}
+}
+
+// trimLog writes a sent log from lines after a header, padding the last
+// line's text so the file is sentMaxBytes+over bytes, trims it and reads
+// it back.
+func trimLog(t *testing.T, over int, lines ...string) *sentLog {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "claude-conv.jsonl")
+	head := `{"format":1,"session":"run-1","agent":"claude","agent_session":"conv","cwd":"/w","started":"2026-09-01T12:00:00Z"}` + "\n"
+	body := head
+	for _, l := range lines {
+		body += l + "\n"
+	}
+	last := `{"time":"2026-09-01T12:09:00Z","text":"last %s"}` + "\n"
+	pad := sentMaxBytes + over - len(body) - len(fmt.Sprintf(last, ""))
+	body += fmt.Sprintf(last, strings.Repeat("x", pad))
+	if len(body) != sentMaxBytes+over {
+		t.Fatalf("log is %d bytes", len(body))
+	}
+	os.WriteFile(path, []byte(body), 0o600)
+	if err := trimSent(path); err != nil {
+		t.Fatal(err)
+	}
+	l, err := readSent(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return l
+}
+
+// A trim that drops every message before a resume line keeps the line:
+// the message after it still comes from the run that resumed.
+func TestSentLogTrimAtAResumeLine(t *testing.T) {
+	old := `{"time":"2026-09-01T12:01:00Z","text":"old"}`
+	resume := `{"resumed":"2026-09-01T12:05:00Z","session":"run-2"}`
+	// Over by less than the old message and the resume line together.
+	l := trimLog(t, len(old)+1+5, old, resume)
+	if l.Dropped != 1 || len(l.messages) != 1 || len(l.resumes) != 1 || l.resumes[0].Session != "run-2" || l.resumes[0].after != 0 {
+		t.Fatalf("dropped %d, %d messages, resumes %+v", l.Dropped, len(l.messages), l.resumes)
+	}
+
+	// A resume line and an unknown line at the cut: the resume line whose
+	// run lost every message goes, the next one stays, the unknown line
+	// stays, and only messages count as dropped.
+	first := `{"time":"2026-09-01T12:01:00Z","text":"first"}`
+	second := `{"time":"2026-09-01T12:03:00Z","text":"second"}`
+	l = trimLog(t, len(first)+1+len(second)+1+1,
+		first,
+		`{"resumed":"2026-09-01T12:02:00Z","session":"run-2"}`,
+		second,
+		`{"future":"kind"}`,
+		`{"resumed":"2026-09-01T12:05:00Z","session":"run-3"}`,
+		`{"time":"2026-09-01T12:06:00Z","text":"third"}`,
+	)
+	var texts []string
+	for _, m := range l.messages {
+		texts = append(texts, m.Text[:min(len(m.Text), 5)])
+	}
+	if l.Dropped != 2 || !slices.Equal(texts, []string{"third", "last "}) || len(l.resumes) != 1 ||
+		l.resumes[0].Session != "run-3" || l.resumes[0].after != 0 {
+		t.Fatalf("dropped %d, %q, resumes %+v", l.Dropped, texts, l.resumes)
+	}
+	if data, _ := os.ReadFile(l.path); !strings.Contains(string(data), `{"future":"kind"}`) {
+		t.Fatal("an unknown line was dropped")
 	}
 }
