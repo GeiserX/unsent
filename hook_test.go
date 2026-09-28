@@ -315,3 +315,22 @@ func TestHookUsage(t *testing.T) {
 		}
 	}
 }
+
+// A draft the automatic paste gave up on still gets a note: it is the one
+// the user most needs to hear about, and only the paste has a retry cap.
+func TestHookClaudeNotesADraftThePasteGaveUpOn(t *testing.T) {
+	st := testStore(t)
+	work := realPath(t.TempDir())
+	r := &record{ID: "gave-up", Agent: "claude", AgentSession: hookConv, Cwd: work, Draft: hookDraft, RestoreTries: maxRestoreTries}
+	r.Format, r.Command, r.PID, r.Updated = recordFormat, []string{"claude"}, 4242, time.Now().Add(-time.Hour)
+	r.Started, r.Ended = r.Updated, r.Updated
+	if err := st.write(r); err != nil {
+		t.Fatal(err)
+	}
+	if st.sessionOrphan("claude", work, hookConv) != nil {
+		t.Fatal("the paste has not given up on it")
+	}
+	if why := checkHookOutput(runHook(t, hookJSON(hookConv, work, "resume"))); why != "" {
+		t.Fatalf("no note for a draft the paste gave up on: %s", why)
+	}
+}

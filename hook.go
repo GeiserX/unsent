@@ -129,7 +129,9 @@ func runClaudeHook(stdin io.Reader, stdout io.Writer) {
 	if st == nil {
 		return
 	}
-	r := st.sessionOrphan("claude", in.Cwd, in.SessionID)
+	// The pick the restore makes, without its retry cap: a draft the paste
+	// gave up on is the one the user most needs to hear about.
+	r := st.conversationOrphan("claude", in.Cwd, in.SessionID)
 	if r == nil {
 		return
 	}

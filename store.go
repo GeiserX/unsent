@@ -523,8 +523,18 @@ func (s *store) dropStaleClaims() {
 // conversation id, that restores have not given up on; nil when there is
 // none.
 func (s *store) sessionOrphan(agent, cwd, id string) *record {
+	if r := s.conversationOrphan(agent, cwd, id); r != nil && r.RestoreTries < maxRestoreTries {
+		return r
+	}
+	return nil
+}
+
+// conversationOrphan is the newest orphan an agent left in folder cwd in
+// the conversation id, whether or not restores gave up on it: a draft
+// still waits for the user after its last paste failed.
+func (s *store) conversationOrphan(agent, cwd, id string) *record {
 	for _, r := range s.orphans() {
-		if r.agent() == agent && samePath(r.Cwd, cwd) && sessionMatch(r.AgentSession, id) && r.RestoreTries < maxRestoreTries {
+		if r.agent() == agent && samePath(r.Cwd, cwd) && sessionMatch(r.AgentSession, id) {
 			return r
 		}
 	}
