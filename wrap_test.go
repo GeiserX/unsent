@@ -174,9 +174,19 @@ func fakeAgent() {
 	}
 	os.Stdout.WriteString("\x1b[?2004h")
 	draw()
+	// UNSENT_FAKE_INPUT names a file the agent appends every byte it reads
+	// to, so a test can tell what reached it even when the box shows
+	// nothing for it.
+	var got *os.File
+	if f := os.Getenv("UNSENT_FAKE_INPUT"); f != "" {
+		got, _ = os.OpenFile(f, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	}
 	buf := make([]byte, 4096)
 	for {
 		n, err := os.Stdin.Read(buf)
+		if got != nil && n > 0 {
+			got.Write(buf[:n])
+		}
 		if err != nil {
 			return
 		}
@@ -1600,6 +1610,7 @@ func TestWrapCtrlZSuspendsTheWrapper(t *testing.T) {
 	defer func() { stopSelf = old }()
 	debug := t.TempDir()
 	t.Setenv("UNSENT_DEBUG_DIR", debug)
+	got := agentInput(t)
 	_, st := runWrapped(t, func(type_ func(string)) {
 		type_("before")
 		type_("\x1a")
@@ -1608,6 +1619,10 @@ func TestWrapCtrlZSuspendsTheWrapper(t *testing.T) {
 	})
 	if stops != 1 {
 		t.Fatalf("stopped %d times", stops)
+	}
+	// The agent never gets the key.
+	if in := got(); in != "before after\x04" {
+		t.Fatalf("the agent got %q", in)
 	}
 	rs := st.orphans()
 	if len(rs) != 1 || rs[0].Draft != "before after" {

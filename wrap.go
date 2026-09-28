@@ -169,9 +169,12 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		}
 	}()
 	// A suspend key (Ctrl+Z) can come in any form and anywhere in a read:
-	// the keys before it reach the agent first, the key itself never does,
-	// and the keys after it once the shell resumes unsent. The profile
-	// picks the keys even when the lock failed and nothing is saved.
+	// the keys before it reach the agent first, and the key itself never
+	// does. The keys after it in the same read were typed for the shell,
+	// not the agent, so they are dropped, as the kernel flushes pending
+	// input on its own suspend key; an Enter among them would otherwise
+	// send the draft once resumed. The profile picks the keys even when
+	// the lock failed and nothing is saved.
 	suspend := make(chan chan struct{}, 1)
 	prof := profileFor(agent)
 	stops := suspendKeys(prof)
@@ -197,9 +200,9 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 					resumed := make(chan struct{})
 					suspend <- resumed
 					<-resumed
-				} else {
-					s.forward(rest[at:end], ptmx)
+					break
 				}
+				s.forward(rest[at:end], ptmx)
 				rest = rest[end:]
 			}
 			if err != nil {

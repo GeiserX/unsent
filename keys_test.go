@@ -377,16 +377,35 @@ func TestReportsAreNotKeys(t *testing.T) {
 	}
 }
 
-// Ctrl+Z in kitty form, in the middle of a longer read, suspends unsent
-// once; the agent gets the keys around it and never the key itself, which
-// would show in its box as text.
+// agentInput has the fake agent keep every byte it reads, and returns a
+// reader for them, to call once the run is over. The box cannot tell: the
+// shadow screen shows nothing for an escape code or a lone 0x1a.
+func agentInput(t *testing.T) func() string {
+	t.Helper()
+	f := filepath.Join(t.TempDir(), "input")
+	t.Setenv("UNSENT_FAKE_INPUT", f)
+	return func() string {
+		b, _ := os.ReadFile(f)
+		return string(b)
+	}
+}
+
+// ctrlZForms are Ctrl+Z as a lone byte, in kitty form, as modifyOtherKeys
+// sends it, and in kitty form with Caps Lock on.
+var ctrlZForms = []string{"\x1a", "\x1b[122;5u", "\x1b[27;5;122~", "\x1b[122;69u"}
+
+// Ctrl+Z in any form, in the middle of a longer read, suspends unsent
+// once. The agent gets the keys before it, never the key itself, and not
+// the rest of that read either: those keys were typed for the shell, and
+// the kernel flushes them on its own suspend key too.
 func TestWrapCSIuCtrlZInALongerRead(t *testing.T) {
-	for _, z := range []string{"\x1b[122;5u", "\x1b[27;5;122~", "\x1b[122;69u"} {
+	for _, z := range ctrlZForms {
 		t.Run(fmt.Sprintf("%q", z), func(t *testing.T) {
 			stops := 0
 			old := stopSelf
 			stopSelf = func() { stops++ }
 			defer func() { stopSelf = old }()
+			got := agentInput(t)
 			_, st := runWrapped(t, func(type_ func(string)) {
 				type_("before")
 				type_(" x" + z + "y ")
@@ -396,25 +415,63 @@ func TestWrapCSIuCtrlZInALongerRead(t *testing.T) {
 			if stops != 1 {
 				t.Fatalf("stopped %d times", stops)
 			}
-			if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "before xy after" {
+			if in := got(); in != "before xafter\x04" {
+				t.Fatalf("the agent got %q", in)
+			}
+			if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "before xafter" {
 				t.Fatalf("orphans %+v", rs)
 			}
 		})
 	}
 }
 
-// Inside a paste Ctrl+Z is text, in any form: no suspend.
+// An Enter typed for the shell in the same read as Ctrl+Z never reaches
+// the agent, so the draft is not sent once the shell resumes unsent.
+func TestWrapCtrlZDropsTheShellsKeys(t *testing.T) {
+	for _, z := range ctrlZForms {
+		t.Run(fmt.Sprintf("%q", z), func(t *testing.T) {
+			old := stopSelf
+			stopSelf = func() {}
+			defer func() { stopSelf = old }()
+			got := agentInput(t)
+			_, st := runWrapped(t, func(type_ func(string)) {
+				type_("my draft")
+				type_(z + "ls\r")
+				type_("\x04")
+			})
+			if in := got(); in != "my draft\x04" {
+				t.Fatalf("the agent got %q", in)
+			}
+			for _, l := range st.sentLogs() {
+				if len(l.messages) != 0 {
+					t.Fatalf("sent %+v", l.messages)
+				}
+			}
+			if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "my draft" {
+				t.Fatalf("orphans %+v", rs)
+			}
+		})
+	}
+}
+
+// Inside a paste Ctrl+Z is text, in any form: no suspend, and the agent
+// gets the paste byte for byte.
 func TestWrapCSIuCtrlZInsideAPaste(t *testing.T) {
 	stops := 0
 	old := stopSelf
 	stopSelf = func() { stops++ }
 	defer func() { stopSelf = old }()
+	got := agentInput(t)
+	paste := "\x1b[200~a\x1b[122;5ub\x1a\x1b[27;5;122~c\x1b[201~"
 	runWrapped(t, func(type_ func(string)) {
-		type_("\x1b[200~a\x1b[122;5ub\x1a\x1b[201~")
+		type_(paste)
 		type_("\x04")
 	})
 	if stops != 0 {
 		t.Fatalf("stopped %d times inside a paste", stops)
+	}
+	if in := got(); in != paste+"\x04" {
+		t.Fatalf("the agent got %q", in)
 	}
 }
 
