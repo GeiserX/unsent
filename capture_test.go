@@ -242,25 +242,53 @@ func TestCaptureAsksOnlyTheAgentItsVersion(t *testing.T) {
 // A capture needs a terminal and a command; without them it records nothing.
 func TestCaptureRefuses(t *testing.T) {
 	t.Chdir(t.TempDir())
+	var said strings.Builder
+	if code := run([]string{"capture"}, io.Discard, &said); code != 2 {
+		t.Fatalf("capture with no command: exit %d", code)
+	}
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
 	defer w.Close()
-	old := os.Stdin
-	os.Stdin = r
-	defer func() { os.Stdin = old }()
-	var said strings.Builder
-	for _, args := range [][]string{{"capture"}, {"capture", "sh"}} {
-		if code := run(args, io.Discard, &said); code != 2 {
-			t.Fatalf("%q: exit %d", args, code)
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { user.Close(); tty.Close() }()
+	errLog, err := os.Create(filepath.Join(t.TempDir(), "err.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer errLog.Close()
+	oldExec := execAgent
+	execAgent = func(string, []string) error { return nil }
+	defer func() { execAgent = oldExec }()
+	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
+	defer func() { os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr }()
+	// Each case leaves one of the three off the terminal: stdin on a pipe,
+	// stdout on a pipe, stderr on a file. The command exits by itself, so a
+	// capture that goes ahead by mistake returns 0 and fails here, not hangs.
+	for _, c := range []struct {
+		name            string
+		in, out, errOut *os.File
+	}{
+		{"stdin on a pipe", r, tty, tty},
+		{"stdout on a pipe", tty, w, tty},
+		{"stderr on a file", tty, tty, errLog},
+	} {
+		os.Stdin, os.Stdout, os.Stderr = c.in, c.out, c.errOut
+		code := run([]string{"capture", "sh", "-c", "exit 0"}, io.Discard, &said)
+		os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr
+		if code != 2 {
+			t.Fatalf("capture with %s: exit %d", c.name, code)
 		}
 	}
 	if _, err := os.Stat("testdata"); !os.IsNotExist(err) {
 		t.Fatalf("a refused capture wrote testdata: %v", err)
 	}
-	if !strings.Contains(said.String(), "capture needs a terminal") {
+	if strings.Count(said.String(), "capture needs a terminal") != 3 {
 		t.Fatalf("stderr %q", said.String())
 	}
 }

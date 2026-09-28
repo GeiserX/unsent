@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +25,30 @@ import (
 // The test binary doubles as a fake agent that draws a box like Claude
 // Code's, so the wrapper can be tested end to end without the real thing.
 func TestMain(m *testing.M) {
+	// The test binary as unsent in front of the fake agent: only the
+	// agent it starts is the fake one.
+	if os.Getenv("UNSENT_TEST_RUN") == "wrap" {
+		os.Unsetenv("UNSENT_TEST_RUN")
+		os.Setenv("UNSENT_FAKE_AGENT", "1")
+		if os.Getenv("UNSENT_TEST_PTY") == "fail" {
+			os.Unsetenv("UNSENT_TEST_PTY")
+			startPty = func(*exec.Cmd, *pty.Winsize) (*os.File, error) {
+				return nil, errors.New("forced pty failure")
+			}
+		}
+		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
+	}
+	// The test binary as unsent at its end, after the agent was killed by
+	// signal UNSENT_TEST_KILLED_BY, with the stop signals armed and
+	// disarmed as wrap does.
+	if os.Getenv("UNSENT_TEST_RUN") == "exit" {
+		n, _ := strconv.Atoi(os.Getenv("UNSENT_TEST_KILLED_BY"))
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+		signal.Stop(sigs)
+		killedBy = syscall.Signal(n)
+		exitAs(128 + n)
+	}
 	if os.Getenv("UNSENT_FAKE_AGENT") == "1" {
 		fakeAgent()
 		return
@@ -29,7 +56,7 @@ func TestMain(m *testing.M) {
 	// The test binary as unsent itself, for tests that need it in a
 	// terminal of its own.
 	if os.Getenv("UNSENT_TEST_RUN") == "1" {
-		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
 	os.Exit(m.Run())
 }
@@ -45,6 +72,17 @@ func fakeAgent() {
 		fmt.Printf("%s (Fake Agent)\n", v)
 		return
 	}
+	// UNSENT_FAKE_STARTED names a file the agent creates as it starts.
+	if f := os.Getenv("UNSENT_FAKE_STARTED"); f != "" {
+		os.WriteFile(f, nil, 0o600)
+	}
+	// UNSENT_FAKE_HUP makes the agent hang itself up at start: it lives on
+	// only if it was started with the hang-up ignored.
+	if os.Getenv("UNSENT_FAKE_HUP") == "1" {
+		syscall.Kill(os.Getpid(), syscall.SIGHUP)
+	}
+	// UNSENT_FAKE_STDERR is what the agent writes to its stderr at start.
+	os.Stderr.WriteString(os.Getenv("UNSENT_FAKE_STDERR"))
 	if old, err := term.MakeRaw(0); err == nil {
 		defer term.Restore(0, old)
 	}
@@ -100,7 +138,11 @@ func fakeAgent() {
 				in = ""
 			case in[0] == 4: // Ctrl+D quits
 				return
-			case in[0] == 5: // Ctrl+E quits with an error
+			case in[0] == 5: // Ctrl+E quits with an error, or dies of UNSENT_FAKE_SIGNAL
+				if n, err := strconv.Atoi(os.Getenv("UNSENT_FAKE_SIGNAL")); err == nil {
+					syscall.Kill(os.Getpid(), syscall.Signal(n))
+					time.Sleep(10 * time.Second)
+				}
 				os.Exit(3)
 			case in[0] == 7: // Ctrl+G hands the draft to $VISUAL, then $EDITOR
 				editDraft(strings.Join(draft, ""))
@@ -225,15 +267,10 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 
 	// run wraps on the process's own terminal, so lend it the pair, and
 	// keep what unsent itself prints.
-	errR, errW, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	errOut := make(chan string, 1)
-	go func() { b, _ := io.ReadAll(errR); errOut <- string(b) }()
-	oldIn, oldOut, oldErr := os.Stdin, os.Stdout, os.Stderr
-	os.Stdin, os.Stdout, os.Stderr = term, term, errW
-	defer func() { os.Stdin, os.Stdout, os.Stderr = oldIn, oldOut, oldErr }()
+	said := lendStderr(t)
+	oldIn, oldOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = term, term
+	defer func() { os.Stdin, os.Stdout = oldIn, oldOut }()
 	// saved holds when the last timed save to end began.
 	var saved atomic.Int64
 	oldSave := timedSave
@@ -279,12 +316,71 @@ func runWrappedOut(t *testing.T, command string, argv []string, script func(type
 	case <-time.After(10 * time.Second):
 		t.Fatal("wrapper did not exit")
 	}
-	errW.Close()
-	stderr = <-errOut
+	stderr = said()
 	st, _ = openStore()
 	mu.Lock()
 	defer mu.Unlock()
 	return code, st, string(shown), stderr
+}
+
+// lendStderr makes a terminal the process's stderr, as a shell does, since
+// unsent wraps only when stderr is one too. said puts the old stderr back
+// and returns what was printed on the terminal; raw mode keeps line feeds
+// as written.
+func lendStderr(t *testing.T) (said func() string) {
+	t.Helper()
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := term.MakeRaw(int(tty.Fd())); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var got []byte
+	grew := make(chan struct{}, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := user.Read(buf)
+			mu.Lock()
+			got = append(got, buf[:n]...)
+			mu.Unlock()
+			select {
+			case grew <- struct{}{}:
+			default:
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	old := os.Stderr
+	os.Stderr = tty
+	var once sync.Once
+	restore := func() { once.Do(func() { os.Stderr = old }) }
+	t.Cleanup(func() { restore(); user.Close(); tty.Close() })
+	return func() string {
+		restore()
+		// The terminal keeps order: once the end mark is read, so is
+		// everything printed before it.
+		const end = "\x00end of stderr\x00"
+		tty.WriteString(end)
+		deadline := time.After(10 * time.Second)
+		for {
+			mu.Lock()
+			s := string(got)
+			mu.Unlock()
+			if i := strings.Index(s, end); i >= 0 {
+				return s[:i]
+			}
+			select {
+			case <-grew:
+			case <-deadline:
+				t.Fatalf("stderr never showed the end mark: %q", s)
+			}
+		}
+	}
 }
 
 func TestWrapSavesDraftLeftInTheBox(t *testing.T) {
@@ -458,6 +554,7 @@ func TestWrapEmptyBoxLeavesNothing(t *testing.T) {
 
 func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 	t.Setenv("UNSENT_HOME", t.TempDir())
+	lendStderr(t)
 	user, term, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -473,6 +570,7 @@ func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 }
 
 func TestWrapStepsAsideForPipes(t *testing.T) {
+	lendStderr(t)
 	t.Setenv("UNSENT_HOME", t.TempDir())
 	var ran []string
 	old := execAgent
@@ -490,6 +588,317 @@ func TestWrapStepsAsideForPipes(t *testing.T) {
 	execAgent = func(string, []string) error { return os.ErrPermission }
 	if code := wrap("sh", []string{"sh"}, r, w, nil); code != 126 {
 		t.Fatalf("exit %d on exec failure", code)
+	}
+}
+
+// unsentClaude runs unsent, the command that starts the test binary as
+// unsent claude, in a terminal of its own, with bin, which holds the fake claude, first on PATH and env added
+// to the environment. errLog, when not nil, is where its stderr goes
+// instead. It types hello, waits past a save, quits the fake agent with 3
+// and returns the exit code and everything the terminal showed.
+func unsentClaude(t *testing.T, unsent []string, bin string, env []string, errLog *os.File) (code int, shown string) {
+	t.Helper()
+	state, shown := unsentClaudeState(t, unsent, bin, env, errLog)
+	return state.ExitCode(), shown
+}
+
+// unsentClaudeState is unsentClaude returning how unsent ended, so a test
+// can tell a signal from an exit code.
+func unsentClaudeState(t *testing.T, unsent []string, bin string, env []string, errLog *os.File) (state *os.ProcessState, shown string) {
+	t.Helper()
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { user.Close(); tty.Close() }()
+	pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
+	cmd := exec.Command(unsent[0], unsent[1:]...)
+	cmd.Env = append(append(os.Environ(), "UNSENT_TEST_RUN=wrap", "UNSENT_FAKE_STDERR=to-stderr",
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH")), env...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+	if errLog != nil {
+		cmd.Stderr = errLog
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var out []byte
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := user.Read(buf)
+			mu.Lock()
+			out = append(out, buf[:n]...)
+			mu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}()
+	waitFor := func(want string) {
+		t.Helper()
+		for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
+			mu.Lock()
+			s := string(out)
+			mu.Unlock()
+			if strings.Contains(s, want) {
+				return
+			}
+			if time.Since(start) > 10*time.Second {
+				cmd.Process.Kill()
+				t.Fatalf("the terminal never showed %q: %q", want, s)
+			}
+		}
+	}
+	waitFor("❯")
+	user.WriteString("hello")
+	waitFor("hello")
+	time.Sleep(3 * saveInterval) // a wrapper has saved it by now
+	user.WriteString("\x05")     // the fake agent quits with 3
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("unsent claude did not exit")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	return cmd.ProcessState, string(out)
+}
+
+// claude 2>err.log keeps its redirect: with stdin and stdout on the
+// terminal and stderr on a file, unsent hands over to the agent, so the
+// agent's stderr reaches the file and its exit status comes through. With
+// stderr on the terminal too, the same run is wrapped and saves the draft.
+func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("UNSENT_HOME", home)
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	start := func(errLog *os.File) (int, string) {
+		return unsentClaude(t, []string{self, "claude"}, bin, nil, errLog)
+	}
+
+	errLog, err := os.Create(filepath.Join(t.TempDir(), "err.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer errLog.Close()
+	code, shown := start(errLog)
+	logged, _ := os.ReadFile(errLog.Name())
+	if code != 3 || string(logged) != "to-stderr" || strings.Contains(shown, "to-stderr") {
+		t.Fatalf("stderr on a file: exit %d, file %q, terminal showed it: %v; want 3, the text in the file only",
+			code, logged, strings.Contains(shown, "to-stderr"))
+	}
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rs := st.orphans(); len(rs) != 0 {
+		t.Fatalf("stderr on a file: orphans %+v, want none: unsent should have handed over", rs)
+	}
+
+	code, shown = start(nil)
+	if code != 3 || !strings.Contains(shown, "to-stderr") {
+		t.Fatalf("stderr on the terminal: exit %d, terminal showed it: %v", code, strings.Contains(shown, "to-stderr"))
+	}
+	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" {
+		t.Fatalf("stderr on the terminal: orphans %+v, want the draft: unsent should have wrapped", rs)
+	}
+}
+
+// A launcher that execs unsent and watches that pid sees the agent start at
+// once: the slow work waits until the agent runs. The shell import, which
+// waits while another unsent imports, holds up nothing, and still runs
+// before the notice, which reaches the terminal before the agent's first
+// paint and names the line a dead shell left.
+func TestWrapStartsTheAgentBeforeTheSlowWork(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("UNSENT_HOME", home)
+	work := realPath(t.TempDir())
+	t.Chdir(work)
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedAs(t, st, "left", "claude", work, "a draft left behind", 5)
+	notice := strings.TrimSuffix(orphanNotice(st, work, "claude"), "\n")
+	if notice == "" {
+		t.Fatal("no notice for the seeded draft")
+	}
+	// A dead shell of this host left a line here: only the import at the
+	// start puts it in the start notice (the one after exit imports again).
+	// The test holds the import lock as another unsent importing would.
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", work}, zrec{"b", "make release"})
+	shellLine := "unsent: a zsh line you typed here and did not run is saved"
+	shell := filepath.Join(home, "shell")
+	lock, err := os.OpenFile(filepath.Join(shell, ".import.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	started := filepath.Join(t.TempDir(), "started")
+	whileLocked := make(chan bool, 1)
+	go func() {
+		defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+		for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Stat(started); err == nil {
+				whileLocked <- true
+				return
+			}
+		}
+		whileLocked <- false
+	}()
+
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	code, shown := unsentClaude(t, []string{self, "claude"}, bin, []string{"UNSENT_FAKE_STARTED=" + started}, nil)
+	if !<-whileLocked {
+		t.Fatal("the agent started only once the shell import could run; it should start first")
+	}
+	if code != 3 {
+		t.Fatalf("exit %d, want the agent's 3", code)
+	}
+	i, line, box := strings.Index(shown, notice), strings.Index(shown, shellLine), strings.Index(shown, "❯")
+	if i < 0 || line < i || box < line {
+		t.Fatalf("terminal %q: want the notice %q, then %q, before the agent's box", shown, notice, shellLine)
+	}
+}
+
+// A draft saver that cannot run never costs the session: with the draft
+// folder unwritable, or no pseudo-terminal to be had, unsent says so in one
+// line and hands over, so the agent runs to the end on the terminal and its
+// exit status is the session's. A hang-up ignored when unsent started (as
+// under nohup) is still ignored by the agent it hands over to.
+func TestWrapHandsOverWhenItCannotSave(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only folder")
+	}
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	locked := t.TempDir()
+	if err := os.Chmod(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o700) })
+	const off = "; drafts are not being saved this session"
+	direct := []string{self, "claude"}
+	// sh ignores the hang-up before unsent starts, as nohup does, and the
+	// fake agent hangs itself up.
+	noHup := []string{"/bin/sh", "-c", `trap "" HUP; exec "$0" claude`, self}
+	for _, c := range []struct {
+		name, home, pty, hup, want string
+		unsent                     []string
+	}{
+		{"unwritable UNSENT_HOME", locked, "", "", "unsent: cannot open the draft folder: mkdir " + locked, direct},
+		{"no pseudo-terminal", t.TempDir(), "fail", "", "unsent: cannot start a pseudo-terminal: forced pty failure" + off, direct},
+		{"hang-up ignored", locked, "", "1", "unsent: cannot open the draft folder: mkdir " + locked, noHup},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			code, shown := unsentClaude(t, c.unsent, bin,
+				[]string{"UNSENT_HOME=" + c.home, "UNSENT_TEST_PTY=" + c.pty, "UNSENT_FAKE_HUP=" + c.hup}, nil)
+			if code != 3 || !strings.Contains(shown, c.want) || strings.Count(shown, off) != 1 {
+				t.Fatalf("exit %d, terminal %q; want exit 3 and one line %q ending %q", code, shown, c.want, off)
+			}
+			if !strings.Contains(shown, "to-stderr") || !strings.Contains(shown, "hello") {
+				t.Fatalf("terminal %q: the agent did not run on it", shown)
+			}
+		})
+	}
+}
+
+// An agent killed by a signal is reported to the shell as killed by that
+// signal, as it would be without unsent, not as the exit code 128+n: job
+// control and $? tell the two apart. The draft is saved first, and a normal
+// exit code still comes through as it is.
+func TestWrapDiesOfTheSignalThatKilledTheAgent(t *testing.T) {
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	for _, sig := range []syscall.Signal{syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGKILL, 0} {
+		t.Run(fmt.Sprint(sig), func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("UNSENT_HOME", home)
+			env := []string{"UNSENT_HOME=" + home}
+			if sig != 0 {
+				env = append(env, fmt.Sprintf("UNSENT_FAKE_SIGNAL=%d", sig))
+			}
+			state, shown := unsentClaudeState(t, []string{self, "claude"}, bin, env, nil)
+			ws := state.Sys().(syscall.WaitStatus)
+			if sig == 0 {
+				if ws.Signaled() || ws.ExitStatus() != 3 {
+					t.Fatalf("unsent ended %v; want exit status 3", state)
+				}
+			} else if !ws.Signaled() || ws.Signal() != sig {
+				t.Fatalf("unsent ended %v; want killed by %v, as the agent was (terminal %q)", state, sig, shown)
+			}
+			st, err := openStore()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" {
+				t.Fatalf("orphans %+v, want the draft", rs)
+			}
+		})
+	}
+}
+
+// When dying of the signal does not end unsent, the shell gets 128+n: a
+// hang-up unsent was started with ignored (nohup) stays ignored, and a
+// SIGQUIT would make Go's runtime print a goroutine dump and exit 2.
+func TestExitAsFallsBackTo128PlusN(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		sig  syscall.Signal
+		argv []string
+	}{
+		{"ignored hang-up", syscall.SIGHUP, []string{"/bin/sh", "-c", `trap "" HUP; exec "$0"`, self}},
+		{"quit", syscall.SIGQUIT, []string{self}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			cmd := exec.Command(c.argv[0], c.argv[1:]...)
+			cmd.Env = append(os.Environ(), "UNSENT_TEST_RUN=exit", fmt.Sprintf("UNSENT_TEST_KILLED_BY=%d", c.sig))
+			out, err := cmd.CombinedOutput()
+			ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
+			if ws.Signaled() || ws.ExitStatus() != 128+int(c.sig) || len(out) != 0 {
+				t.Fatalf("ended %v (%v), printed %q; want exit status %d and nothing printed", cmd.ProcessState, err, out, 128+int(c.sig))
+			}
+		})
 	}
 }
 
@@ -730,13 +1139,9 @@ func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
 	}
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
-	r, w, _ := os.Pipe()
-	old := os.Stderr
-	os.Stderr = w
+	stderr := lendStderr(t)
 	code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term, nil)
-	os.Stderr = old
-	w.Close()
-	said, _ := io.ReadAll(r)
+	said := stderr()
 	line := "unsent: no reader for \"sh\" yet, running it without saving drafts\n"
 	if code != 0 || strings.Count(string(said), line) != 2 {
 		t.Fatalf("exit %d, stderr %q", code, said)
@@ -759,17 +1164,13 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 	go io.Copy(io.Discard, user)
 	defer func() { user.Close(); term.Close() }()
 	agent := func(want int, script string, args ...string) string {
-		r, w, _ := os.Pipe()
-		old := os.Stderr
-		os.Stderr = w
+		stderr := lendStderr(t)
 		code := wrap("claude", append([]string{"sh", "-c", script, "sh"}, args...), term, term, nil)
-		os.Stderr = old
-		w.Close()
-		said, _ := io.ReadAll(r)
+		said := stderr()
 		if code != want {
 			t.Fatalf("exit %d, want %d, stderr %q", code, want, said)
 		}
-		return string(said)
+		return said
 	}
 	line := orphanNotice(st, work, "claude")
 	if !strings.HasPrefix(line, "unsent: recovered a draft from ") {
@@ -782,7 +1183,9 @@ func TestWrapSaysTheNoticeAgainOnExit(t *testing.T) {
 	if said := agent(3, `exit 3`); said != line+line {
 		t.Fatalf("stderr %q, want the notice before and after a failed exit", said)
 	}
-	if said := agent(0, `rm "$1"`, st.draftPath("left")); said != line {
+	// The agent's output waits in the pseudo-terminal until the notice is
+	// out, so a write larger than its buffer ends only after that.
+	if said := agent(0, `head -c 262144 /dev/zero; rm "$1"`, st.draftPath("left")); said != line {
 		t.Fatalf("stderr %q, want the notice only before: the draft was restored meanwhile", said)
 	}
 }
@@ -816,6 +1219,7 @@ func TestWrapNoticeOnExitNamesTheDraftRestoreTakes(t *testing.T) {
 // leaves unsent on.
 func TestWrapOff(t *testing.T) {
 	t.Setenv("UNSENT_HOME", t.TempDir())
+	lendStderr(t)
 	user, term, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)

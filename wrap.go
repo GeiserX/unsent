@@ -39,15 +39,13 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
 		return 127
 	}
-	if off() || !term.IsTerminal(int(in.Fd())) || !term.IsTerminal(int(out.Fd())) {
-		// Switched off, or piped (git diff | claude -p ...) or redirected:
-		// the agent draws no input box, and a pseudo-terminal would turn the
-		// pipe into keystrokes. Get out of the way.
-		if err := execAgent(bin, args); err != nil {
-			fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
-			return 126
-		}
-		return 0
+	if off() || !onTerminal(in, out) {
+		// Switched off, or piped (git diff | claude -p ...) or redirected
+		// (claude 2>err.log): the agent draws no input box, a
+		// pseudo-terminal would turn the pipe into keystrokes, and the
+		// agent's stderr would land in it instead of the file. Get out of
+		// the way.
+		return handOver(bin, args)
 	}
 	// Arm the signal handlers before anything slow (the store, the
 	// pseudo-terminal): a hang-up or Ctrl+C during startup must be handled,
@@ -58,24 +56,41 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer signal.Stop(resizes)
 	defer signal.Stop(sigs)
-
-	st, err := openStore()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
-		return 1
+	// broken hands the session to the agent when unsent cannot run it: a
+	// draft saver that fails must not cost the user the session. The
+	// handlers go first, so the agent gets the dispositions unsent was
+	// started with (a hang-up ignored under nohup stays ignored).
+	broken := func(what string, err error) int {
+		fmt.Fprintf(os.Stderr, "unsent: %s: %v; drafts are not being saved this session\n", what, err)
+		signal.Stop(resizes)
+		signal.Stop(sigs)
+		return handOver(bin, args)
 	}
+
+	// Only what decides whether unsent can run the agent comes before it
+	// starts: a launcher that execs unsent and watches that pid should see
+	// the agent's child at once. The store's folders are made here and read
+	// only once the agent runs.
+	st, err := makeStore()
+	if err != nil {
+		return broken("cannot open the draft folder", err)
+	}
+	cmd := exec.Command(bin, args[1:]...)
+	cols, rows := termSize(in)
+	ptmx, err := startPty(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+	if err != nil {
+		return broken("cannot start a pseudo-terminal", err)
+	}
+	defer ptmx.Close()
+
+	// The agent runs. Its output waits in the pseudo-terminal until the
+	// reader below starts, so what unsent prints until then still comes
+	// before the agent's first paint, as when this ran before the start.
+	// The import can wait on another unsent's import, and prunes history.
+	st.importShells()
 	cwd, _ := os.Getwd()
 	cwd = realPath(cwd)
 	fmt.Fprint(os.Stderr, orphanNotice(st, cwd, agent))
-
-	cmd := exec.Command(bin, args[1:]...)
-	cols, rows := termSize(in)
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
-		return 1
-	}
-	defer ptmx.Close()
 
 	s := &session{
 		rec:    newRecord(args, cwd),
@@ -232,6 +247,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
 				if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
+					killedBy = st.Signal()
 					return 128 + int(st.Signal())
 				}
 				return exit.ExitCode()
@@ -243,6 +259,29 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 
 const ctrlZ = 0x1a
 
+// killedBy is the signal that killed the agent, once wrap has returned
+// 128+n for it; exitAs dies of it too.
+var killedBy syscall.Signal
+
+// exitAs ends unsent with code, or, when the agent was killed by a signal,
+// by that same signal, so the shell's $? and job control see what they
+// would see without unsent. It runs only after wrap has returned: the
+// terminal is restored, the draft saved and the lock released. Go's runtime
+// dies of a hang-up, Ctrl+C or SIGTERM nobody listens for, and nothing
+// survives SIGKILL. The others it would answer with a goroutine dump, or
+// ignore, so they keep 128+n, as does a signal unsent was started with
+// ignored, which signal.Reset leaves ignored.
+func exitAs(code int) {
+	switch sig := killedBy; sig {
+	case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL:
+		signal.Reset(sig)
+		syscall.Kill(os.Getpid(), sig)
+		// Delivery is not instant; a signal still ignored never comes.
+		time.Sleep(100 * time.Millisecond)
+	}
+	os.Exit(code)
+}
+
 // stopSelf suspends the wrapper the way Ctrl+Z suspends any job, and returns
 // when the shell resumes it.
 var stopSelf = func() {
@@ -253,9 +292,29 @@ var stopSelf = func() {
 // only once a save has read the screen the last key drew.
 var timedSave = (*session).save
 
+// onTerminal reports whether in, out and the process's stderr are all
+// terminals. The pseudo-terminal replaces all three for the agent, so any
+// one of them redirected would lose that redirect.
+func onTerminal(in, out *os.File) bool {
+	return term.IsTerminal(int(in.Fd())) && term.IsTerminal(int(out.Fd())) && term.IsTerminal(int(os.Stderr.Fd()))
+}
+
 // execAgent replaces the wrapper with the agent.
 var execAgent = func(bin string, args []string) error {
 	return syscall.Exec(bin, args, os.Environ())
+}
+
+// startPty starts the agent on a new pseudo-terminal; tests make it fail.
+var startPty = pty.StartWithSize
+
+// handOver replaces unsent with the agent, so the agent's exit status is
+// the session's. It returns only when the agent cannot be started.
+func handOver(bin string, args []string) int {
+	if err := execAgent(bin, args); err != nil {
+		fmt.Fprintf(os.Stderr, "unsent: %v\n", err)
+		return 126
+	}
+	return 0
 }
 
 // off reports whether UNSENT_OFF switches unsent off: the way out when a
