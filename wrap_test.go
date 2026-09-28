@@ -719,8 +719,9 @@ func TestWrapStepsAsideWhenStderrIsRedirected(t *testing.T) {
 
 // A launcher that execs unsent and watches that pid sees the agent start at
 // once: the slow work waits until the agent runs. The shell import, which
-// waits while another unsent imports, holds up nothing, and the notice
-// still reaches the terminal before the agent's first paint.
+// waits while another unsent imports, holds up nothing, and still runs
+// before the notice, which reaches the terminal before the agent's first
+// paint and names the line a dead shell left.
 func TestWrapStartsTheAgentBeforeTheSlowWork(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("UNSENT_HOME", home)
@@ -735,16 +736,13 @@ func TestWrapStartsTheAgentBeforeTheSlowWork(t *testing.T) {
 	if notice == "" {
 		t.Fatal("no notice for the seeded draft")
 	}
-	// A shell log gives the import something to do (another host's, which it
-	// leaves in place), and the test holds the import lock as another
-	// unsent importing would.
+	// A dead shell of this host left a line here: only the import at the
+	// start puts it in the start notice (the one after exit imports again).
+	// The test holds the import lock as another unsent importing would.
+	writeShellLog(t, st, shellLogName(deadPid(t), 1, ".log"),
+		zrec{"v", "1"}, zrec{"i", work}, zrec{"b", "make release"})
+	shellLine := "unsent: a zsh line you typed here and did not run is saved"
 	shell := filepath.Join(home, "shell")
-	if err := os.MkdirAll(shell, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(shell, "zsh-elsewhere-1-1.log"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
 	lock, err := os.OpenFile(filepath.Join(shell, ".import.lock"), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -781,8 +779,9 @@ func TestWrapStartsTheAgentBeforeTheSlowWork(t *testing.T) {
 	if code != 3 {
 		t.Fatalf("exit %d, want the agent's 3", code)
 	}
-	if i, box := strings.Index(shown, notice), strings.Index(shown, "❯"); i < 0 || box < i {
-		t.Fatalf("terminal %q: want the notice %q before the agent's box", shown, notice)
+	i, line, box := strings.Index(shown, notice), strings.Index(shown, shellLine), strings.Index(shown, "❯")
+	if i < 0 || line < i || box < line {
+		t.Fatalf("terminal %q: want the notice %q, then %q, before the agent's box", shown, notice, shellLine)
 	}
 }
 
