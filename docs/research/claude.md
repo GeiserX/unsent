@@ -199,11 +199,11 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 | How it was opened | `sessionId` in `sessions/<new pid>.json` | Tag |
 | --- | --- | --- |
 | `claude --resume fe24d118-…` | `fe24d118-…`, the same id. New messages append to the same transcript (16 lines at resume, 20 after one more send, one `sessionId` in the file) | measured |
-| `claude -c` | the same id as the newest conversation | measured |
+| `claude -c` | the same id as the newest conversation | measured (no capture kept) |
 | `claude --resume` with no id (the picker) | while the picker is open, a fresh id that matches no conversation. After Down and Enter, the chosen id. A 20 ms poll saw the file change and the box appear in the same poll, 67 ms after Enter. The box is not drawn while the picker is open | measured, `cap-s5-picker.txt` |
-| `/resume` typed in a running session | the same pid switches to the chosen id | measured |
-| `/clear` | the same pid gets a new id, and its transcript is created at once (5 lines, no message) | measured |
-| `claude --resume <id> --fork-session` | a new id | measured |
+| `/resume` typed in a running session | the same pid switches to the chosen id | measured (no capture kept) |
+| `/clear` | the same pid gets a new id, and its transcript is created at once (5 lines, no message) | measured (no capture kept) |
+| `claude --resume <id> --fork-session` | a new id | measured (no capture kept) |
 | `claude --resume <id>` of a session that typed but never sent | Claude Code prints `No conversation found with session ID: <id>` and exits. Such a session is not in the picker either | measured |
 
 Claude Code did not put back the draft left in the box when the window closed: the resumed box was empty [measured, `cap-s2-resume-id.txt`].
@@ -212,7 +212,7 @@ Claude Code did not put back the draft left in the box when the window closed: t
 
 - `--resume <id>`, `-c` and a picker choice each fired it once with `{"session_id":<the resumed id>,"transcript_path":…,"cwd":…,"hook_event_name":"SessionStart","source":"resume"}`. A new chat fired it with `"source":"startup"` and a `model` field. The picker's fresh id fired nothing before the choice [measured, `hook-log.jsonl`].
 - The binary's schema lists `source` as `startup`, `resume`, `clear`, `compact` or `fork`, and the hook's output as `additionalContext`, `initialUserMessage`, `sessionTitle`, `watchPaths` and `reloadSkills` [source]. `initialUserMessage` would send a message, so unsent must never use it [guess from the name].
-- A hook that prints `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"UNSENT-NOTE-TEST"}}` drew nothing on screen. After the next send, the transcript held it as an `attachment` of type `hook_additional_context` [measured]. That the model reads it on that turn is [docs].
+- A hook that prints `{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"UNSENT-NOTE-TEST"}}` drew nothing on screen. After the next send, the transcript held it as an `attachment` of type `hook_additional_context` [measured]. That the model reads it on that turn is [docs, [Claude Code hooks: SessionStart](https://code.claude.com/docs/en/hooks)].
 
 **A long draft pasted back.** Drafts made with `python3`: 1,391 characters with 7 line breaks and accented text (`draft-multi.txt`), and a 900-character single line (`draft-one.txt`). Each went in as one bracketed paste with `tmux paste-buffer -p`, then Ctrl+G ran a copy script as `$EDITOR`:
 
