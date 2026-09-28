@@ -537,6 +537,7 @@ func TestWrapUnknownAgentPassesThrough(t *testing.T) {
 }
 
 func TestWrapStepsAsideForPipes(t *testing.T) {
+	lendStderr(t)
 	t.Setenv("UNSENT_HOME", t.TempDir())
 	var ran []string
 	old := execAgent
