@@ -1,0 +1,62 @@
+[
+  {
+    "format": 1,
+    "n": 1,
+    "id": "20260928-184000-4242",
+    "kind": "orphan",
+    "agent": "claude",
+    "agent_session": "0b1c2d3e-4f50-4a6b-8c9d-0e1f2a3b4c5d",
+    "folder": "/work/app",
+    "started": "2026-09-28T18:40:07+02:00",
+    "updated": "2026-09-28T18:42:07+02:00",
+    "ended": "2026-09-28T18:43:07+02:00",
+    "lines": 7,
+    "bytes": 61,
+    "first_line": "Refactor <the> parser & keep\tthe tests"
+  },
+  {
+    "format": 1,
+    "n": 2,
+    "id": "zsh-host-77-1",
+    "kind": "shell",
+    "agent": "zsh",
+    "agent_session": "",
+    "folder": "/work",
+    "started": "2026-09-28T18:10:07+02:00",
+    "updated": "2026-09-28T18:41:07+02:00",
+    "ended": "2026-09-28T18:44:07+02:00",
+    "lines": 1,
+    "bytes": 18,
+    "first_line": "git rebase -i main"
+  },
+  {
+    "format": 1,
+    "n": 3,
+    "id": "20260928-183000.000000-99",
+    "kind": "history",
+    "agent": "claude",
+    "agent_session": "",
+    "folder": "/work",
+    "started": "2026-09-28T18:01:07+02:00",
+    "updated": "2026-09-28T18:30:07+02:00",
+    "ended": "",
+    "lines": 1,
+    "bytes": 210,
+    "first_line": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+  },
+  {
+    "format": 1,
+    "n": 4,
+    "id": "20260928-180000-55",
+    "kind": "version",
+    "agent": "claude",
+    "agent_session": "",
+    "folder": "/work",
+    "started": "2026-09-28T18:00:07+02:00",
+    "updated": "2026-09-28T18:20:07+02:00",
+    "ended": "",
+    "lines": 2,
+    "bytes": 34,
+    "first_line": "an earlier version"
+  }
+]

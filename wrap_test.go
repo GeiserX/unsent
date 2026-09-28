@@ -1266,6 +1266,63 @@ func TestWrapSaysAgainOnExitThatAnAgentIsNotProtected(t *testing.T) {
 	}
 }
 
+// UNSENT_NOTICE=0 turns off the draft notices, never a line that says
+// drafts are not being saved: silence is the worst failure there. Each
+// line is checked with the notices on too, so the test sees the notice go.
+func TestNoticesOffKeepTheLinesThatSayNothingIsSaved(t *testing.T) {
+	for _, notice := range []string{"", "0"} {
+		t.Run("UNSENT_NOTICE="+notice, func(t *testing.T) {
+			t.Setenv("UNSENT_NOTICE", notice)
+			t.Run("no reader", func(t *testing.T) {
+				st := testStore(t)
+				work := realPath(t.TempDir())
+				t.Chdir(work)
+				seedAs(t, st, "left", "sh", work, "a draft left behind", 5)
+				user, term, err := pty.Open()
+				if err != nil {
+					t.Fatal(err)
+				}
+				go io.Copy(io.Discard, user)
+				defer func() { user.Close(); term.Close() }()
+				stderr := lendStderr(t)
+				code := wrap("sh", []string{"sh", "-c", "exit 0"}, term, term, nil)
+				said := stderr()
+				line := "unsent: no reader for \"sh\" yet, running it without saving drafts\n"
+				if code != 0 || strings.Count(said, line) != 2 {
+					t.Fatalf("exit %d, stderr %q: want %q before start and after exit", code, said, line)
+				}
+				if got := strings.Count(said, "recovered a draft"); got != map[string]int{"": 2, "0": 0}[notice] {
+					t.Fatalf("stderr %q: %d notices", said, got)
+				}
+			})
+			t.Run("hand over", func(t *testing.T) {
+				bin := t.TempDir()
+				self, err := os.Executable()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+					t.Fatal(err)
+				}
+				_, shown := unsentClaude(t, []string{self, "claude"}, bin,
+					[]string{"UNSENT_HOME=" + t.TempDir(), "UNSENT_TEST_PTY=fail", "UNSENT_NOTICE=" + notice}, nil)
+				if !strings.Contains(shown, "; drafts are not being saved this session") {
+					t.Fatalf("terminal %q", shown)
+				}
+			})
+			t.Run("box never read", func(t *testing.T) {
+				old := claude.read
+				claude.read = func(*screen) (view, bool) { return view{}, false }
+				defer func() { claude.read = old }()
+				_, _, _, said := runWrappedOut(t, "claude", []string{"claude"}, func(type_ func(string)) { type_("hello"); type_("\x04") })
+				if !strings.Contains(said, "unsent: could not read claude") || !strings.Contains(said, "nothing was saved") {
+					t.Fatalf("stderr %q", said)
+				}
+			})
+		})
+	}
+}
+
 // The recovery notice is printed before the agent starts and again after it
 // exits, because an agent on the alternate screen hides the first one. The
 // second is asked afresh: a draft restored while the agent ran is not

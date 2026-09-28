@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -389,5 +391,126 @@ func TestRestoreMentionsUnplacedPastes(t *testing.T) {
 	_, _, errOut := runCLI("restore")
 	if !strings.Contains(errOut, "1 paste(s) could not be put back") {
 		t.Fatalf("stderr %q", errOut)
+	}
+}
+
+// seedJSON writes one draft of each kind, at fixed times in a fixed zone,
+// so the JSON output is the same on every machine.
+func seedJSON(t *testing.T) *store {
+	t.Helper()
+	st := testStore(t)
+	zone := time.FixedZone("", 2*3600)
+	at := func(min int) time.Time { return time.Date(2026, 9, 28, 18, min, 7, 0, zone) }
+	orphan := &record{Format: recordFormat, ID: "20260928-184000-4242", Command: []string{"claude", "--resume"},
+		Agent: "claude", AgentSession: "0b1c2d3e-4f50-4a6b-8c9d-0e1f2a3b4c5d", Cwd: "/work/app", PID: 4242,
+		Started: at(40), Updated: at(42), Ended: at(43),
+		Draft:  "\n  Refactor <the> parser & keep\tthe tests\nsecond line\n" + "a\nb\nc\nd",
+		Pastes: []string{"a\nb\nc\nd", "\x1b[31mnot placed\x1b[0m"}}
+	shell := &record{Format: recordFormat, ID: "zsh-host-77-1", Command: []string{"zsh"}, Agent: "zsh",
+		Cwd: "/work", PID: 77, Started: at(10), Updated: at(41), Ended: at(44), Draft: "git rebase -i main"}
+	for _, r := range []*record{orphan, shell} {
+		if err := st.write(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cleared := &record{Format: recordFormat, Command: []string{"claude"}, Agent: "claude", Cwd: "/work",
+		PID: 99, Started: at(1), Updated: at(30), Draft: strings.Repeat("é", firstLineMax+5)}
+	if err := st.archiveAs(cleared, "20260928-183000.000000-99"); err != nil {
+		t.Fatal(err)
+	}
+	version := &record{Format: recordFormat, ID: "20260928-180000-55", Command: []string{"claude"}, Agent: "claude",
+		Cwd: "/work", PID: 55, Started: at(0), Updated: at(20), Draft: "an earlier version\nof a long draft"}
+	if err := st.keepVersion(version); err != nil {
+		t.Fatal(err)
+	}
+	return st
+}
+
+// golden compares got with testdata/json/<name>; UNSENT_UPDATE_GOLDEN=1
+// rewrites it.
+func golden(t *testing.T, name, got string) {
+	t.Helper()
+	path := filepath.Join("testdata", "json", name)
+	if os.Getenv("UNSENT_UPDATE_GOLDEN") == "1" {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != string(want) {
+		t.Fatalf("output differs from %s (UNSENT_UPDATE_GOLDEN=1 rewrites it):\n%s", path, got)
+	}
+}
+
+// list --json and show --json print the shape the README documents: a
+// change to it shows up as a change to a golden file, and the README says
+// a field is only ever added.
+func TestCLIJSONGolden(t *testing.T) {
+	seedJSON(t)
+	code, out, errOut := runCLI("list", "--all", "--json")
+	if code != 0 || errOut != "" {
+		t.Fatalf("list --all --json: exit %d, %q", code, errOut)
+	}
+	golden(t, "list-all.golden", out)
+	code, out, errOut = runCLI("show", "1", "--json")
+	if code != 0 || errOut != "" {
+		t.Fatalf("show 1 --json: exit %d, %q", code, errOut)
+	}
+	golden(t, "show.golden", out)
+}
+
+// Every item's n is the number show takes, filters keep the numbers, and
+// the text is the draft show prints.
+func TestCLIJSONNumbersAndFilters(t *testing.T) {
+	seedJSON(t)
+	list := func(args ...string) []draftJSON {
+		t.Helper()
+		code, out, errOut := runCLI(append([]string{"list", "--json"}, args...)...)
+		var items []draftJSON
+		if code != 0 || errOut != "" || json.Unmarshal([]byte(out), &items) != nil {
+			t.Fatalf("list --json %v: exit %d, %q, %q", args, code, out, errOut)
+		}
+		return items
+	}
+	all := list("--all")
+	if len(all) != 4 {
+		t.Fatalf("list --all --json: %d items", len(all))
+	}
+	for _, it := range all {
+		_, out, _ := runCLI("show", "--json", strconv.Itoa(it.N))
+		var one showJSON
+		if err := json.Unmarshal([]byte(out), &one); err != nil || one.draftJSON != it {
+			t.Fatalf("show %d --json %q, want %+v", it.N, out, it)
+		}
+		_, plain, _ := runCLI("show", strconv.Itoa(it.N))
+		if !strings.HasPrefix(plain, one.Text+"\n") || one.Bytes != len(one.Text) {
+			t.Fatalf("show %d: text %q, plain %q", it.N, one.Text, plain)
+		}
+	}
+	if got := list(); len(got) != 2 || got[0] != all[0] || got[1] != all[1] {
+		t.Fatalf("list --json %+v: want the two drafts left behind, numbered as in --all", got)
+	}
+	if got := list("--all", "--agent", "zsh"); len(got) != 1 || got[0] != all[1] {
+		t.Fatalf("list --all --agent zsh --json %+v", got)
+	}
+	if got := list("--agent", "codex"); got == nil || len(got) != 0 {
+		t.Fatalf("no match: %+v, want an empty array", got)
+	}
+	if code, _, _ := runCLI("restore", "--json"); code != 2 {
+		t.Fatalf("restore --json: exit %d, want 2 (unknown option)", code)
+	}
+}
+
+// With nothing to recover, list --json is an empty array, not a sentence.
+func TestCLIJSONEmpty(t *testing.T) {
+	testStore(t)
+	if code, out, _ := runCLI("list", "--all", "--json"); code != 0 || out != "[]\n" {
+		t.Fatalf("exit %d, %q", code, out)
 	}
 }

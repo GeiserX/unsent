@@ -62,7 +62,7 @@ unsent setup --undo   # remove the block again
 
 Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude`, into a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, and a function of the same name is left alone. An alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path, skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
 
-`UNSENT_NOTICE=0` turns off the notices and the line under the box, for sessions nobody watches. Drafts still go back into their conversation's box.
+`UNSENT_NOTICE=0` turns off the notices and the line under the box, for sessions nobody watches. Drafts still go back into their conversation's box, and a line saying drafts are not being saved still shows.
 
 To run the agent without `unsent` for a while, for example when an agent update confuses it, set `UNSENT_OFF=1`: `unsent` then hands over to the agent directly. `command claude` also skips the wrapper, for one run.
 
@@ -79,6 +79,22 @@ unsent list --here --agent claude   # only Claude Code's drafts from this folder
 ```
 
 Each draft remembers the agent and the folder it came from. The notice only offers a draft back to that agent in that folder, and counts the ones left in subfolders. `unsent restore --agent claude` copies that agent's newest draft from this folder, and a number from `unsent list` reaches any draft.
+
+For a script, a launcher or an agent looking for a lost prompt, `unsent list --json` prints the same list, with the same filters, as a JSON array, newest first. `unsent show N --json` prints one draft as an object with the same fields plus its text:
+
+| Field | What it holds |
+| --- | --- |
+| `format` | the version of this shape, now `1` |
+| `n` | the number `show` and `restore` take |
+| `id` | unsent's id for the draft |
+| `kind` | `orphan` (left behind), `history` (cleared or replaced), `version` (an earlier version) or `shell` (a shell's command line) |
+| `agent`, `agent_session` | the agent, and its own id of the conversation, `""` when unknown |
+| `folder` | the folder it was typed in, as a real path |
+| `started`, `updated`, `ended` | RFC 3339 times with the offset, `""` when unknown |
+| `lines`, `bytes`, `first_line` | its size, and its first line with text, cut to 100 characters |
+| `text`, `pastes` | `show` only: the draft with pastes expanded, and the raw text of each paste |
+
+Fields are only ever added. A renamed or retyped field bumps `format`.
 
 ## Your half-typed zsh command line survives too
 

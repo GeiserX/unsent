@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -27,11 +28,12 @@ Usage:
                              the same, for a command whose name does not say
                              which agent it starts (npx, node cli.js, a renamed
                              binary); UNSENT_AGENT=<agent> does the same
-  unsent list [--all] [--here] [--agent <agent>]
+  unsent list [--all] [--here] [--agent <agent>] [--json]
                              list drafts left behind (--all adds cleared ones
                              and earlier versions; --here keeps this folder's,
-                             --agent one agent's)
-  unsent show [--agent <agent>] [N]
+                             --agent one agent's; --json prints a JSON array,
+                             its shape in the README)
+  unsent show [--agent <agent>] [--json] [N]
                              print draft N (default: this folder's newest)
   unsent restore [--agent <agent>] [N]
                              copy draft N to the clipboard and mark it restored
@@ -188,6 +190,7 @@ func contains(rs []*record, r *record) bool {
 // options are the flags list, show, restore and log take.
 type options struct {
 	all, here bool
+	json      bool   // list and show --json
 	agent     string // "" for every agent
 	copy      int    // log --copy N; 0 when not given
 	rest      []string
@@ -214,6 +217,8 @@ func parseOptions(args []string, allowed ...string) (options, error) {
 			o.all = true
 		case "--here":
 			o.here = true
+		case "--json":
+			o.json = true
 		case "--agent":
 			if i+1 >= len(args) || args[i+1] == "" {
 				return o, fmt.Errorf("--agent needs an agent name")
@@ -241,7 +246,7 @@ func (o options) keeps(r *record, cwd string) bool {
 }
 
 func cmdList(args []string, stdout, stderr io.Writer) int {
-	o, err := parseOptions(args, "--all", "--here", "--agent")
+	o, err := parseOptions(args, "--all", "--here", "--agent", "--json")
 	if err == nil && len(o.rest) > 0 {
 		err = fmt.Errorf("unexpected argument %q", o.rest[0])
 	}
@@ -265,6 +270,13 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 			width = max(width, len(r.agent()))
 		}
 	}
+	if o.json {
+		items := []draftJSON{}
+		for _, i := range shown {
+			items = append(items, jsonOf(st, rs[i], i+1))
+		}
+		return printJSON(stdout, stderr, items)
+	}
 	if len(shown) == 0 {
 		fmt.Fprintln(stdout, "No drafts to recover.")
 		return 0
@@ -281,7 +293,11 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 }
 
 func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
-	o, err := parseOptions(args, "--agent")
+	allowed := []string{"--agent"}
+	if !restore {
+		allowed = append(allowed, "--json")
+	}
+	o, err := parseOptions(args, allowed...)
 	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 2
@@ -326,6 +342,13 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 		}
 	}
 	r := rs[n-1]
+	if o.json {
+		pastes := r.Pastes
+		if pastes == nil {
+			pastes = []string{}
+		}
+		return printJSON(stdout, stderr, showJSON{jsonOf(st, r, n), r.Draft, pastes})
+	}
 	if !restore {
 		fmt.Fprintln(stdout, r.Draft)
 		for _, p := range r.Pastes {
@@ -350,6 +373,87 @@ func cmdShow(args []string, stdout, stderr io.Writer, restore bool) int {
 	if n := unplaced(r); n > 0 {
 		// Restoring moved the draft to history, so its number changed.
 		fmt.Fprintf(stderr, "%d paste(s) could not be put back in place: find the draft in `unsent list --all`, and `unsent show <number>` prints them.\n", n)
+	}
+	return 0
+}
+
+// draftFormat is the version of the shape list --json and show --json
+// print, documented in the README. Fields are only added; a rename or a
+// retype bumps it, the rule the records follow.
+const draftFormat = 1
+
+// draftJSON is one draft as list --json prints it. Times are RFC 3339 with
+// the offset they were saved with, "" when unknown.
+type draftJSON struct {
+	Format       int    `json:"format"`
+	N            int    `json:"n"` // the number show and restore take
+	ID           string `json:"id"`
+	Kind         string `json:"kind"` // orphan, history, version or shell
+	Agent        string `json:"agent"`
+	AgentSession string `json:"agent_session"`
+	Folder       string `json:"folder"`
+	Started      string `json:"started"`
+	Updated      string `json:"updated"`
+	Ended        string `json:"ended"`
+	Lines        int    `json:"lines"`
+	Bytes        int    `json:"bytes"`
+	FirstLine    string `json:"first_line"`
+}
+
+// showJSON is one draft as show --json prints it: the list's fields, the
+// draft with its pastes expanded, and the raw paste texts kept with it.
+type showJSON struct {
+	draftJSON
+	Text   string   `json:"text"`
+	Pastes []string `json:"pastes"`
+}
+
+// firstLineMax caps first_line, in characters.
+const firstLineMax = 100
+
+func jsonOf(st *store, r *record, n int) draftJSON {
+	kind := "history"
+	switch {
+	case isShell(r.agent()):
+		kind = "shell"
+	case r.Version:
+		kind = "version"
+	case isDraftFile(st, r):
+		kind = "orphan"
+	}
+	first := ""
+	for l := range strings.SplitSeq(r.Draft, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			first = l
+			break
+		}
+	}
+	if c := []rune(first); len(c) > firstLineMax {
+		first = string(c[:firstLineMax])
+	}
+	return draftJSON{
+		Format: draftFormat, N: n, ID: r.ID, Kind: kind,
+		Agent: r.agent(), AgentSession: r.AgentSession, Folder: r.Cwd,
+		Started: rfc3339(r.Started), Updated: rfc3339(r.Updated), Ended: rfc3339(r.Ended),
+		Lines: strings.Count(r.Draft, "\n") + 1, Bytes: len(r.Draft), FirstLine: first,
+	}
+}
+
+func rfc3339(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
+}
+
+// printJSON writes v indented, with <, > and & left as they are.
+func printJSON(stdout, stderr io.Writer, v any) int {
+	enc := json.NewEncoder(stdout)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
 	}
 	return 0
 }
