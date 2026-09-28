@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -40,77 +41,56 @@ type keyEvent struct {
 
 // kinds splits typed keys into submit keys, clear keys and other keys, in
 // order, with runs of other keys as one. Submit keys are matched first.
-// Focus and mouse reports are not keys and are skipped. loneEsc reports
-// that b ends in an Esc on its own, which a following Esc makes Esc Esc.
+// Focus and mouse reports, releases and the terminal's answers are not
+// keys and are skipped. loneEsc reports that b ends in an Esc on its own,
+// which a following Esc makes Esc Esc.
 func (ks keyset) kinds(b []byte) (out []keyKind, loneEsc bool) {
+	return ks.kindsOf(pressed(b))
+}
+
+func (ks keyset) kindsOf(keys []key) (out []keyKind, loneEsc bool) {
 	add := func(k keyKind) {
 		if k != keyOther || len(out) == 0 || out[len(out)-1] != keyOther {
 			out = append(out, k)
 		}
 	}
-	for i := 0; i < len(b); {
+	for i := 0; i < len(keys); {
 		loneEsc = false
-		if n := prefixOf(b[i:], ks.submit); n > 0 {
+		if n := chordAt(keys[i:], ks.submit); n > 0 {
 			add(keySubmit)
 			i += n
 			continue
 		}
-		if n := prefixOf(b[i:], ks.clear); n > 0 {
+		if n := chordAt(keys[i:], ks.clear); n > 0 {
 			add(keyClear)
 			i += n
 			continue
 		}
-		n, key := keyLen(b[i:])
-		if key {
-			add(keyOther)
-		}
-		loneEsc = n == 1 && b[i] == 0x1b
-		i += n
+		add(keyOther)
+		loneEsc = keys[i] == plain(keyEsc)
+		i++
 	}
 	return out, loneEsc
 }
 
-// prefixOf returns the length of the first of keys that b starts with, or 0.
-func prefixOf(b []byte, keys [][]byte) int {
-	for _, k := range keys {
-		if bytes.HasPrefix(b, k) {
-			return len(k)
+// pressed returns the keys pressed in b, in order (see keysIn).
+func pressed(b []byte) []key {
+	var keys []key
+	for _, k := range keysIn(b) {
+		keys = append(keys, k.key)
+	}
+	return keys
+}
+
+// chordAt returns the length of the first of chords that keys start with,
+// or 0.
+func chordAt(keys []key, chords [][]key) int {
+	for _, c := range chords {
+		if len(c) > 0 && len(keys) >= len(c) && slices.Equal(keys[:len(c)], c) {
+			return len(c)
 		}
 	}
 	return 0
-}
-
-// keyLen returns the length of the key that starts b, and false when it is
-// a focus or mouse report rather than a key: Claude Code turns on focus
-// events and all-motion mouse tracking, so these arrive with every move.
-func keyLen(b []byte) (int, bool) {
-	if b[0] != 0x1b || len(b) == 1 || b[1] == 0x1b {
-		return 1, true
-	}
-	switch b[1] {
-	case 'O': // SS3: F1 to F4, and arrows in application mode
-		return min(3, len(b)), true
-	case '[':
-	default: // Alt and a key
-		return 2, true
-	}
-	j := 2
-	for j < len(b) && b[j] >= 0x20 && b[j] <= 0x3f {
-		j++
-	}
-	if j == len(b) {
-		return j, true
-	}
-	params, final := b[2:j], b[j]
-	switch {
-	case len(params) > 0 && params[0] == '<': // SGR mouse
-		return j + 1, false
-	case len(params) == 0 && (final == 'I' || final == 'O'): // focus in, out
-		return j + 1, false
-	case len(params) == 0 && final == 'M': // X10 mouse: three more bytes
-		return min(j+4, len(b)), false
-	}
-	return j + 1, true
 }
 
 // keyLog collects the submit and clear keys typed between two saves. The
@@ -135,10 +115,11 @@ func (l *keyLog) push(ks keyset, typed []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	// Esc Esc arrives as two reads of one Esc each.
-	if l.esc && typed[0] == 0x1b && (len(typed) == 1 || typed[1] == 0x1b) {
-		typed = append([]byte{0x1b}, typed...)
+	keys := pressed(typed)
+	if l.esc && len(keys) > 0 && keys[0] == plain(keyEsc) {
+		keys = append([]key{plain(keyEsc)}, keys...)
 	}
-	kinds, esc := ks.kinds(typed)
+	kinds, esc := ks.kindsOf(keys)
 	l.esc = esc
 	for _, k := range kinds {
 		after := l.last

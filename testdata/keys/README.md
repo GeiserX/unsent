@@ -12,6 +12,8 @@ One folder per terminal:
 
 `tmux-extkeys/no-tmux-env.*` is a second tmux run, described below.
 
+`TestReplayKeyCaptures` in [`keys_test.go`](../../keys_test.go) replays the input of all three logs through the key decoder and Claude Code's keyset. There is no Warp log, so `synthesizedKitty` in the same file covers the kitty protocol's fullest form (flags 15: every key as an escape code, release and repeat events, alternate keys, lock bits) from the kitty spec. It is synthesized, not captured.
+
 ## Environment
 
 - Claude Code 2.1.283, the macOS arm64 binary, on a Mac mini running macOS 26.6.1, at 120x40.

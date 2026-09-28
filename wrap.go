@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -167,7 +168,13 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			}
 		}
 	}()
-	suspend := make(chan struct{}, 1)
+	// A suspend key (Ctrl+Z) can come in any form and anywhere in a read:
+	// the keys before it reach the agent first, the key itself never does,
+	// and the keys after it once the shell resumes unsent. The profile
+	// picks the keys even when the lock failed and nothing is saved.
+	suspend := make(chan chan struct{}, 1)
+	prof := profileFor(agent)
+	stops := suspendKeys(prof)
 	go func() {
 		buf := make([]byte, 32*1024)
 		for {
@@ -175,14 +182,25 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			// Logged before the agent gets them, so the record has each key
 			// ahead of the agent's answer. Ctrl+Z too, which the agent never gets.
 			raw.record('i', buf[:n])
-			// After a panic the paste tracker is no longer fed, and could
-			// be stuck inside a paste.
-			if n == 1 && buf[0] == ctrlZ && (s.broken.Load() || !s.pastes.inPaste()) {
-				suspend <- struct{}{}
-				continue
-			}
-			if n > 0 {
-				s.forward(buf[:n], ptmx)
+			for rest := buf[:n]; len(rest) > 0; {
+				at, end := s.suspendAt(rest, stops)
+				if at < 0 {
+					s.forward(rest, ptmx)
+					break
+				}
+				if at > 0 {
+					s.forward(rest[:at], ptmx)
+				}
+				// After a panic the paste tracker is no longer fed, and
+				// could be stuck inside a paste.
+				if s.broken.Load() || !s.pastes.inPaste() {
+					resumed := make(chan struct{})
+					suspend <- resumed
+					<-resumed
+				} else {
+					s.forward(rest[at:end], ptmx)
+				}
+				rest = rest[end:]
 			}
 			if err != nil {
 				return
@@ -216,13 +234,19 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			timedSave(s)
 			s.tryRestore()
 			s.out.tick()
-		case <-suspend:
+		case resumed := <-suspend:
 			// The agent runs in its own terminal session, where the kernel
 			// drops a suspend signal: it would print "suspended" and hang.
 			// So the wrapper suspends instead, agent and all, and the shell's
 			// fg brings both back.
 			s.save()
 			cmd.Process.Signal(syscall.SIGSTOP)
+			// Once the stopped agent's last output is through, turn off what
+			// it turned on, as its own suspend would (profile.suspended).
+			if prof != nil && prof.suspended != nil {
+				time.Sleep(50 * time.Millisecond)
+				s.out.Write(s.leaving(prof.suspended))
+			}
 			if cooked != nil {
 				term.Restore(int(in.Fd()), cooked)
 			}
@@ -239,6 +263,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(c), Rows: uint16(r)})
 			s.resize(c, r)
 			raw.resize(c, r)
+			close(resumed)
 		case err := <-done:
 			// Let the last output reach the shadow screen before the final save.
 			time.Sleep(50 * time.Millisecond)
@@ -277,6 +302,39 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 }
 
 const ctrlZ = 0x1a
+
+// leaveAlt switches the terminal back from the alternate screen.
+var leaveAlt = []byte("\x1b[?1049l")
+
+// leaving is what unsent writes for the agent as it suspends it: the
+// agent's own suspend output, without leaving the alternate screen when
+// the agent draws on the main one, where that would move the cursor.
+func (s *session) leaving(suspended []byte) []byte {
+	s.mu.Lock()
+	alt := s.screen.IsAltScreen()
+	s.mu.Unlock()
+	if alt {
+		return suspended
+	}
+	return bytes.ReplaceAll(suspended, leaveAlt, nil)
+}
+
+// suspendAt returns where the first of the suspend keys starts and ends in
+// b, or -1, -1. Should the decoder ever panic, saving stops (see fail) and
+// that read suspends only when it is a lone Ctrl+Z byte, as before the
+// decoder.
+func (s *session) suspendAt(b []byte, keys []key) (at, end int) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.fail(r)
+			at, end = -1, -1
+			if len(b) == 1 && b[0] == ctrlZ && slices.Contains(keys, ctrl('z')) {
+				at, end = 0, 1
+			}
+		}
+	}()
+	return findKey(b, keys)
+}
 
 // killedBy is the signal that killed the agent, once wrap has returned
 // 128+n for it; exitAs dies of it too.
@@ -472,54 +530,6 @@ func (s *session) fail(r any) {
 		s.failure, s.failedAt = fmt.Sprint(r), time.Now()
 		s.broken.Store(true)
 	})
-}
-
-// typedKeys reports whether b holds a key the user typed, not only focus
-// and mouse reports or the terminal's answers to the agent's queries: a
-// string (OSC, DCS, APC, PM, SOS), a CSI with a private marker (?, >, =),
-// a window report (CSI ... t, the answer to the cell size query Claude Code
-// sends at start) or a mode report (CSI ... $ y), which no key carries.
-func typedKeys(b []byte) bool {
-	for i := 0; i < len(b); {
-		if b[i] == 0x1b && i+1 < len(b) {
-			switch b[i+1] {
-			case ']', 'P', '_', '^', 'X':
-				end := bytes.IndexAny(b[i+2:], "\x07\x1b")
-				switch {
-				case end < 0:
-					return false
-				case b[i+2+end] == 0x07:
-					i += 2 + end + 1
-				default:
-					i += 2 + end + 2 // ESC \
-				}
-				continue
-			case '[':
-				n, _ := keyLen(b[i:])
-				if i+2 < len(b) && bytes.IndexByte([]byte("?>="), b[i+2]) >= 0 || reportCSI(b[i:i+n]) {
-					i += n
-					continue
-				}
-			}
-		}
-		n, key := keyLen(b[i:])
-		if key {
-			return true
-		}
-		i += n
-	}
-	return false
-}
-
-// reportCSI reports whether a whole CSI sequence is one of the terminal's
-// reports that has no private marker: a window report ends in t, a mode
-// report in $ y. No key ends that way.
-func reportCSI(seq []byte) bool {
-	if len(seq) < 3 {
-		return false
-	}
-	final := seq[len(seq)-1]
-	return final == 't' || final == 'y' && seq[len(seq)-2] == '$'
 }
 
 func (s *session) feedScreen(output <-chan []byte) {
@@ -957,30 +967,34 @@ func shrunk(old, draft string) int {
 	return max(0, utf8.RuneCountInString(old)-utf8.RuneCountInString(draft))
 }
 
-// keyset is the keys that remove text in an agent's input box: one
-// character each, any amount, and (a subset of both) those that can remove
-// text after the cursor. submit are the keys that send the box, and clear
-// those that empty it without sending (see sent.go).
+// keyset is the keys of an agent's input box that unsent must know about,
+// as decoded keys (keys.go), whatever form the terminal sends them in. The
+// delete keys: one removes one character, many any amount, and ahead (a
+// subset of both) those that can remove text after the cursor; a key in
+// neither of the first two only removes text before it. submit are the
+// keys that send the box, and clear those that empty all of it without
+// sending (see sent.go); each is a chord of one key or more, such as Esc
+// Esc. suspend are the keys unsent takes for itself to suspend the agent,
+// on the first press; the agent never gets them.
 type keyset struct {
-	one, many, ahead [][]byte
-	submit, clear    [][]byte
+	one, many, ahead []key
+	submit, clear    [][]key
+	suspend          []key
 }
 
 // deletes returns how many characters the keys in b can delete, and
 // whether any can delete after the cursor.
 func (ks keyset) deletes(b []byte) (chars int64, ahead bool) {
-	for _, k := range ks.one {
-		chars += int64(bytes.Count(b, k))
-	}
-	for _, k := range ks.many {
-		if bytes.Contains(b, k) {
-			chars = unlimited
+	many := false
+	for _, k := range pressed(b) {
+		if slices.Contains(ks.one, k) {
+			chars++
 		}
+		many = many || slices.Contains(ks.many, k)
+		ahead = ahead || slices.Contains(ks.ahead, k)
 	}
-	for _, k := range ks.ahead {
-		if bytes.Contains(b, k) {
-			ahead = true
-		}
+	if many {
+		chars = unlimited
 	}
 	return chars, ahead
 }

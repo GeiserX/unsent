@@ -329,6 +329,18 @@ All [measured]. tmux sends modifyOtherKeys form even though it did not answer th
 
 So the case 2.8 feared happens in both terminals: the session looks suspended, and it is stuck until a Ctrl+C ends it [measured]. That Ctrl+C ends Claude Code, so a draft in the box then would be left only in unsent's last save [guess: the box was empty at Ctrl+Z in these runs].
 
+**unsent's suspend with the key decoder** (Claude Code 2.1.284, same environment, 2026-09-28). unsent now finds Ctrl+Z in every form and suspends on it, and Claude Code never gets the key.
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| `ESC[27;5;122~` (tmux) and `ESC[122;5u` (Ghostty) suspend unsent and Claude Code; the shell prints `zsh: suspended` and gets the terminal; `fg` brings Claude Code back with the draft in the box, and typing and Ctrl+W work after it | measured | tmux `capture-pane`, Ghostty screenshots, `unsent list` |
+| Without anything written on suspend, the shell got the agent's keyboard mode: Ctrl+C at the prompt printed `;5;99~` (tmux), so `fg` typed after it failed | measured | tmux `capture-pane` |
+| With Claude Code's own suspend output written first (mouse and focus reports off, `ESC[<u`, `ESC[?1049l`, `ESC[>4m`, `ESC[<u`, cursor on), the shell ran on the main screen and Ctrl+C cleared its line, in tmux and Ghostty | measured | same |
+| On the size nudge after the resume, Claude Code writes `ESC[?1049h ESC[<u ESC[>5u ESC[>4;2m`, mouse modes and `ESC[?1004h`; the next key after that brought `ESC[?2004h`; `ESC[?2031h` never came back | measured | raw log of the tmux run |
+| After `fg` the Ctrl keys came in the pushed form again (`ESC[27;5;119~` in tmux, `ESC[119;5u` in Ghostty) | measured | raw logs |
+
+Open: zsh turns bracketed paste off when it runs `fg`, and Claude Code turns it on again only with the next key, so a paste that is the first input after `fg` may arrive unbracketed [guess, not measured].
+
 **Other input that is not a key** [measured, `ghostty/keys.txt`]. Ghostty sent a focus report `ESC[I` at start, and answered Claude Code's queries on input: XTVERSION (`ESC P>|ghostty 1.3.1 ESC \`), `ESC[?5u`, DA1 twice, DECRPM for modes 2026 and 1016 (`ESC[?2026;2$y`, `ESC[?1016;2$y`), a kitty graphics reply (`ESC _Gi=31;OK ESC \`) and a cell size report (`ESC[6;17;8t`). tmux answered with XTVERSION and DA1 only.
 
 **Synchronized output depends on the terminal.** Claude Code asks `ESC[?2026$p` at start. Ghostty answered it and got every frame wrapped in `ESC[?2026h` … `ESC[?2026l`. tmux 3.6b did not answer, and the whole tmux run has no such mark [measured, both captures, counted in the raw logs]. The CLAUDE.md fact that every redraw after a key is wrapped was measured on tmux 3.7c.

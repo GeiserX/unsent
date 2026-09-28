@@ -36,17 +36,31 @@ var claude = profile{
 	// the middle as "[...Truncated text #N +M lines...]".
 	truncated: regexp.MustCompile(`\[\.\.\.Truncated text #(\d+) \+(\d+) lines\.\.\.\]`),
 	// Backspace, Ctrl+H, Delete and Ctrl+D remove one character; Ctrl+W,
-	// Ctrl+U, Ctrl+K, Alt+Backspace, Alt+D and undo (Ctrl+_) any amount.
-	// Delete, Ctrl+D, Ctrl+K, Alt+D and undo can remove text after the
-	// cursor. Enter sends the box (Ctrl+X Enter queues it, which also ends
-	// in Enter); Esc+Enter makes a new line. Ctrl+C and Esc Esc clear it.
+	// Ctrl+U, Ctrl+K, Alt+Backspace, Ctrl+Backspace, Alt+D and undo (Ctrl+_,
+	// Ctrl+-) any amount. Delete, Ctrl+D, Ctrl+K, Alt+D and undo can remove
+	// text after the cursor. Enter sends the box, and Ctrl+Enter sends it
+	// now (Ctrl+X Enter queues it, which also ends in Enter); Esc+Enter and
+	// Shift+Enter make a new line. Ctrl+C and Esc Esc clear it. Ctrl+Z is
+	// unsent's: Claude Code's own suspend hangs in a pseudo-terminal
+	// (docs/research/claude.md section 12). Ctrl+X Ctrl+S also sends now,
+	// but Ctrl+S alone stashes the box, so a chord misread would count a
+	// stash as a send: it is left out and reads as a clear. The defaults of
+	// Claude Code's keybindings (docs/research/claude.md section 4).
 	keys: keyset{
-		one:    [][]byte{{0x7f}, {0x08}, []byte("\x1b[3~"), {0x04}},
-		many:   [][]byte{{0x17}, {0x15}, {0x0b}, {0x1f}, {0x1b, 0x7f}, []byte("\x1bd")},
-		ahead:  [][]byte{[]byte("\x1b[3~"), {0x04}, {0x0b}, {0x1f}, []byte("\x1bd")},
-		submit: [][]byte{{'\r'}},
-		clear:  [][]byte{{0x03}, []byte("\x1b\x1b")},
+		one:     []key{plain(keyBackspace), ctrl('h'), plain(keyDelete), ctrl('d')},
+		many:    append([]key{ctrl('w'), ctrl('u'), ctrl('k'), alt(keyBackspace), ctrl(keyBackspace), alt('d')}, claudeUndo...),
+		ahead:   append([]key{plain(keyDelete), ctrl('d'), ctrl('k'), alt('d')}, claudeUndo...),
+		submit:  [][]key{{plain(keyEnter)}, {ctrl(keyEnter)}},
+		clear:   [][]key{{ctrl('c')}, {plain(keyEsc), plain(keyEsc)}},
+		suspend: []key{ctrl('z')},
 	},
+	// Claude Code's own suspend writes this, measured on 2.1.283 in tmux
+	// and Ghostty (testdata/keys), less bracketed paste and colour scheme
+	// reports, which it does not turn on again with its repaint. The repaint
+	// after unsent's resume sets the rest again: the alternate screen, kitty
+	// flags 5, modifyOtherKeys 2, mouse and focus reports (measured on
+	// 2.1.284 in tmux). Without it the shell got Ctrl+C as ESC[27;5;99~.
+	suspended: []byte("\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?1004l\x1b[<u\x1b[?1049l\x1b[>4m\x1b[<u\x1b[?25h"),
 	// The fixtures in testdata/claude; `claude --version` prints
 	// "2.1.282 (Claude Code)".
 	verified: "2.1.282",
@@ -69,6 +83,10 @@ var claude = profile{
 		},
 	},
 }
+
+// claudeUndo is Claude Code's undo, Ctrl+_ and Ctrl+-: 0x1f as legacy
+// bytes, and minus with Ctrl, or Ctrl and Shift, in the CSI forms.
+var claudeUndo = []key{ctrl('_'), ctrl('-'), {'-', modCtrl | modShift}, {'_', modCtrl | modShift}}
 
 // claudeChat reports whether Claude Code's arguments open the chat box with
 // nothing sent on start: no prompt argument (claude "fix x" sends it), no

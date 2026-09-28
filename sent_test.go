@@ -156,12 +156,13 @@ func TestSendCtrlCIsAClear(t *testing.T) {
 }
 
 // A check that cannot fail is not a check: with a submit key that matches
-// every key, the Ctrl+C test above must fail.
+// every key, Ctrl+C included, the Ctrl+C test above must fail.
 func TestSendCtrlCTestCatchesAnAlwaysTrueSubmit(t *testing.T) {
 	broken := claude
 	broken.keys.submit = nil
 	for b := range 256 {
-		broken.keys.submit = append(broken.keys.submit, []byte{byte(b)})
+		k, _ := legacyKey([]byte{byte(b)})
+		broken.keys.submit = append(broken.keys.submit, []key{k})
 	}
 	s := newSendSession(t, &broken)
 	clearThenSave(s, "\x03")
@@ -425,7 +426,7 @@ func TestKeyKinds(t *testing.T) {
 		{"\x1b\x1b", []keyKind{c}, false},
 		{"\r\x03", []keyKind{s, c}, false},
 		{"\x1b[A\x1bOB\x1bb", []keyKind{o}, false},
-		{"\x1b[13;2u", []keyKind{o}, false}, // Shift+Enter in CSI-u form: not known yet
+		{"\x1b[13;2u", []keyKind{o}, false}, // Shift+Enter in CSI-u form: a new line
 		{"\r\x1b[I\x1b[O\x1b[<0;10;5M\x1b[<35;1;1m\x1b[M abc", []keyKind{s, o}, false},
 		{"\r\x1b[<0;1", []keyKind{s, o}, false}, // cut short: a key, to be safe
 		{"x\x1b", []keyKind{o}, true},
