@@ -1,0 +1,284 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second row nu xi omicron pi rho sigma"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"keys": [
+"C-h"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-w"
+]
+},
+{
+"keys": [
+"M-BSpace"
+]
+},
+{
+"keys": [
+"C-BSpace"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"keys": [
+"Home"
+]
+},
+{
+"keys": [
+"DC"
+]
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"keys": [
+"M-d"
+]
+},
+{
+"keys": [
+"C-DC"
+]
+},
+{
+"keys": [
+"M-DC"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"End"
+]
+},
+{
+"keys": [
+"C-u"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-y"
+]
+},
+{
+"wait": 0.4
+},
+{
+"screen": "deletes-yank"
+},
+{
+"keys": [
+"M-y"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"Home"
+]
+},
+{
+"keys": [
+"Right",
+"Right",
+"Right",
+"Right",
+"Right",
+"Right"
+]
+},
+{
+"keys": [
+"C-k"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C--"
+]
+},
+{
+"wait": 0.4
+},
+{
+"screen": "deletes-ctrl-minus"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-_"
+]
+},
+{
+"wait": 0.4
+},
+{
+"screen": "deletes-ctrl-underscore"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"S-BSpace"
+]
+},
+{
+"keys": [
+"S-DC"
+]
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "deletes-cleared"
+},
+{
+"keys": [
+"C--"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "deletes-undo-after-clear"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

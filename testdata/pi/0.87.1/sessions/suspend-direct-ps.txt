@@ -1,0 +1,6 @@
+  PID  PPID  PGID   SESS STAT COMMAND
+96227 96209 96227      0 Ss   /bin/zsh -f
+96635 96227 96635      0 S+   script -q -r -t 0 ../out/suspend-direct.rec pi
+
+  PID  PPID  PGID STAT TTY      COMMAND
+96637 96635 96637 Ss+  ttys003  pi 

@@ -146,6 +146,155 @@ omicron pi rho sigma tau upsilon
 - How common extension editors (`setEditorComponent`) are among users.
 - Whether unsent should capture undo (`ctrl+-`) as a draft-restoring key.
 
+## Capture run on pi 0.87.1 (measured 2026-09-29)
+
+**Environment.** `@earendil-works/pi-coding-agent` 0.87.1, still the npm `latest` on 2026-09-29 (the same version the research above measured), installed with `npm install --ignore-scripts` into a scratch folder on a Mac mini with macOS 26.6.1 and run by Node 26.0.0. It ran in a private tmux 3.6b server (`tmux -L unsent-071 -f /dev/null`, `TERM=tmux-256color`, 120x40) with `extended-keys on` and `extended-keys-format csi-u`, under `unsent capture pi` with `UNSENT_DEBUG_DIR` set. unsent has no pi reader, so it printed its not-protected line and passed every byte through while logging both directions; the debug folder stayed empty, and the capture's own record is the raw log. The environment was `env -i` with a scratch `HOME`, `PI_CODING_AGENT_DIR`, `TMPDIR` and XDG folders, `PI_OFFLINE=1`, `PI_SKIP_VERSION_CHECK=1`, `PI_TELEMETRY=0`, no provider key, no `GITHUB_TOKEN`, `GH_TOKEN` or `CI`, and a `PATH` with only unsent, pi, node and the system folders (checked: no other agent resolves on it). `$EDITOR` and `$VISUAL` were unsent's copy-and-exit script. The captures, screens and probes are in [`testdata/pi/0.87.1/`](../../testdata/pi/0.87.1/), described in [its README](../../testdata/pi/README.md); every session id below is from that throwaway home.
+
+**A rig trap: with no model, pi writes no session, so nothing can be resumed.** A session file is created only once the session holds an assistant message (`_persist` in `session-manager.js` [source, 0.87.1 dist]), and with no model a submit ends in `Error: No API key found for the selected model.` before any assistant message exists [measured, `submit`, `sessions/id-3-submit-0.5s.txt`]. So the box scenarios ran with no model, as planned, and the identity and resume scenarios ran with a second scratch agent folder holding one custom provider in `models.json` (`baseUrl` `http://127.0.0.1:9/v1`, `api` `openai-completions`, `apiKey` `dummy`, model `dummy-model`) and `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY` at the same dead port. Every request failed on the machine with `Error: Connection error.`; pi retried three times and recorded each failure as an assistant error message [measured, `identity`]. This is the "unreachable base URL" path of [SPEC 5.2](../SPEC.md#52-the-real-app-test-rig), not the no-model path the lane used.
+
+### What this run corrects or adds to the profile above
+
+| The profile above says | 0.87.1 does | Tag | Evidence |
+| --- | --- | --- | --- |
+| Under unsent the terminal must answer pi's startup queries, or pi waits and falls back | tmux answered only DA1 (`ESC[?1;2;4c`), not the kitty query `ESC[?u` nor `OSC 11;?`. pi did not wait: the first frame, box and footer included, came 2 ms after the queries, 0.19 s after start. With no kitty answer pi kept modifyOtherKeys 2, and tmux sent keys in CSI-u form (table below) | measured | the first chunks of every `.rec` |
+| (not covered) | pi sends its whole terminal setup again after every Ctrl+G and on SIGCONT (`ESC[?2004h ESC[>7u ESC[?u ESC[c ESC[?25l … ESC[>4;2m`), and takes it down before the editor, on its own Ctrl+Z and on exit (`ESC[?25h ESC[?2004l ESC[<u ESC[>4;0m`) | measured | 49 kitty pushes and 48 pops in 23 records; `suspend-direct.rec` at 2.9 s and 7.1 s |
+| Ctrl+G's full redraw clears scrollback | Confirmed: each of the 10 Ctrl+G in `deletes` wrote `Launching external editor: …` outside a frame, then one `ESC[2J ESC[H ESC[3J` frame | measured | `deletes.rec` |
+| On exit 0 the editor file is set back minus one trailing `\n` | Confirmed, and it changes the draft: a draft ending in a line break (`… mu\n`, the editor copy) came back without it, so a Ctrl+Y after the round trip joined the yanked line onto `mu` | measured | `deletes.editor-4.txt`, `screens/deletes-yank.txt` |
+| Byte-exact editor copy is source only (the lane's file was overwritten) | **Byte-exact, measured.** Every editor copy equals the typed and pasted text, placeholders expanded in the right order after renumbering, no trailing newline added: `typed`, `multiline` (a blank line; `\` then Enter left no `\`), `accents`, `tall` (both), `pastes` (all three), `send-paste` | measured | the copies against the key scripts, compared by program |
+| Ctrl+C and bash-mode wipes are undoable with Ctrl+- (source) | **Measured for Ctrl+C.** Ctrl+C emptied the box, and Ctrl+- (`ESC[45;5u`) brought the whole draft back, in `deletes` and in `ctrlc-history`. Esc in `!` bash mode emptied the box too [measured, `screens/bash-mode-esc.txt`]; its undo was not tried | measured | `deletes.editor-10.txt`, `ctrlc-history.editor-2.txt` |
+| Paste ids renumber on Backspace over any marker (source) | **Measured.** `[paste #1 +12 lines] B [paste #2 1001 chars] C [paste #3 1001 chars]`, then Ctrl+A, Right (one press stepped over the whole marker) and Backspace (removed it whole) gave ` B [paste #1 1001 chars] C [paste #2 1001 chars]`; the next paste was `[paste #3 +12 lines]`. The editor copy put each text where its old id was | measured | `screens/pastes-*.txt`, `pastes.editor-2.txt` |
+| Prompt history is browsed with Up on the first row | Up browses only when the box is empty, already browsing, or the cursor is at column 0 of the first row (`editor.js`). In a typed draft the first Up moved the cursor to the line start and the second showed the newest entry, **with the draft held aside in memory**; Down put the draft back. Ctrl+C does not add the cleared draft to history; a submit that fails with no model does | measured + source | `ctrlc-history`, `screens/ctrlc-history-up-in-draft.txt`, `…-up-again-in-draft.txt`, `…-down-in-draft.txt` |
+| The working status in the top rule is source only | **Measured** during retries: `── ⠇ Retrying (1/3) in 1s... (escape to cancel) ────…`, the spinner changing each frame; after the last retry `Error: Retry failed after 3 attempts: Connection error.` above the box and the plain rule back. The box took typing during the turn, one row high | measured | `screens/identity-retry.txt`, `identity-draft-during-turn.txt`, `identity-after-retries.txt` |
+| (Ctrl+Z not covered; undo is `ctrl+z` only on win32) | Ctrl+Z is `app.suspend`: pi takes down its screen and sends SIGTSTP to its own process group. See "Ctrl+Z" below | measured | `suspend`, `suspend-direct` |
+
+Unchanged and re-seen: the inline main screen (0 `ESC[?1049h` in 23 records), the full-width `─` rules with no side border, 12 content rows at 40 rows (`max(5, floor(rows*0.3))`), centred ` ↑ N more ` and ` ↓ N more ` labels whose counts add up with the visible rows to the draft's rows (4 + 12 + 29 = 45), the reverse-video fake cursor (`ESC[7m ESC[0m` on an empty box, raw bytes), the hardware cursor hidden, `ESC]8;; BEL` at the end of every row, and the rule colour `38;5;239` [measured, `typed`, `tall`].
+
+### Box, wrapping and text
+
+- Wrap width 119 at 120 columns: 118 `a`s and then `漢字` put `漢` on the next row, leaving the first row one cell short of the width limit; 117 `x`s followed by ` ñandú` wrapped at the space [measured, `accents`, `screens/accents.txt`].
+- Precomposed accents (`ñandú`, `¿qué pasó?`, `Pingüino`), decomposed ones (`e` + U+0301, `n` + U+0303), `👍🏽` and the flag `🇪🇸` came back byte-identical through Ctrl+G [measured, `accents.editor-1.txt`].
+- A 45-line draft: 40 Up from the last row scrolled the box to rows 05 to 16 (`↑ 4 more`, `↓ 29 more`), with the cursor on the top row; an edit there, then 40 Down back to rows 34 to 45 (`↑ 33 more`), and the editor copy held the edit out of sight. After Ctrl+G the cursor sat at the end of the text; 30 Up and a Ctrl+W on row 15 changed only that row [measured, `tall`, `tall.editor-1.txt`, `tall.editor-2.txt`].
+- A blank line in the draft is a blank content row; `\` then Enter gives a new line and the `\` is not kept, even with the two keys in separate reads 0.16 s apart [measured, `multiline`].
+
+### Pastes
+
+- A 3-line paste, a 10-line paste and a 1,000-character paste went in as text. An 11-line paste ending in a line break became `[paste #1 +12 lines]` (the count is `split("\n").length`), 1,001 characters `[paste #2 1001 chars]`, an 11-line paste with no final break sent with CR `[paste #1 +11 lines]` [measured, `pastes`].
+- CR line breaks (tmux's default `paste-buffer`) came back as LF [measured, `pastes.editor-3.txt`: 10 LF, no CR].
+- After Ctrl+G the box holds the expanded text, the markers are gone, and one Backspace removes one character (`dummy` to `dumm`) [measured, `screens/pastes-after-editor.txt`, `pastes-bspace-after-editor.txt`].
+- A sent message is stored expanded: the session file's user message was the 1,021 characters typed and pasted, the transcript showed them expanded, and Up recalled them expanded [measured, `send-paste`, `sessions/id-send-paste.txt`, `screens/send-paste-up.txt`].
+
+### Keys as they reached pi in tmux (modifyOtherKeys 2, `extended-keys-format csi-u`)
+
+| Key | Bytes | What pi did (editor copy or screen) |
+| --- | --- | --- |
+| Enter | `CR` | submit |
+| Alt+Enter | `ESC[13;3u` | submit (idle) |
+| Esc then Enter (`send-keys Escape Enter`) | `ESC CR` in one read | submit (read as Alt+Enter) |
+| Ctrl+Enter, Ctrl+M | `ESC[13;5u`, `ESC[109;5u` | nothing |
+| Ctrl+J | `ESC[106;5u` | new line |
+| Shift+Enter | `ESC[13;2u` | new line |
+| `\` then Enter | `\`, then `CR` | new line, `\` dropped |
+| Backspace, Shift+Backspace | `0x7f`, `ESC[127;2u` | one character back |
+| Ctrl+H | `ESC[104;5u` | nothing |
+| Ctrl+W, Alt+Backspace | `ESC[119;5u`, `ESC[127;3u` | one word back |
+| Ctrl+Backspace | `ESC[127;5u` | nothing (bound only in the session picker) |
+| Delete, Ctrl+D (in a draft) | `ESC[3~`, `ESC[100;5u` | one character forward |
+| Alt+D, Alt+Delete | `ESC[100;3u`, `ESC[3;3~` | one word forward |
+| Ctrl+Delete | `ESC[3;5~` | nothing |
+| Shift+Delete | `ESC[3;2~` | nothing at the end of the text (not tried elsewhere) |
+| Ctrl+U | `ESC[117;5u` | kills to the start of the current line |
+| Ctrl+K | `ESC[107;5u` | kills to the end of the line |
+| Ctrl+Y, Alt+Y | `ESC[121;5u`, `ESC[121;3u` | yank, then yank-pop (the kill ring held `pha beta`, two forward kills joined) |
+| Ctrl+- | `ESC[45;5u` | undo, including a Ctrl+C clear |
+| Ctrl+_ | `ESC[95;5u` | nothing |
+| Ctrl+C | `ESC[99;5u` | clears a draft; Ctrl+D then quits on the empty box |
+| Ctrl+D (empty box) | `ESC[100;5u` | quits |
+| Ctrl+G | `ESC[103;5u` | external editor |
+| Ctrl+R | `ESC[114;5u` | nothing in the main box |
+| Ctrl+Z | `ESC[122;5u` | pi's suspend (below); through unsent, unsent's |
+| Esc | `ESC` | closes a dialog or picker; during a turn cancels the retry (`Retry cancelled`) |
+
+[measured, `deletes.rec`, `submit.rec`, `multiline.rec`, `ctrlc-history.rec`, `identity.rec`; effects from `deletes.editor-1` to `-10` and the screens]. Two effects are paired by source, not by the capture: in the group Alt+D, Ctrl+Delete, Alt+Delete the copy lost `pha` and ` beta`, and the keybindings put the word forward on Alt+D and Alt+Delete only. The encodings are tmux's for modifyOtherKeys 2 under its csi-u format; no kitty-capable terminal was run, so flag-7 release events were not seen.
+
+**Submit keys: Enter, Alt+Enter, and Esc then Enter when the two arrive in one read. New line: Ctrl+J, Shift+Enter, `\` then Enter.** A submit empties the box at once; with no model the prompt is not drawn in the transcript, only the error, and with a model it is drawn above the box [measured, `submit`, `identity`, `send-paste`].
+
+**Ctrl+Z.** pi binds it to `app.suspend`: `ui.stop()`, then `process.kill(0, "SIGTSTP")`, and it redraws when a SIGCONT comes (`handleCtrlZ`, `interactive-mode.js` [source]). Run alone under `script` (its own terminal session, so an orphaned process group), Ctrl+Z made pi write `ESC[4B CR CR LF ESC[?25h ESC[?2004l ESC[<u ESC[>4;0m`: the cursor below the box, cursor on, bracketed paste off, kitty pop, modifyOtherKeys off. The kernel dropped the SIGTSTP, so pi kept running (state `S`, not `T`) with its screen stopped: text typed then was echoed by the terminal and went into the box when the rig sent SIGCONT by hand, after which pi set its modes again and redrew with `ESC[2J ESC[H ESC[3J` [measured, `suspend-direct.rec` at 2.9 s and 7.1 s, `sessions/suspend-direct-ps.txt`, `screens/suspend-direct-after-cont.txt`]. Without that SIGCONT pi would stay like that: the same hang unsent's suspend exists for. Through unsent, which takes Ctrl+Z for an agent with no profile, zsh printed `suspended  unsent capture pi`, unsent showed state `T`, and `fg` brought the box back with the draft, which the next Ctrl+G copy matched [measured, `suspend`]. So pi's profile keeps Ctrl+Z as unsent's, and its `suspended` bytes are the teardown above.
+
+### A send that fails
+
+- With no model: Enter empties the box, draws `Error: No API key found for the selected model.` and the `/login` hint above it, and writes nothing to disk. The prompt goes into the in-memory history (Up recalls it) [measured, `submit`, `ctrlc-history`].
+- With the dead-port model: Enter draws the prompt above the box, then `Error: Connection error.`, and the top rule carries `Retrying (n/3) in Ns... (escape to cancel)` for about 12 s; a draft typed during the retries stays in the box and Ctrl+G copies it. Alt+Enter submits the same way. Esc cancels the retry (`Retry failed after 1 attempts: Retry cancelled`) and leaves the box empty [measured, `identity`].
+
+### Session identity
+
+| When | What is under `PI_CODING_AGENT_DIR` | What another process can read | Tag |
+| --- | --- | --- | --- |
+| Start, before any key | `settings.json` (`{"lastChangelogVersion": "0.87.1"}`), `auth.json` and `models-store.json` (`{}`), and an empty `sessions/--<cwd with / as ->--/` folder, all written at start. No session file | the pi process holds only its working folder open; no pid-keyed file; the process title is `pi` | measured, `sessions/id-0-start.txt`, `id-dp-0-start.txt` |
+| Typed, not sent; after Ctrl+C | nothing new | nothing new | measured, `id-1-typed.txt`, `id-2-ctrlc.txt`, `id-dp-1`, `id-dp-2` |
+| After a failed submit, no model | nothing new, then or at exit | nothing | measured, `id-3-submit-0.5s.txt`, `id-6-end.txt` |
+| 0.3 s after a failed submit, dead port | `sessions/--<cwd>--/<start time>_<id>.jsonl`, named with the time pi **started** (`2026-09-29T13-55-21-526Z`, 6 s before the submit). Its lines: `{"type":"session","version":3,"id":"<id>",…,"cwd":…}`, `model_change`, `thinking_level_change`, a `system` message, the `user` message, then one `assistant` error message and one `context_edit` per retry | the file, held open only for the instant of an append (one poll caught it open, the next one no longer); its name and first line carry the id | measured, `id-dp-3-submit-0.3s.txt`, `poll-identity.txt` |
+| After Esc cancels a retry, after a later Ctrl+C | appended entries, same file | the same | measured, `id-dp-5`, `id-dp-6` |
+| At exit, once the session has a file | the screen prints `To resume this session: pi --session <id>`; nothing is written | nothing | measured, every `-exit` screen of the dead-port runs |
+
+`/session` shows the session file and `ID: <id>` from start, before the file exists: a UUIDv7 (`01a0ed72-d735-77d5-…`), the file named `<start time>_<id>.jsonl` [measured, `screens/session-info.txt`, `identity-session.txt`]. That is the only place the id shows while nothing has been written, and reading it takes typing a command.
+
+**Resume forms.**
+
+| How it was opened | Session it then runs (from `/session`) | What changed on disk at the start | Tag |
+| --- | --- | --- | --- |
+| `pi -c` | the newest session of the folder, same id and same file; later entries appended to it | nothing, until the next submit (the file stayed 9,517 bytes until then) | measured, `resume-c`, `poll-resume-c.txt` |
+| `pi -r` (the picker, drawn between the `─` rules in place of the box, `Resume Session (Current Folder)`, newest first) | the chosen id; Down then Enter picked the older one | nothing while open or after the choice | measured, `resume-picker`, `poll-resume-picker.txt` |
+| `pi --session <id prefix>` | that id | nothing | measured, `resume-session`, `poll-resume-session.txt` |
+| `/resume` inside a session, then Enter | the chosen id. The new session pi had started with (`01a0ed74-7e72-…`) was never written | nothing | measured, `slash-resume` |
+| `/new` inside a session | a new id (`✓ New session started`), with no file until its first submit | nothing, then a new file | measured, `slash-new` |
+| `pi --fork <id>` | a new id, whose file exists at start with `"parentSession": "<path of the old file>"` in its header | a new file | measured, `fork`, `sessions/fork-session.jsonl` |
+| `pi --session <id>` of a session that never got a reply, or of an unknown id | `No session found matching '<id>'`, exit status 1 | nothing | measured, `resume-unsent-id`, `resume-unknown` |
+
+The picker lists only sessions with a file. `pi --session-id <id>` ("use exact project session ID, creating it if missing") also exists [source, the help text in `cli/args.js`], not tried.
+
+**So the running session's id cannot be read from outside while pi runs, until pi appends to the session file.** pi holds no file open between appends, writes nothing keyed by pid, and a resume, the picker, `/resume` and `/new` touch no file until the next entry [measured, the polls and `id-*` probes above]. What another process can read:
+
+- after the running pi's first append (a reply, an error reply, a model change), the `sessions/--<cwd>--/` file whose size grew since the child started: its name and first line hold the id. Two pi processes in the same folder make that ambiguous [guess];
+- a fork, whose new file exists from start [measured];
+- the screen: a resumed session redraws its earlier prompts above the box (`resume-c` shows both sent prompts), which could be matched against the user messages of each session file [design, not tried].
+
+Reading the id from `pi -c`, `--session` or `--fork` on the command line would miss the picker and `/resume`, and [SPEC 2.3](../SPEC.md#23-restore-in-box) rules the command line out; passing `--session-id` ourselves would be reconfiguring the agent, which [decision 3](../SPEC.md#8-decisions) rules out. For restore this also means: a pi draft typed in a session that never got a reply has no file, cannot be resumed, and can only come back through the notice and `unsent restore`, as for Claude Code.
+
+### Kill, close, synchronized output
+
+- `kill -9` of pi: unsent exited with it, by the same signal, the draft (`kill nine draft zebra`) is in no file of the scratch folders, and the terminal kept bracketed paste and modifyOtherKeys 2 on, with unsent's exit lines printed on the draft's last row [measured, `kill9`, `sessions/id-k9-after.txt`, `screens/kill9-after.txt`].
+- tmux `kill-session`: pi wrote its teardown on the hangup, pi and unsent exited, no process was left, and the draft is in no file [measured, `killsession.rec` at 3.1 s, `sessions/ks-kill.txt`].
+- **pi sends synchronized-output marks.** 664 `ESC[?2026h`/`ESC[?2026l` pairs in 23 records, balanced in every record, and every paint of the box inside a pair. Outside the pairs there were only hardware-cursor moves (`ESC[nG`, `ESC[nA`, `ESC[nB`, `ESC[?25l`), the mode setups and teardowns, the startup queries, the window title (`OSC 0;π - work`), the `Launching external editor:` lines, the exit line, and the terminal's echo of text typed while pi was stopped. The median time between the ends of two frames was 82 ms, the shortest 0.7 ms [measured, all records]. pi needs no quiet-gap read.
+
+### Negative screens
+
+Each of these draws the same two full-width `─` rules with something that is not the draft between them, in place of the box [measured, `dialogs`, `resume-picker`, `slash-resume`]:
+
+- `/model` and Ctrl+L: the model picker, a `> ` search row with the reverse-video cursor, `No matching models`, `Model catalogs refreshed.`, a key hint row;
+- `/resume` and `pi -r`: `Resume Session (Current Folder)`, two hint rows, the same `> ` search row with the cursor, then the sessions or `No sessions in current folder. Press Tab to view all.`;
+- `/settings`: a list of 31 settings with `→` on the chosen row and a `> ` search row with the cursor;
+- `/login`: `Select authentication method:` with `→`; `/trust`: `Project trust` with `→`; `/tree`: `Session Tree` with its own rules inside;
+- the `/` menu (`→ settings …`, `(1/25)`) draws under the bottom rule, with the box itself holding `/`; `@` in the empty scratch folder drew no list;
+- `!` bash mode: the box holds `!echo dummy` with the rule in another colour, and Esc empties it.
+
+A reader that takes "two rules, content rows, one reverse-video cursor" as the box would read the pickers' `> ` rows as a draft of `>`: the rows under the top rule, a row starting `> ` with hint rows around it, and a content height the box would not have tell them apart. `/hotkeys` and `/session` print into the transcript and leave the box as it is.
+
+### Open questions from above, answered where this run could
+
+- **The top rule during a real agent turn:** measured with a retrying request (above). A streaming reply was not seen, since nothing can answer.
+- **Delete-key bytes under Ghostty or iTerm2 with kitty flags 7:** not run. tmux does not answer `ESC[?u`, so the table is modifyOtherKeys 2 in tmux's CSI-u form.
+- **Fullscreen with a long transcript:** not run.
+- **Extension editors:** not run; none is installed in a scratch home.
+- **Whether unsent should capture undo (`ctrl+-`) as a draft-restoring key:** Ctrl+- brings back a Ctrl+C clear in full, markers included, so a profile that treats Ctrl+C as a clear must also expect the cleared text back in the box with no recall key [measured]; how the profile handles it is a design choice.
+- **SPEC 2.3's pi row, "how the running session's id is read":** no out-of-process source until the first append (above).
+
+### What this run could not capture
+
+- A kitty-capable terminal, flag-7 release events, fullscreen mode, a Ctrl+V or right-click clipboard paste, and a streaming reply.
+- The paste settle delay and a restore: unsent has no pi reader yet.
+- The resume forms with no model: no session file is ever written then, so they ran on the dead-port provider instead.
+- History recalled in a resumed session (`populateHistory`): not tried.
+
 ## Verification notes
 Checked against the lane's scratch dir `/tmp/pi-profile` (clone at `2b0a123d`, raw logs, fixtures, grab file) plus `npm view` and `curl`:
 - **Re-counted in `raw.log` / `raw-fs.log` and confirmed:** 0 vs 1 × `?1049h`; 69/69 `?2026` pairs; 2 × `2J`/`3J`, both after Ctrl+G; `>7u` and `>4;2m`; `38;5;239`/`143`; both paste markers.

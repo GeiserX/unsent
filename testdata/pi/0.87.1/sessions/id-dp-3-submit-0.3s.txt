@@ -1,0 +1,27 @@
+pane pid: 39890
+  PID  PPID COMMAND
+39890 39875 unsent capture pi
+child: 39954 39890 pi 
+  files the child holds open under the scratch folder:
+    work
+agent dir (PI_CODING_AGENT_DIR):
+       dir 15:55:21 agentdir-deadport/
+         2 15:55:21 agentdir-deadport/auth.json
+         2 15:55:21 agentdir-deadport/models-store.json
+       193 15:53:51 agentdir-deadport/models.json
+       dir 15:55:21 agentdir-deadport/sessions/
+       dir 15:55:27 agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/
+      7115 15:55:27 agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl
+        38 15:55:21 agentdir-deadport/settings.json
+== agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl (7 lines)
+{"type":"session","version":3,"id":"01a0ed72-d735-77d5-9a17-81331e615add","timestamp":"2026-09-29T13:55:21.526Z","cwd":"/Volumes/Data/unsent-071.hggN/work"}
+{"type":"model_change","id":"04707c3a","parentId":null,"timestamp":"2026-09-29T13:55:21.542Z","provider":"deadport","modelId":"dummy-model"}
+{"type":"thinking_level_change","id":"84633ae0","parentId":"04707c3a","timestamp":"2026-09-29T13:55:21.542Z","thinkingLevel":"off"}
+{"type":"message","id":"a751c460","parentId":"84633ae0","timestamp":"2026-09-29T13:55:27.259Z","message":{"role":"system","content":"","sections":{"preamble":"You are an expert coding assistant operating inside pi, a coding agent harness. Y
+{"type":"message","id":"a202a940","parentId":"a751c460","timestamp":"2026-09-29T13:55:27.260Z","message":{"role":"user","content":[{"type":"text","text":"dummy prompt that must fail on the dead port"}],"timestamp":1790690127256}}
+{"type":"message","id":"5d2e9ef9","parentId":"a202a940","timestamp":"2026-09-29T13:55:27.271Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"5dd3c335","parentId":"5d2e9ef9","timestamp":"2026-09-29T13:55:27.272Z","targetId":"5d2e9ef9","replacement":null}
+== agentdir-deadport/settings.json: {  "lastChangelogVersion": "0.87.1"}
+== agentdir-deadport/auth.json: {}
+== agentdir-deadport/models-store.json: {}
+== agentdir-deadport/models.json: {  "providers": {    "deadport": {      "baseUrl": "http://127.0.0.1:9/v1",      "api": "openai-completions",      "apiKey": "dummy",      "models": [{ "id": "dummy-model" }]    }  }}

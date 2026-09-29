@@ -1,0 +1,44 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "kill nine draft zebra"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line of it"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "kill9-before"
+},
+{
+"sh": "./ids.sh",
+"out": "id-k9-before"
+},
+{
+"sh": "P=$(./t display -p -t rig '#{pane_pid}'); C=$(pgrep -P $P); echo killing $C; kill -9 $C; sleep 1.5; ps -o pid,stat,command -p $P $C; true",
+"out": "k9-kill"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "kill9-after"
+},
+{
+"sh": "grep -rl 'zebra' agentdir home tmp xdg 2>/dev/null | grep -v unsent-capture || echo 'zebra: in no file of the scratch pi dirs'; find agentdir -type f",
+"out": "id-k9-after"
+}
+]

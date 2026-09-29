@@ -1,0 +1,157 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-0-start"
+},
+{
+"type": "typed but not submitted, dummy"
+},
+{
+"wait": 0.8
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-1-typed"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-2-ctrlc"
+},
+{
+"type": "dummy prompt that must fail on the dead port"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 0.3
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-3-submit-0.3s"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "identity-retry"
+},
+{
+"type": "a draft typed during the retries"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "identity-draft-during-turn"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-4-during-turn"
+},
+{
+"wait": 10
+},
+{
+"screen": "identity-after-retries"
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-5-after-retries"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"type": "/session"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "identity-session"
+},
+{
+"type": "second prompt for the dead port, dummy"
+},
+{
+"keys": [
+"M-Enter"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "identity-alt-enter"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "identity-escape"
+},
+{
+"sh": "./ids.sh",
+"out": "id-dp-6-escape"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

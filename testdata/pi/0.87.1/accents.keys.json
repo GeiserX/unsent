@@ -1,0 +1,61 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "Canci\u00f3n del \u00f1and\u00fa: \u00bfqu\u00e9 pas\u00f3? \u00a1Ol\u00e9! Ping\u00fcino, caf\u00e9, acci\u00f3n. cafe\u0301 decomposed, n\u0303 too. Emoji \ud83c\udf89 \ud83d\udc4d\ud83c\udffd \ud83c\uddea\ud83c\uddf8 done."
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u6f22\u5b57 wide at the edge"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \u00f1and\u00fa wraps here"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "accents"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "accents-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

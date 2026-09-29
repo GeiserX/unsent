@@ -1,0 +1,73 @@
+[
+{
+"until": "Resume Session",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"screen": "resume-picker"
+},
+{
+"sh": "./ids.sh",
+"out": "id-picker-open"
+},
+{
+"keys": [
+"Down"
+]
+},
+{
+"wait": 0.4
+},
+{
+"screen": "resume-picker-down"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-picker-chosen"
+},
+{
+"type": "/session"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "resume-picker-session"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

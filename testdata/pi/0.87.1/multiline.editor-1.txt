@@ -1,0 +1,6 @@
+first line of a dummy draft
+second line
+
+fourth, after a blank line
+fifth via Shift+Enter
+sixth via backslash Enter

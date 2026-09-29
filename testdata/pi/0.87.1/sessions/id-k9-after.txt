@@ -1,0 +1,4 @@
+zebra: in no file of the scratch pi dirs
+agentdir/settings.json
+agentdir/models-store.json
+agentdir/auth.json

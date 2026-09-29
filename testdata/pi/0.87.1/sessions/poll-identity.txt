@@ -1,0 +1,11 @@
+  0.00s box: no
+  0.00s picker: no
+  0.01s session files: none
+  0.59s child pid: 39898
+  0.60s held open: work
+  0.74s child pid: 39954
+  0.95s box: drawn
+  6.61s held open: agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl work
+  6.61s session files: 2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl 6973B
+  6.69s held open: work
+  6.69s session files: 2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl 7115B

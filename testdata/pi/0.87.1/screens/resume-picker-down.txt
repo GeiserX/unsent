@@ -1,0 +1,40 @@
+unsent: no reader for "pi" yet, running it without saving drafts
+
+[38;5;109m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[1m[39mResume Session (Current Folder)[0m                                      [38;5;109m◉ Current Folder[38;5;244m | ○ All[39m  [38;5;244mName: [38;5;109mAll[39m  [38;5;244mSort: [38;5;109mThreaded
+[38;5;241mtab[38;5;244m scope · re:<pattern> regex · "phrase" exact[39m
+[38;5;241mctrl+s[38;5;244m sort · [38;5;241mctrl+n[38;5;244m named · [38;5;241mctrl+d[38;5;244m delete · [38;5;241mctrl+p[38;5;244m path (off)[39m
+
+> [7m [0m
+
+  prompt in the new session, dummy                                                                                 [38;5;241m3 now
+[38;5;109m[48;5;59m› [1m[39mdummy prompt that must fail on the dead port[0m[48;5;59m                                                                    [38;5;241m10 now
+
+[38;5;109m[49m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

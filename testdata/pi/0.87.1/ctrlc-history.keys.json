@@ -1,0 +1,226 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "a draft to clear with ctrl c"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "its second line"
+},
+{
+"wait": 0.4
+},
+{
+"screen": "ctrlc-history-draft"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "ctrlc-history-cleared"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-after-clear"
+},
+{
+"type": "first sent prompt, dummy"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.5
+},
+{
+"type": "second sent prompt, dummy"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "ctrlc-history-sent"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-1"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-2"
+},
+{
+"keys": [
+"Down"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-down-1"
+},
+{
+"keys": [
+"Down"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-down-back"
+},
+{
+"type": "typed draft"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-in-draft"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-again-in-draft"
+},
+{
+"keys": [
+"Down"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-down-in-draft"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-r"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-ctrl-r"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "ctrlc-history-cleared-2"
+},
+{
+"keys": [
+"C--"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-undo"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

@@ -1,0 +1,51 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"screen": "typed-empty"
+},
+{
+"type": "hello from the rig, dummy text only"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "typed"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "typed-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "typed-cleared"
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

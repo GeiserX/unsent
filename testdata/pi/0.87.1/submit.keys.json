@@ -1,0 +1,195 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-0-start"
+},
+{
+"type": "typed but not submitted, dummy"
+},
+{
+"wait": 0.8
+},
+{
+"sh": "./ids.sh",
+"out": "id-1-typed"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-2-ctrlc"
+},
+{
+"type": "dummy prompt that must fail with no model"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "submit-0.5s"
+},
+{
+"sh": "./ids.sh",
+"out": "id-3-submit-0.5s"
+},
+{
+"wait": 3
+},
+{
+"screen": "submit-4s"
+},
+{
+"type": "a draft typed after the failed submit"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "submit-draft-after"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-4-draft-after"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-5-ctrlc-after-submit"
+},
+{
+"screen": "submit-cleared"
+},
+{
+"type": "submitted with alt enter, dummy"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"M-Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "submit-alt-enter"
+},
+{
+"type": "submitted with esc then enter, dummy"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"Escape",
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "submit-esc-enter"
+},
+{
+"type": "submitted with ctrl enter, dummy"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"C-Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "submit-ctrl-enter"
+},
+{
+"type": "ctrl m, dummy"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"C-m"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "submit-ctrl-m"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-6-end"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

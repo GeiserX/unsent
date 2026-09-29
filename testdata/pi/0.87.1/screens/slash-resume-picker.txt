@@ -1,0 +1,40 @@
+ [38;5;226mWarning: ripgrep not found. Offline mode enabled, skipping download.[39m
+
+ [1mSession Info[0m
+
+ [38;5;241mFile:[39m
+ /Volumes/Data/unsent-071.hggN/agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-57-09-875
+ Z_01a0ed74-7e72-7317-8d76-7494dfb4a739.jsonl
+ [38;5;241mID:[39m 01a0ed74-7e72-7317-8d76-7494dfb4a739
+
+ [1mMessages[0m
+ [38;5;241mTotal:[39m 0
+ [38;5;241mUser:[39m 0
+ [38;5;241mAssistant:[39m 0
+ [38;5;241mTools:[39m 0 calls, 0 results
+
+ [1mTokens[0m
+ [38;5;241mInput:[39m 0
+ [38;5;241mOutput:[39m 0
+ [38;5;241mTotal:[39m 0
+
+ [1mCache Warming[0m
+ [38;5;241mMode:[39m streaming
+ [38;5;241mStatus:[39m Inactive (waiting for first request)
+
+
+
+[38;5;109m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[1m[39mResume Session (Current Folder)[0m                                      [38;5;109m◉ Current Folder[38;5;244m | ○ All[39m  [38;5;244mName: [38;5;109mAll[39m  [38;5;244mSort: [38;5;109mThreaded
+[38;5;241mtab[38;5;244m scope · re:<pattern> regex · "phrase" exact[39m
+[38;5;241mctrl+s[38;5;244m sort · [38;5;241mctrl+n[38;5;244m named · [38;5;241mctrl+d[38;5;244m delete · [38;5;241mctrl+p[38;5;244m path (off) · [38;5;241mctrl+r[38;5;244m rename[39m
+
+> [7m [0m
+
+[38;5;109m[48;5;59m› [1m[39mprompt in the new session, dummy[0m[48;5;59m                                                                                 [38;5;241m3 now
+[39m[49m  dummy prompt that must fail on the dead port                                                                     [38;5;241m10 1m
+
+[38;5;109m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;241m/Volumes/Data/unsent-071.hggN/work[39m
+[38;5;241m0.0%/128k (auto)                                                                                             dummy-model

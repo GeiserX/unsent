@@ -1,0 +1,47 @@
+pane pid: 72249
+  PID  PPID COMMAND
+72249 72232 unsent capture pi --session 01a0ed72
+child: 72315 72249 pi   
+  files the child holds open under the scratch folder:
+    work
+agent dir (PI_CODING_AGENT_DIR):
+       dir 15:57:00 agentdir-deadport/
+         2 15:55:21 agentdir-deadport/auth.json
+         2 15:55:21 agentdir-deadport/models-store.json
+       193 15:53:51 agentdir-deadport/models.json
+       dir 15:55:21 agentdir-deadport/sessions/
+       dir 15:56:20 agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/
+     10319 15:56:05 agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl
+      7103 15:56:20 agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-56-16-928Z_01a0ed73-af9e-70b8-a4f1-db2216d2e0cc.jsonl
+        38 15:55:21 agentdir-deadport/settings.json
+== agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl (18 lines)
+{"type":"session","version":3,"id":"01a0ed72-d735-77d5-9a17-81331e615add","timestamp":"2026-09-29T13:55:21.526Z","cwd":"/Volumes/Data/unsent-071.hggN/work"}
+{"type":"model_change","id":"04707c3a","parentId":null,"timestamp":"2026-09-29T13:55:21.542Z","provider":"deadport","modelId":"dummy-model"}
+{"type":"thinking_level_change","id":"84633ae0","parentId":"04707c3a","timestamp":"2026-09-29T13:55:21.542Z","thinkingLevel":"off"}
+{"type":"message","id":"a751c460","parentId":"84633ae0","timestamp":"2026-09-29T13:55:27.259Z","message":{"role":"system","content":"","sections":{"preamble":"You are an expert coding assistant operating inside pi, a coding agent harness. Y
+{"type":"message","id":"a202a940","parentId":"a751c460","timestamp":"2026-09-29T13:55:27.260Z","message":{"role":"user","content":[{"type":"text","text":"dummy prompt that must fail on the dead port"}],"timestamp":1790690127256}}
+{"type":"message","id":"5d2e9ef9","parentId":"a202a940","timestamp":"2026-09-29T13:55:27.271Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"5dd3c335","parentId":"5d2e9ef9","timestamp":"2026-09-29T13:55:27.272Z","targetId":"5d2e9ef9","replacement":null}
+{"type":"message","id":"1f0ca060","parentId":"5dd3c335","timestamp":"2026-09-29T13:55:29.279Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"b6982759","parentId":"1f0ca060","timestamp":"2026-09-29T13:55:29.279Z","targetId":"1f0ca060","replacement":null}
+{"type":"message","id":"cec3d731","parentId":"b6982759","timestamp":"2026-09-29T13:55:33.285Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"1a5c539d","parentId":"cec3d731","timestamp":"2026-09-29T13:55:33.285Z","targetId":"cec3d731","replacement":null}
+{"type":"message","id":"f7273471","parentId":"1a5c539d","timestamp":"2026-09-29T13:55:41.288Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"message","id":"862fb244","parentId":"f7273471","timestamp":"2026-09-29T13:55:45.787Z","message":{"role":"user","content":[{"type":"text","text":"second prompt for the dead port, dummy"}],"timestamp":1790690145786}}
+{"type":"message","id":"77099bcf","parentId":"862fb244","timestamp":"2026-09-29T13:55:45.790Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"77704c7e","parentId":"77099bcf","timestamp":"2026-09-29T13:55:45.790Z","targetId":"77099bcf","replacement":null}
+{"type":"message","id":"90992a32","parentId":"77704c7e","timestamp":"2026-09-29T13:56:05.962Z","message":{"role":"user","content":[{"type":"text","text":"prompt in the resumed session, dummy"}],"timestamp":1790690165961}}
+{"type":"message","id":"35ec275f","parentId":"90992a32","timestamp":"2026-09-29T13:56:05.971Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"a560f702","parentId":"35ec275f","timestamp":"2026-09-29T13:56:05.972Z","targetId":"35ec275f","replacement":null}
+== agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-56-16-928Z_01a0ed73-af9e-70b8-a4f1-db2216d2e0cc.jsonl (7 lines)
+{"type":"session","version":3,"id":"01a0ed73-af9e-70b8-a4f1-db2216d2e0cc","timestamp":"2026-09-29T13:56:16.928Z","cwd":"/Volumes/Data/unsent-071.hggN/work"}
+{"type":"model_change","id":"bc75cf51","parentId":null,"timestamp":"2026-09-29T13:56:16.944Z","provider":"deadport","modelId":"dummy-model"}
+{"type":"thinking_level_change","id":"ff41e1bf","parentId":"bc75cf51","timestamp":"2026-09-29T13:56:16.944Z","thinkingLevel":"off"}
+{"type":"message","id":"57213722","parentId":"ff41e1bf","timestamp":"2026-09-29T13:56:20.531Z","message":{"role":"system","content":"","sections":{"preamble":"You are an expert coding assistant operating inside pi, a coding agent harness. Y
+{"type":"message","id":"a1fddd36","parentId":"57213722","timestamp":"2026-09-29T13:56:20.531Z","message":{"role":"user","content":[{"type":"text","text":"prompt in the new session, dummy"}],"timestamp":1790690180528}}
+{"type":"message","id":"e2b09d96","parentId":"a1fddd36","timestamp":"2026-09-29T13:56:20.545Z","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"deadport","model":"dummy-model","usage":{"input":0,"output":0,"
+{"type":"context_edit","id":"44552bed","parentId":"e2b09d96","timestamp":"2026-09-29T13:56:20.547Z","targetId":"e2b09d96","replacement":null}
+== agentdir-deadport/settings.json: {  "lastChangelogVersion": "0.87.1"}
+== agentdir-deadport/auth.json: {}
+== agentdir-deadport/models-store.json: {}
+== agentdir-deadport/models.json: {  "providers": {    "deadport": {      "baseUrl": "http://127.0.0.1:9/v1",      "api": "openai-completions",      "apiKey": "dummy",      "models": [{ "id": "dummy-model" }]    }  }}

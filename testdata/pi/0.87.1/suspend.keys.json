@@ -1,0 +1,110 @@
+[
+{
+"wait": 1.0
+},
+{
+"type": "unsent capture pi"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "draft before ctrl z, dummy"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "suspend-draft"
+},
+{
+"keys": [
+"C-z"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "suspend-stopped"
+},
+{
+"sh": "./t display -p -t rig '#{alternate_on}'; ps -o pid,ppid,stat,command -t $(./t display -p -t rig '#{pane_tty}' | sed 's|/dev/tty||') | cut -c1-80",
+"out": "suspend-ps"
+},
+{
+"type": "fg"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-fg"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "suspend-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+},
+{
+"wait": 1.0
+},
+{
+"screen": "suspend-shell-after"
+},
+{
+"type": "exit"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+}
+]

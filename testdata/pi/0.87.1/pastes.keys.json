@@ -1,0 +1,213 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"paste": "p3 line 01 dummy\np3 line 02 dummy\np3 line 03 dummy",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-3-lines"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"paste": "p10 line 01 dummy\np10 line 02 dummy\np10 line 03 dummy\np10 line 04 dummy\np10 line 05 dummy\np10 line 06 dummy\np10 line 07 dummy\np10 line 08 dummy\np10 line 09 dummy\np10 line 10 dummy",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-10-lines"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"paste": "thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand t",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-1000"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "pastes-inline-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"paste": "p11 line 01 dummy\np11 line 02 dummy\np11 line 03 dummy\np11 line 04 dummy\np11 line 05 dummy\np11 line 06 dummy\np11 line 07 dummy\np11 line 08 dummy\np11 line 09 dummy\np11 line 10 dummy\np11 line 11 dummy\n",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-11-lines"
+},
+{
+"type": " B "
+},
+{
+"paste": "overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit o",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"type": " C "
+},
+{
+"paste": "secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone secondone s",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-three-markers"
+},
+{
+"keys": [
+"C-a"
+]
+},
+{
+"wait": 0.3
+},
+{
+"keys": [
+"Right"
+]
+},
+{
+"wait": 0.3
+},
+{
+"screen": "pastes-cursor-after-first"
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-first-deleted"
+},
+{
+"keys": [
+"End"
+]
+},
+{
+"type": " D "
+},
+{
+"paste": "p12 line 01 dummy\np12 line 02 dummy\np12 line 03 dummy\np12 line 04 dummy\np12 line 05 dummy\np12 line 06 dummy\np12 line 07 dummy\np12 line 08 dummy\np12 line 09 dummy\np12 line 10 dummy\np12 line 11 dummy\np12 line 12 dummy",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-pasted-again"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "pastes-after-editor"
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "pastes-bspace-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"paste": "cr one\ncr two\ncr three\ncr four\ncr five\ncr six\ncr seven\ncr eight\ncr nine\ncr ten\ncr eleven",
+"raw": false
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-cr"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

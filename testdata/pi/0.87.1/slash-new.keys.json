@@ -1,0 +1,80 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "/new"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "slash-new"
+},
+{
+"sh": "./ids.sh",
+"out": "id-slash-new-before-send"
+},
+{
+"type": "/session"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "slash-new-session"
+},
+{
+"type": "prompt in the new session, dummy"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-slash-new-after-send"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

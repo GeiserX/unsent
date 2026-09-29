@@ -1,0 +1,86 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "before "
+},
+{
+"paste": "pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend pastedsend ",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"type": " after, dummy"
+},
+{
+"wait": 0.4
+},
+{
+"screen": "send-paste-draft"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "send-paste-sent"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-send-paste"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "send-paste-up"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

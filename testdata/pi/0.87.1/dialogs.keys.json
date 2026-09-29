@@ -1,0 +1,284 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"screen": "empty"
+},
+{
+"type": "/"
+},
+{
+"wait": 0.8
+},
+{
+"screen": "slash-menu"
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"type": "@"
+},
+{
+"wait": 1.0
+},
+{
+"screen": "at-popup"
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"keys": [
+"C-o"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "startup-help"
+},
+{
+"keys": [
+"C-o"
+]
+},
+{
+"wait": 0.5
+},
+{
+"type": "/settings"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "settings"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"type": "/hotkeys"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "hotkeys"
+},
+{
+"type": "/login"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "login"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"type": "/resume"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "resume-empty"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"type": "/model"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "model-picker"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"C-l"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "model-ctrl-l"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"type": "/session"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "session-info"
+},
+{
+"type": "!"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "bash-mode"
+},
+{
+"type": "echo dummy"
+},
+{
+"wait": 0.3
+},
+{
+"screen": "bash-mode-typed"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "bash-mode-esc"
+},
+{
+"type": "/tree"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "tree"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"type": "/trust"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "trust"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "empty-again"
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

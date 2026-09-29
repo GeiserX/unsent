@@ -1,0 +1,40 @@
+[48;5;59m
+ [38;5;188msecond prompt for the dead port, dummy[39m
+
+
+[49m [38;5;167mError: Connection error.[39m
+
+[48;5;59m
+ [38;5;188mprompt in the resumed session, dummy[39m
+
+
+[49m [38;5;167mError: Connection error.[39m
+
+ [1mSession Info[0m
+
+ [38;5;241mFile:[39m
+ /Volumes/Data/unsent-071.hggN/agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-55-21-526
+ Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl
+ [38;5;241mID:[39m 01a0ed72-d735-77d5-9a17-81331e615add
+
+ [1mMessages[0m
+ [38;5;241mTotal:[39m 10
+ [38;5;241mUser:[39m 3
+ [38;5;241mAssistant:[39m 6
+ [38;5;241mTools:[39m 0 calls, 0 results
+
+ [1mTokens[0m
+ [38;5;241mInput:[39m 0
+ [38;5;241mOutput:[39m 0
+ [38;5;241mTotal:[39m 0
+
+ [1mCache Warming[0m
+ [38;5;241mMode:[39m streaming
+ [38;5;241mStatus:[39m Inactive (waiting for first request)
+
+
+[38;5;239m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[7m[39m [0m
+[38;5;239m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;241m/Volumes/Data/unsent-071.hggN/work[39m
+[38;5;241m1.1%/128k (auto)                                                                                             dummy-model
