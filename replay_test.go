@@ -289,6 +289,13 @@ func replayRun(t *testing.T, file string, tick time.Duration, closed bool) (send
 //   - agents-view: /rename alpha-notes, Enter, ← to the agents view, whose
 //     box shows a grey placeholder, Esc back, a message sent, ← again and
 //     Ctrl+C twice; its output also sets the window title "✳ alpha-notes";
+//   - rename-long-name: /rename with a name wider than the window, which
+//     the rule shows cut with an ellipsis and no rule before it, then a
+//     prompt typed under it and Ctrl+C twice, which clears it first;
+//   - resume-picker-ctrlc: a message sent, /resume, Ctrl+C twice, which
+//     leaves the picker open, the window closed;
+//   - model-ctrlc: /model, Ctrl+C twice, which leaves the dialog open, the
+//     window closed;
 //   - control: a prompt half typed, the window closed.
 func TestReplayClaudeSlashCommandsAndNames(t *testing.T) {
 	for _, c := range []struct {
@@ -309,6 +316,9 @@ func TestReplayClaudeSlashCommandsAndNames(t *testing.T) {
 		{"slash-help", false, []string{"/exit"}, []string{"/help"}, ""},
 		{"slash-model", false, []string{"/exit"}, []string{"/model"}, ""},
 		{"agents-view", false, []string{"/rename alpha-notes", "hello there"}, nil, ""},
+		{"rename-long-name", false, []string{"/rename " + strings.Repeat("long-name-", 14) + "end"}, []string{"typed after long rename"}, ""},
+		{"resume-picker-ctrlc", true, []string{"hello"}, []string{"/resume"}, ""},
+		{"model-ctrlc", true, nil, []string{"/model"}, ""},
 		{"control", true, nil, nil, "please refactor the parser so that"},
 	} {
 		for _, tick := range []time.Duration{0, saveInterval} {
@@ -326,8 +336,9 @@ func TestReplayClaudeSlashCommandsAndNames(t *testing.T) {
 				// name, from the rule or the window title, not a picker's
 				// search, not a placeholder.
 				for _, d := range drafts {
-					switch strings.TrimSpace(d) {
-					case "calls", "alpha-notes", "alph", "describe a task for a new session":
+					switch d := strings.TrimSpace(d); {
+					case d == "calls", d == "alpha-notes", d == "alph", d == "describe a task for a new session",
+						strings.HasSuffix(d, "…"):
 						t.Errorf("saved %q as a draft (all: %q)", d, drafts)
 					}
 				}

@@ -133,6 +133,14 @@ func TestClaudeTitledRule(t *testing.T) {
 		{"calls " + strings.Repeat("─", 94) + " ─", false},
 		{strings.Repeat("─", 92) + " calls", false},
 		{rule, false},
+		// A name as wide as the window minus three leaves no rule before
+		// it, and a wider one is cut with an ellipsis; both keep the full
+		// width, and only then does a row with no rule before the name count.
+		{" " + strings.Repeat("n", 97) + " ─", true},
+		{" " + strings.Repeat("n", 96) + "… ─", true},
+		{" " + strings.Repeat("n", 95) + "… ─", false},
+		{" calls ─", false},
+		{"  " + strings.Repeat("n", 96) + " ─", false},
 	} {
 		if got := claudeTitledRule(c.row, 100); got != c.ok {
 			t.Errorf("claudeTitledRule(%q) = %v", c.row, got)

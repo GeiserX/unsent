@@ -257,17 +257,21 @@ func claudeBox(s *screen) (view, bool) {
 // session's box: a rule with the name near its right end, as in
 // "──────── calls ─". Claude Code 2.1.284 draws it from the /rename that
 // names the session on, and from the first frame of a resumed named session
-// (docs/research/claude.md section 13). The label of history browsing
-// ("─── History 1/1 ───…") sits at the left end and is still no rule: the
-// box shows an old message then, not the draft.
+// (docs/research/claude.md section 13). The rule keeps the full width: a
+// name as wide as the window minus three leaves no rule before it
+// (" name ─"), and a wider one is cut with an ellipsis (" nam… ─"), so a
+// row with no rule before the name counts only at the full width. The
+// label of history browsing ("─── History 1/1 ───…") sits at the left end
+// and is still no rule: the box shows an old message then, not the draft.
 func claudeTitledRule(t string, cols int) bool {
 	rest, ok := strings.CutSuffix(t, " ─")
 	if !ok {
 		return false
 	}
 	name, ok := strings.CutPrefix(strings.TrimLeft(rest, "─"), " ")
-	return ok && strings.HasPrefix(rest, "─") && strings.TrimSpace(name) != "" &&
-		!strings.Contains(name, "─") && runewidth.StringWidth(t) >= cols/2
+	w := runewidth.StringWidth(t)
+	return ok && strings.TrimSpace(name) == name && name != "" && !strings.Contains(name, "─") &&
+		(strings.HasPrefix(rest, "─") && w >= cols/2 || w == cols)
 }
 
 // claudePlaceholder reports whether the box's first row shows Claude Code's

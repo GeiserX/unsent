@@ -689,7 +689,11 @@ func (s *session) save() {
 			}
 			s.armed, s.leftOnSubmit = false, false
 		case keyClear:
-			s.armed, s.cleared = false, true
+			// A clear key after a submit that took the box away (Ctrl+C
+			// in a /resume picker or a /model dialog) means the agent did
+			// not leave on that key: at exit its draft goes to history,
+			// not the sent log, and is not left behind (finish).
+			s.armed, s.cleared, s.leftOnSubmit = false, true, false
 		case keySubmit:
 			s.armed = e.before != nil && s.look(e.before)
 		}
@@ -871,9 +875,10 @@ func (s *session) finish() {
 		s.rec.Draft = ""
 	case !s.leftOnSubmit && s.goneOnSubmit && s.store.archive(s.rec) == nil:
 		// The submit key took the box away and it never came back: the
-		// agent ran the draft (a /resume picker the window closed on). It
-		// was not left in the box, but nothing proves a send, so it goes to
-		// history, as a box that empties after such a screen does.
+		// agent ran the draft (a /resume picker the window closed on, even
+		// after Ctrl+C left it open). It was not left in the box, but
+		// nothing proves a send, so it goes to history, as a box that
+		// empties after such a screen does.
 		s.rec.Draft = ""
 	}
 	if s.rec.Draft == "" {
