@@ -1,0 +1,78 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "r1-start"
+},
+{
+"type": "first prompt, dummy, must fail on the dead port"
+},
+{
+"wait": 0.5
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 3
+},
+{
+"screen": "r1-sent"
+},
+{
+"sh": "./ids.sh",
+"out": "r1-after-send"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "r1-interrupted"
+},
+{
+"type": "orphan draft line one, \u00f1and\u00fa"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "line two of the orphan"
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "r1-draft"
+},
+{
+"sh": "./ids.sh",
+"out": "r1-draft"
+},
+{
+"sh": "find xdg/state -type f | sort; for f in xdg/state/unsent/drafts/*.json; do echo; cat $f; done; echo; cat xdg/state/unsent/sent/* 2>/dev/null",
+"out": "r1-store"
+}
+]

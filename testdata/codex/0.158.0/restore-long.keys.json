@@ -1,0 +1,36 @@
+[
+{
+"until": "Ask Codex to do anything|Ask a follow-up",
+"timeout": 40
+},
+{
+"wait": 5
+},
+{
+"screen": "long-restored"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]

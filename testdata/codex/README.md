@@ -1,6 +1,6 @@
 # Codex captures
 
-Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks. `replay_test.go` replays `typed`, `multiline`, `accents`, `wrap`, `pastes` and the first Ctrl+G of `tall` through Codex's wrap, scroll and paste models, with a stand-in reader until Codex's own lands, and checks each draft against the editor copy.
+Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks. `replay_test.go` replays every capture that has editor copies through Codex's profile (its reader, wrap, scroll, paste rule and keys) and checks each draft against the editor copy, and `inline` to check that its box is never read. `agent_codex_test.go` reads the dialogs, menus and history browsing in `dialogs`, `picker`, `slash-new` and `ctrlc-history` as negative screens, checks the sent log in `orphan` and `recall-send`, and puts the drafts of `restore-id`, `restore-last`, `restore-picker` and `restore-long` back through its own restore.
 
 ## What each file is
 
@@ -25,6 +25,12 @@ Differences from that setup:
 - `tinted` ran with `window-style "fg=#cdd6f4,bg=#1e1e2e"` set in the tmux server, so tmux answered `OSC 10;?` and `OSC 11;?` and Codex tinted its box (`ESC[48;5;237m`). An earlier try with only `bg` set got an answer to `OSC 11` alone, and Codex drew no tint.
 - `picker` was started with `codex resume` and its keys begin with the picker open. `resume-id`, `resume-unsent-id`, `resume-last` and `fork-last` were started with `codex resume <id>`, `codex resume <id of a thread that never sent>`, `codex resume --last` and `codex fork --last`.
 
+A second run on 2026-09-29, the same setup and the same Codex 0.158.0, ran unsent with the Codex profile, so it saved drafts, kept a sent log and put drafts back: `paste-exact`, `orphan`, `restore-id`, `restore-last`, `restore-picker`, `restore-long`, `early-paste`, `slash-new`, `edge-deletes`, `recall-send`, `daemon-draft` and `inline`. The restores in them are unsent's own pastes, logged as keys. Differences:
+
+- `restore-id` and `restore-long` were started with `codex resume <id>`, `restore-last` and `early-paste` with `codex resume --last`, `restore-picker` with `codex resume`, `slash-new` with `codex resume --last`, and `inline` with `--no-alt-screen`.
+- `daemon-draft` ran without `-c`, with the full Codex package (`codex-package.json`, `codex-resources`, `codex-path`) beside the binary, which the shared background server needs: with the bare binary Codex quits with `this CLI has no complete local package`.
+- `slash-new` began in a thread that had an orphan: the restore went in 2.4 s after the box, and the draft cleared with Ctrl+C is the restored one.
+
 ## Scenarios
 
 | Record | What it holds |
@@ -47,6 +53,16 @@ Differences from that setup:
 | `daemon-quit`, `daemon-killsession` | the shared background server: a quit, and a draft followed by `kill-session` |
 | `suspend`, `suspend-direct` | Ctrl+Z through unsent and `fg`; Ctrl+Z to Codex alone |
 | `wrap` | lines that end on a full row (117 columns at 120): before a blank line, before a line, a row of words, a word two rows long, and at the end of the draft; each gets an empty row after it. Recorded on its own on 2026-09-29 with a fresh scratch home, the same setup |
+| `paste-exact` | pastes with tabs, spaces at line ends, a blank line, decomposed accents, emoji and a flag, sent with LF and with CR, an 853-character one with tabs, and one ending in a line break; each editor copy is byte for byte what was pasted |
+| `orphan` | a prompt sent with Enter that fails on the dead port, Ctrl+C to interrupt the turn, then a two-line draft left in the box at a window close |
+| `restore-id`, `restore-last`, `restore-picker` | that draft, and the next ones left the same way, put back by unsent into the empty box of `codex resume <id>`, `codex resume --last` and the picker's choice, Ctrl+G, Ctrl+C |
+| `restore-long` | a draft of 1,259 characters on 18 lines put back, shown as `[Pasted Content 1259 chars]`; the editor copy is the whole draft |
+| `early-paste` | a paste sent 0.30 s after start, on the first frame that shows the box, in a resumed thread with an orphan: the paste goes in whole and unsent's restore does not go in after it |
+| `slash-new` | `/new` opens a dialog, `Where should the new conversation run?`; Enter picks the current checkout, and the process then holds two thread locks; a draft typed in the new thread |
+| `edge-deletes` | 45 lines, the box at its cap with the cursor on its last row: Ctrl+W, Backspace, Alt+Backspace, Ctrl+U, Left, Ctrl+K, Delete and Ctrl+D there |
+| `recall-send` | a prompt cleared with Ctrl+C, brought back with Up and sent with Enter |
+| `daemon-draft` | a draft under the shared background server, which Codex starts as its own child a moment after it draws the box |
+| `inline` | `--no-alt-screen`: the box drawn under the terminal's text with one footer row, a draft, Ctrl+G |
 
 ## Adding one
 

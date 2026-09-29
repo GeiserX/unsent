@@ -352,7 +352,10 @@ func TestSetupUndoKeepsTheUsersLines(t *testing.T) {
 
 	// An older block, in the middle of the file, is rewritten where it is.
 	old := readFile(t, rc)
-	stale := strings.Replace(old, "for _unsent_a in claude;", "for _unsent_a in claude oldagent;", 1)
+	stale := strings.Replace(old, "for _unsent_a in claude", "for _unsent_a in claude oldagent", 1)
+	if stale == old {
+		t.Fatal("the block names no claude to make stale")
+	}
 	os.WriteFile(rc, []byte(stale), 0o644)
 	out := mustSetup(t, "zsh")
 	if got := readFile(t, rc); got != old {
@@ -607,7 +610,10 @@ func TestBypassesSkipsOnlyTheBlock(t *testing.T) {
 // undo removes both.
 func TestSetupWithTwoBlocks(t *testing.T) {
 	block := setupBlock("zsh")
-	stale := strings.Replace(block, "for _unsent_a in claude;", "for _unsent_a in claude oldagent;", 1)
+	stale := strings.Replace(block, "for _unsent_a in claude", "for _unsent_a in claude oldagent", 1)
+	if stale == block {
+		t.Fatal("the block names no claude to make stale")
+	}
 	text := "a\n" + stale + "b\n" + stale + "c\n"
 	got, err := withBlock(text, block)
 	if want := "a\n" + block + "b\nc\n"; err != nil || got != want {

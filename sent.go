@@ -28,6 +28,10 @@ const (
 	keyOther keyKind = iota
 	keySubmit
 	keyClear
+	// keyRecall is a run of the profile's recall keys (keyset.recall): to
+	// send detection another key, and one that brings history into an
+	// empty box.
+	keyRecall
 )
 
 // keyEvent is one submit or clear key, or a run of other keys.
@@ -39,8 +43,9 @@ type keyEvent struct {
 	before *screen
 }
 
-// kinds splits typed keys into submit keys, clear keys and other keys, in
-// order, with runs of other keys as one. Submit keys are matched first.
+// kinds splits typed keys into submit keys, clear keys, recall keys and
+// other keys, in order, with runs of other keys, and of recall keys, as
+// one. Submit keys are matched first.
 // Focus and mouse reports, releases and the terminal's answers are not
 // keys and are skipped. loneEsc reports that b ends in an Esc on its own,
 // which a following Esc makes Esc Esc.
@@ -50,7 +55,7 @@ func (ks keyset) kinds(b []byte) (out []keyKind, loneEsc bool) {
 
 func (ks keyset) kindsOf(keys []key) (out []keyKind, loneEsc bool) {
 	add := func(k keyKind) {
-		if k != keyOther || len(out) == 0 || out[len(out)-1] != keyOther {
+		if !k.runs() || len(out) == 0 || out[len(out)-1] != k {
 			out = append(out, k)
 		}
 	}
@@ -66,11 +71,21 @@ func (ks keyset) kindsOf(keys []key) (out []keyKind, loneEsc bool) {
 			i += n
 			continue
 		}
-		add(keyOther)
+		if slices.Contains(ks.recall, keys[i]) {
+			add(keyRecall)
+		} else {
+			add(keyOther)
+		}
 		loneEsc = keys[i] == plain(keyEsc)
 		i++
 	}
 	return out, loneEsc
+}
+
+// runs reports whether keys of kind k that follow one another are one
+// event: other keys and recall keys are, submit and clear keys never.
+func (k keyKind) runs() bool {
+	return k == keyOther || k == keyRecall
 }
 
 // pressed returns the keys pressed in b, in order (see keysIn).
@@ -141,7 +156,7 @@ func (l *keyLog) hold() {
 func (l *keyLog) add(k keyKind) {
 	after := l.last
 	l.last = k
-	if n := len(l.events); k == keyOther && n > 0 && l.events[n-1].kind == keyOther {
+	if n := len(l.events); k.runs() && n > 0 && l.events[n-1].kind == k {
 		return
 	}
 	e := &keyEvent{kind: k}
@@ -149,7 +164,7 @@ func (l *keyLog) add(k keyKind) {
 	switch {
 	case k == keySubmit:
 		l.pending, l.waiting = append(l.pending, e), true
-	case k == keyOther && after == keySubmit:
+	case k.runs() && after == keySubmit:
 		// Typed into the agent's answer to the submit key, if it has
 		// drawn one: a box that is empty there was sent.
 		l.pending = append(l.pending, e)

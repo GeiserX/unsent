@@ -1,0 +1,63 @@
+[
+{
+"until": "Resume a previous session",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"screen": "r5-picker"
+},
+{
+"sh": "./ids.sh",
+"out": "r5-picker-ids"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "Ask Codex to do anything|Ask a follow-up|third orphan",
+"timeout": 30
+},
+{
+"wait": 4
+},
+{
+"screen": "r5-restored"
+},
+{
+"sh": "find xdg/state -type f | sort; for f in xdg/state/unsent/drafts/*.json; do echo; cat $f; done; echo",
+"out": "r5-store"
+},
+{
+"sh": "./ids.sh",
+"out": "r5-ids"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]

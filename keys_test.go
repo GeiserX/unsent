@@ -83,6 +83,8 @@ func TestDecodeKey(t *testing.T) {
 		{"\x1b[?2026;2$y", key{}, 11, tokReport},
 		{"\x1b[2026;2$y", key{}, 10, tokReport},
 		{"\x1b[6;17;8t", key{}, 9, tokReport},
+		{"\x1b[40;1R", key{}, 7, tokReport},
+		{"\x1b[1;1R", key{}, 6, tokReport},
 		{"\x1bP>|ghostty 1.3.1\x1b\\", key{}, 19, tokReport},
 		{"\x1b_Gi=31;OK\x1b\\", key{}, 12, tokReport},
 		{"\x1b]11;rgb:0/0/0\x07", key{}, 15, tokReport},
@@ -365,7 +367,7 @@ func TestSynthesizedKittyKeys(t *testing.T) {
 // never a delete, whatever numbers they carry.
 func TestReportsAreNotKeys(t *testing.T) {
 	for _, r := range []string{"\x1b[<0;127;23M", "\x1b[<64;8;4m", "\x1b[I", "\x1b[O", "\x1b[M\x7f\x17\x1a",
-		"\x1b[?5u", "\x1b[6;17;8t", "\x1bP>|tmux 3.6b\x1b\\"} {
+		"\x1b[?5u", "\x1b[6;17;8t", "\x1bP>|tmux 3.6b\x1b\\", "\x1b[2;1R\x1b[?1;2;4c", "\x1b[36;23R"} {
 		if typedKeys([]byte(r)) {
 			t.Errorf("%q counts as typing", r)
 		}

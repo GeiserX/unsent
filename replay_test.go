@@ -351,67 +351,41 @@ func TestReplayClaudeScreens(t *testing.T) {
 }
 
 // Replays of real Codex 0.158.0 captures in testdata/codex/0.158.0 (see
-// the README there), through the same shadow screen, stitcher and paste
-// tracker as a live session, drawn by Codex's profile: its wrap model,
-// its scroll and its paste rule. At each Ctrl+G the draft must be the
-// next editor copy.
-
-// codexStandIn reads Codex 0.158.0's box for these replays until Codex's
-// own reader lands with its profile: on the alternate screen, the rows
-// from the lowest bold, not dim, not reversed › at column 0 down to the
-// padding row above the two footer rows, from column 2. Rows wrap at the
-// width minus 3, and the box stops growing at the height minus 4 rows
-// (counted one lower, the safe side). It knows nothing of menus or turns:
-// the replays below show neither with a draft in the box.
-func codexStandIn(s *screen) (view, bool) {
-	end := len(s.rows) - 3 // the padding row
-	if !s.alt || end < 1 || s.rows[end].text() != "" {
-		return view{}, false
-	}
-	for y := end - 1; y >= 0; y-- {
-		r := s.rows[y]
-		if r.cells[0] != "›" || !r.look[0].bold || r.look[0].reverse || r.faint[0] {
-			continue
-		}
-		v := view{cursor: -1, width: s.cols - 3, under: -1, capped: end-y >= len(s.rows)-5}
-		if end == y+1 && (r.textFrom(2) == "" || r.faintFrom(2)) {
-			v.empty = true
-			return v, true
-		}
-		for z := y; z < end; z++ {
-			v.rows = append(v.rows, s.rows[z].textFrom(2))
-		}
-		if s.curY >= y && s.curY < end {
-			v.cursor = s.curY - y
-			v.cursorEnd = s.curX >= 2+runewidth.StringWidth(v.rows[v.cursor])
-		}
-		return v, true
-	}
-	return view{}, false
-}
+// the README there), through the same shadow screen, reader, stitcher and
+// paste tracker as a live session, with Codex's profile. At each Ctrl+G
+// the draft must be the next editor copy.
 
 // codexShows reports whether got is Codex's draft truth as far as Codex's
 // screen shows it: byte for byte, but for two things its rows cannot
 // tell. A line break before a word that would not fit after the row reads
 // as a wrap (byteExact's limit, here where a line starts with a word as
-// wide as a row, or wider), and spaces at the very end of the draft are
-// not drawn. Tolerated by Codex's measured drawing, not by the profile's
-// model, so a wrong model cannot excuse itself.
+// wide as a row, or wider), spaces at the end of a line are drawn as the
+// blank cells after it (the end of the draft in pastes, a word deleted
+// with Ctrl+W at the end of a line in tall), and a tab is drawn as one
+// space (paste-exact). Tolerated by Codex's measured drawing, not by the
+// profile's model, so a wrong model cannot excuse itself.
 func codexShows(got, truth string) bool {
-	return got == truth || byteExact(got, strings.TrimRight(truth, " "), 117, wordWrap{endRow: true})
+	lines := strings.Split(strings.ReplaceAll(truth, "\t", " "), "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " ")
+	}
+	return got == truth || byteExact(got, strings.Join(lines, "\n"), 117, wordWrap{endRow: true})
 }
 
-// replayCodex replays name.rec through a session with prof, read by
-// codexStandIn while prof has no reader, and returns the first of the
-// first checks Ctrl+G (all when 0) whose editor copy the saved draft
-// differs from.
-func replayCodex(t *testing.T, prof *profile, name string, checks int) error {
+// replayCodex replays name.rec through a session with prof and returns
+// the first Ctrl+G whose editor copy the saved draft differs from. At the
+// Ctrl+G numbers in recalled the box holds an entry of Codex's history
+// brought back with Up, which is not a draft: nothing new may be saved
+// there, so the draft must be the empty box's.
+func replayCodex(t *testing.T, prof *profile, name string, recalled ...int) error {
 	t.Helper()
-	if prof.read == nil {
-		p := *prof
-		p.read = codexStandIn
-		prof = &p
-	}
+	_, err := replayCodexSession(t, prof, name, recalled...)
+	return err
+}
+
+// replayCodexSession is replayCodex, and also returns the session.
+func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...int) (*session, error) {
+	t.Helper()
 	folder := filepath.Join("testdata", "codex", "0.158.0")
 	data, err := os.ReadFile(filepath.Join(folder, name+".rec"))
 	if err != nil {
@@ -439,7 +413,13 @@ func replayCodex(t *testing.T, prof *profile, name string, checks int) error {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if failed == nil && (checks == 0 || checked <= checks) && !codexShows(s.rec.Draft, string(want)) {
+				switch {
+				case failed != nil:
+				case slices.Contains(recalled, checked):
+					if s.rec.Draft != "" {
+						failed = fmt.Errorf("%s: at Ctrl+G %d the box holds a history entry, saved as the draft %q", name, checked, s.rec.Draft)
+					}
+				case !codexShows(s.rec.Draft, string(want)):
 					failed = fmt.Errorf("%s: at Ctrl+G %d the draft differs from Codex's:\n got %q\nwant %q", name, checked, s.rec.Draft, want)
 				}
 			}
@@ -461,10 +441,10 @@ func replayCodex(t *testing.T, prof *profile, name string, checks int) error {
 		}
 	})
 	copies, _ := filepath.Glob(filepath.Join(folder, name+".editor-*.txt"))
-	if failed == nil && (checked == 0 || checked != len(copies)) {
+	if failed == nil && checked != len(copies) {
 		t.Fatalf("%s: %d Ctrl+G checks for %d editor copies", name, checked, len(copies))
 	}
-	return failed
+	return s, failed
 }
 
 // Recorded with keys and output together (testdata/codex/README.md):
@@ -481,22 +461,69 @@ func replayCodex(t *testing.T, prof *profile, name string, checks int) error {
 //     after the editor round trip showing them whole, and one of 1,079
 //     characters with 11 line breaks, sent with LF and with CR;
 //   - tall: 45 lines in a box of 36 that scrolls a row at a time, edited 40
-//     rows up and read back from the bottom, the edit out of sight. Only
-//     its first Ctrl+G: before the second, Ctrl+W deletes a word 30 rows
-//     up, which only Codex's delete keys, still to come with its profile,
-//     tell from a word scrolled away.
+//     rows up and read back from the bottom, the edit out of sight, then a
+//     word deleted with Ctrl+W 30 rows up, which only Codex's delete keys
+//     tell from a word scrolled away;
+//   - deletes, deletes-xterm: every delete key, in the CSI-u forms Codex
+//     asks for and as legacy bytes;
+//   - placeholder: Backspace right after a placeholder, then a placeholder
+//     cleared with Ctrl+C and brought back with Up (the second Ctrl+G);
+//   - ctrlc-history: a draft cleared with Ctrl+C and brought back with Up
+//     (the first Ctrl+G), then a draft typed over the history, Up in it
+//     and Ctrl+R;
+//   - submit: a draft typed while a send that fails retries;
+//   - suspend: Ctrl+Z, fg and more typing, through unsent;
+//   - suspend-direct: Ctrl+Z to Codex alone, which does not stop, so the
+//     fg typed next lands in its box;
+//   - resume-id, resume-last, fork-last: a draft in a resumed or forked
+//     thread;
+//   - tinted: a draft in a box drawn on a background colour;
+//   - paste-exact: pastes with tabs, spaces at line ends, blank lines,
+//     decomposed accents and a flag, sent with LF and with CR, and one
+//     ending in a line break;
+//   - orphan: a send that fails, then a draft left at a window close;
+//   - restore-id, restore-last, restore-picker: that draft put back by
+//     unsent in codex resume <id>, codex resume --last and the picker;
+//   - restore-long: a draft of 1,259 characters on 18 lines put back,
+//     which Codex shows as "[Pasted Content 1259 chars]";
+//   - early-paste: a paste on the first frame that shows the box;
+//   - slash-new: /new through its dialog, and a draft in the new thread;
+//   - edge-deletes: Ctrl+W, Backspace, Alt+Backspace, Ctrl+U, Ctrl+K,
+//     Delete and Ctrl+D on the last row of a box at its cap, where only
+//     the keys tell a deletion from rows scrolled out of sight below.
 var codexReplays = []struct {
-	name   string
-	checks int
-}{{"typed", 0}, {"multiline", 0}, {"accents", 0}, {"wrap", 0}, {"pastes", 0}, {"tall", 1}}
+	name     string
+	recalled []int
+}{{"typed", nil}, {"multiline", nil}, {"accents", nil}, {"wrap", nil}, {"pastes", nil}, {"tall", nil},
+	{"deletes", nil}, {"deletes-xterm", nil}, {"placeholder", []int{2}}, {"ctrlc-history", []int{1}},
+	{"submit", nil}, {"suspend", nil}, {"suspend-direct", nil}, {"resume-id", nil}, {"resume-last", nil},
+	{"fork-last", nil}, {"tinted", nil}, {"paste-exact", nil}, {"orphan", nil}, {"restore-id", nil},
+	{"restore-last", nil}, {"restore-picker", nil}, {"restore-long", nil}, {"early-paste", nil}, {"slash-new", nil},
+	{"edge-deletes", nil}}
 
 func TestReplayCodex(t *testing.T) {
 	for _, r := range codexReplays {
 		t.Run(r.name, func(t *testing.T) {
-			if err := replayCodex(t, &codex, r.name, r.checks); err != nil {
+			if err := replayCodex(t, &codex, r.name, r.recalled...); err != nil {
 				t.Fatal(err)
 			}
 		})
+	}
+	// With --no-alt-screen Codex draws its box inline, under what the
+	// terminal held, with one footer row: a layout never read, so the
+	// reader must find no box in it at all, and the user learns at exit
+	// that nothing was saved.
+	t.Run("inline", func(t *testing.T) {
+		s, err := replayCodexSession(t, &codex, "inline", 1)
+		if err != nil || s.matched {
+			t.Fatalf("the inline box was read: %v, matched %v", err, s.matched)
+		}
+	})
+	// Every capture with editor copies is replayed: a new one needs a line
+	// in codexReplays.
+	copies, _ := filepath.Glob(filepath.Join("testdata", "codex", "0.158.0", "*.editor-1.txt"))
+	if len(copies) != len(codexReplays)+1 {
+		t.Fatalf("%d captures with editor copies, %d replayed", len(copies), len(codexReplays)+1)
 	}
 }
 
@@ -512,7 +539,7 @@ func TestReplayCodexCatchesAWrongWrapModel(t *testing.T) {
 		p.unwrap = m.rule
 		var red []string
 		for _, r := range codexReplays {
-			if replayCodex(t, &p, r.name, r.checks) != nil {
+			if replayCodex(t, &p, r.name, r.recalled...) != nil {
 				red = append(red, r.name)
 			}
 		}
@@ -533,7 +560,7 @@ func TestReplayCodexCatchesAWrongWrapModel(t *testing.T) {
 // trailing-rows deletes rows at the end. So, as a check that can fail,
 // each profile with the other model must go red.
 func TestReplayScrollModel(t *testing.T) {
-	codexTall := func(t *testing.T, p *profile) { replayCodex(t, p, "tall", 1) }
+	codexTall := func(t *testing.T, p *profile) { replayCodex(t, p, "tall") }
 	claudeBin := func(name string) func(*testing.T, *profile) {
 		return func(t *testing.T, p *profile) { replayBytesAs(t, p, 120, 40, readFixture(t, "2.1.282/"+name+".bin")) }
 	}
@@ -604,9 +631,6 @@ func replayViews(t *testing.T, prof *profile, run func(*testing.T, *profile)) []
 	var views []view
 	p := *prof
 	read := p.read
-	if read == nil {
-		read = codexStandIn
-	}
 	p.read = func(s *screen) (view, bool) {
 		v, ok := read(s)
 		if ok && !v.empty {

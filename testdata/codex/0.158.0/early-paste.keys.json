@@ -1,0 +1,48 @@
+[
+{
+"until": "\u203a Ask Codex to do anything|\u203a Ask a follow-up",
+"timeout": 40,
+"gap": 0
+},
+{
+"paste": "pasted on the first frame of the box, dummy\nsegunda l\u00ednea con acentos: \u00f1and\u00fa, ping\u00fcino\n\n\tand a tab after a blank line",
+"raw": true
+},
+{
+"screen": "r3-first"
+},
+{
+"wait": 4
+},
+{
+"screen": "r3-after"
+},
+{
+"sh": "find xdg/state -type f | sort; for f in xdg/state/unsent/drafts/*.json; do echo; cat $f; done; echo",
+"out": "r3-store"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]

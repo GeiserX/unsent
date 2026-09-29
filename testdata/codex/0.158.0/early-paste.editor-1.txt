@@ -1,0 +1,4 @@
+pasted on the first frame of the box, dummy
+segunda línea con acentos: ñandú, pingüino
+
+	and a tab after a blank line

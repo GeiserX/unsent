@@ -8,7 +8,7 @@ Tags on every claim:
 
 ## Summary
 
-Sections 1 to 9 describe 0.151.0. Section 10 is a capture run on 0.158.0 and corrects them where that version differs: it draws on the alternate screen, has a two-row footer, quits on one Ctrl+C, runs a shared background server by default, and holds a lock file that names the running thread [measured].
+Sections 1 to 9 describe 0.151.0. Section 10 is a capture run on 0.158.0 and corrects them where that version differs: it draws on the alternate screen, has a two-row footer, quits on one Ctrl+C, runs a shared background server by default, and holds a lock file that names the running thread [measured]. Section 11 is the run of unsent's Codex profile on 0.158.0, which reads the box, keeps the sent log and puts drafts back; where it contradicts sections 1 to 10, section 11 holds [measured].
 
 Codex draws its main screen **inline** (not on the alternate screen); the alternate screen is used only for overlays such as the Ctrl+T transcript [measured]. The box has no border lines: 1 padding row, a bold `›` at column 0 of the first visible text row, continuation rows indented 2 columns, 1 padding row, then the footer [measured, source]. An empty box shows a dim hint [measured]. Rows wrap at `cols - 3` [measured, source]; a logical line that exactly fills that width gets an extra empty continuation row the reader must drop [measured, source]. The box grows to `rows - 4` text rows and then scrolls one row at a time to keep the cursor visible [measured, source]. Pastes over 1000 characters become `[Pasted Content N chars]` [measured, source]. Ctrl+C on a draft moves it into `$CODEX_HOME/history.jsonl`; killing Codex loses the draft [measured]. Codex pushes the kitty keyboard protocol, so in modern terminals the delete keys unsent counts arrive as CSI-u sequences, not the legacy bytes `wrap.go` matches today [measured push, docs encoding; not measured end to end].
 
@@ -172,6 +172,8 @@ Defaults [source `keymap.rs:1414-1485`, re-checked]:
 
 ## Reader recipe: `codexBox(s)` for 0.151.x
 
+The reader that shipped reads 0.158.0 and differs from this recipe in steps 3, 4, 8 and 9: see section 11.
+
 1. **Anchor.** Scan rows bottom-up for the lowest row y whose column 0 is `›`, `»` or `!`, **bold and not dim**, not cyan (38;5;6), and whose column 1 is a space or end of row. Bold+dim `›` is a submitted message in history; dim-only `›` is a disabled composer (return ok=false). `!` means shell mode: prepend `!` to line 0.
 2. **Above.** Row y−1 must be blank (top padding, or the separator under remote image rows).
 3. **Bottom edge, tinted.** If row y−1 has a non-default background B at column 0 and the last column, the composer is the contiguous run of rows with background B; its last row is the bottom padding; text rows are y .. last−1.
@@ -334,9 +336,65 @@ So the running thread's id can be read from outside when Codex runs embedded (wi
 
 - The height cap and box during a running turn, and a Tab-queued message.
 - Real terminals other than tmux, and flag-7 release events.
-- A paste on the first frame of the box (the settle delay) and a restore; unsent has no Codex reader yet.
-- A way to name the running thread under the shared server.
+- A paste on the first frame of the box (the settle delay) and a restore; unsent had no Codex reader yet. Section 11 measures both.
+- A way to name the running thread under the shared server. Section 11 names it when the TUI started that server.
 - One inadvertent send: in `suspend-direct` Codex did not stop on Ctrl+Z, so the `fg` and Enter meant for the shell were sent from its box. That send failed on the dead proxy like the others.
+
+## 11. The Codex profile on 0.158.0 (measured 2026-09-29)
+
+**Environment.** The setup of section 10: the same `codex-cli 0.158.0` binary, a Mac mini, a private tmux 3.6b server at 120x40 with `extended-keys-format csi-u`, `env -i` with a scratch `HOME`, `CODEX_HOME`, `TMPDIR` and XDG folders, `OPENAI_API_KEY=dummy`, the base URL and the proxy variables at the dead port 9, `check_for_update_on_startup = false`, and `-c sandbox_mode="danger-full-access"` except in the shared-server runs. This time `unsent capture codex` ran with the Codex profile, so unsent read the box, saved drafts, logged sends and put drafts back. Every request Codex tried ended in `Connection refused (os error 61)` at `wss://api.openai.com`, 92 of them in the scratch `logs_2.sqlite`, and none answered [measured]. The captures are in [`testdata/codex/0.158.0/`](../../testdata/codex/0.158.0/), listed in [its README](../../testdata/codex/README.md).
+
+### The reader
+
+`codexBox` reads the layout of section 10, pinned to the bottom of the alternate screen: the box's last text row is 4 rows from the bottom, then the bottom padding, then two footer rows, the first holding the model and the folder from column 2 [measured, every capture]. From the padding up, the first row with anything in columns 0 and 1 must be the glyph row: `›`, `»` or `!`, bold, not dim, not reversed, and a space after it. Every other row of the box is indented. Changes from the recipe of 0.151.0:
+
+- Step 3 and 4: no tint or footer search; the footer rows are the last two rows of the screen. A popup or menu is drawn above the box, never below it [measured, `dialogs`], so the box's rows never hold a menu row.
+- Step 8: the box counts as at its cap from `rows − 9` text rows: the recipe's `rows − 5`, one under the measured idle cap of `rows − 4`, and 4 rows more, because a running turn is said to lower the cap [source] and that was not measured. Taking a box that is not scrolled for one that is costs a little precision; the opposite would drop rows out of sight.
+- Step 9: 0.158.0 draws everything on the alternate screen, so the alternate screen is no reason to fail. The top padding (step 2) is not checked: no capture has a frame it would reject.
+- The second footer row starts `reverse-i-search:` while Ctrl+R searches history, and the box then shows history entries. That frame reads as no box, so the draft stays as it was [measured, `ctrlc-history`].
+- As Codex quits it shows `› Shutting down...` with a dim, not bold, `›`: a box that takes no input, read as no box [measured, every quit].
+- A row wider than `cols − 3` fails the read, for the pet image's reserve of section 1 [source].
+- A tab in the box is drawn as one space [measured, `paste-exact`]: the saved draft has a space there, while Codex holds the tab.
+- Spaces at the end of a line are drawn as the blank cells after it, so they are not in the saved draft [measured, `tall`, `paste-exact`].
+
+With `--no-alt-screen` (or `tui.alternate_screen = "never"`) Codex draws inline, under what the terminal held, with the box near the top and one footer row [measured, `inline`]. The reader finds no box there, saves nothing, and unsent says so at exit: `unsent: could not read codex 0.158.0's box this session (last verified 0.158.0), nothing was saved` [measured].
+
+Negative frames, each read as no box or as the empty box: the sign-in screen, the API key screen (which shows the key), the trust dialog, the warnings view (F2), the resume picker, the `/new` dialog, the `/status` card, Ctrl+R and the dim quit row. With the `/` menu or the `@` list open, the draft is only what was typed (`/`, `@`) [measured, `dialogs`, `picker`, `slash-new`, `ctrlc-history`].
+
+### History browsing
+
+Up on an empty box brings back Codex's own history entry, drawn as a typed draft would be [measured, `ctrlc-history`, `placeholder`]; the screen cannot tell them apart. The profile names Up and Down as recall keys: while only recall keys came since the last submit or clear key, and nothing was pasted or put back, text in a box whose draft is empty is Codex's history and is not saved. The first other key makes it a draft. Enter on a recalled entry is a send: in `recall-send` the entry reached the sent log once, and history holds only the copy Ctrl+C had cleared [measured].
+
+### Keys
+
+The table of section 10 held through unsent's decoder: every delete key in the CSI-u forms and as legacy bytes. At the last row of a box at its cap, only the delete keys tell a deletion from rows scrolled out of sight below, and the replay of `edge-deletes` goes red with any of the three delete key lists emptied [measured]. Enter and Tab are the submit keys (Codex's `?` help says `tab Send message`), Ctrl+C the clear key.
+
+Codex asks for the cursor position (`ESC[6n`) at start and after a resume, and the terminal's answer, `ESC[2;1R`, was taken for F3 with modifiers, so it counted as typing: once in a session where Codex quit before drawing its box, unsent printed that it could not read the box although nothing was typed [measured, a run under the shared server without its package]. unsent's decoder now reads `CSI <row>;<col> R` as a report.
+
+**Ctrl+Z.** Through unsent, as in section 10: unsent stops Codex and `fg` brings back the box with the draft. Codex's repaint after the resume sets none of its modes again: no `ESC[?1049h`, no kitty push, no `ESC[?2004h` between the Ctrl+Z and the next key [measured, `suspend`]. So the profile writes nothing as it suspends Codex. Writing Codex's own leave sequence would leave its box on the main screen and bracketed paste off after `fg`, where a paste's line breaks read as Enter [design, from that measurement].
+
+### Session identity
+
+- **Embedded** (`-c`, `--enable`, `--disable`, `--search` or `--no-daemon`): the Codex process holds `thread-writer-locks/<thread id>.lock` open, and unsent names the thread from the files it holds (lsof on macOS, `/proc` on Linux), asked again only when the lock folder changes or 5 s have passed. Drafts and the sent log carried the thread id from the box's first save, and the sent log went to `codex-<thread id>.jsonl` across runs, with a `resumed` line for each later run [measured, `orphan`, `restore-id`].
+- **`/new`** opens a dialog in 0.158.0, `Where should the new conversation run?`; after Enter the process holds two locks, the old thread's and the new one's. unsent then names no thread: a draft typed after `/new` had no `agent_session` [measured, `slash-new`].
+- **Under the shared background server** (a plain `codex`): the TUI holds no lock, but a TUI that starts the server starts it as its own child, `codex app-server --listen unix:// --managed-daemon`, and that server holds the thread's lock from before the box is drawn. unsent finds it as the nearest descendant that holds a lock, 2 to 3 s after start [measured, `daemon-draft`, `sessions` listings]. A draft typed before then took the id at the next save, with no redraw needed (`session.lateSession`). A TUI that finds a server already running, left by an earlier TUI (it outlives its TUI with parent pid 1), is not that server's parent: no thread is named, so its drafts get the notice, not a restore [measured: an orphan of the thread, `codex resume <id>` against that server, no paste]. A server that serves more than one thread holds more than one lock, and names none.
+- `history.jsonl` and `sessions/` name no running thread earlier than the lock does: `history.jsonl` gets a line at Ctrl+C and at a send, from any terminal on that `CODEX_HOME`, and `sessions/` gets a rollout only once a thread sends [measured, section 10]. The profile reads neither.
+
+### Restore
+
+- **Resume forms.** A draft left in the box at a window close came back, unsent's own bracketed paste, into the empty box of `codex resume <id>`, `codex resume --last` and the picker's choice, 2.4 s after start (the settle delay of 1 s and three empty reads at 0.4 s). Ctrl+G gave it back byte for byte, and unsent's line `unsent: put back your draft from 07:29 today, not sent` showed on the row under the box, the first footer row, until Codex repainted it [measured, `restore-id`, `restore-last`, `restore-picker`].
+- **Long drafts.** A draft of 1,259 characters on 18 lines went back as one paste, showed as `[Pasted Content 1259 chars]`, read back as the whole text, and Ctrl+G gave it back byte for byte [measured, `restore-long`].
+- **What a paste keeps.** Tabs, two and three spaces at line ends, a blank line, decomposed accents (`e` + U+0301), `👍🏽`, `🇪🇸`, four leading spaces, a space at the very end and a final line break: every editor copy was byte for byte what was pasted, with LF and with CR, which came back as LF [measured, `paste-exact`]. So the paste newline is the draft's own LF, and no draft goes to the clipboard instead.
+- **Settle.** A paste sent 0.30 s after start, on the first frame that showed the box of a resumed thread, went in whole [measured, `early-paste`]. The profile waits 1 s and three empty reads anyway.
+- **New chat.** A plain start in the folder of an orphan got no paste; the notice named the draft before start and again after exit [measured, `newchat` run, not kept].
+- **Typing first.** A key typed before the restore stops it: in `early-paste` the orphan stayed for later [measured].
+- **Editor copy.** It holds the pasted text, never the placeholder [measured, `restore-long`, section 10].
+
+### Traps for the rig
+
+- A restore goes in 1 s plus three reads after the box appears. A scenario that types into the box then, and presses Enter, sends the restored draft with its own text after it: it happened once here, and that send failed on the dead port like the others. A key 10 ms after the paste also keeps the read-back from ever matching, so the orphan goes back to `drafts/` with a try counted and comes back at the next resume. Wait for unsent's line before typing.
+- One Ctrl+C on an empty box quits Codex; under the shared server Ctrl+C during a turn opens `Task is still running` instead of interrupting it. Esc interrupts in both.
+- The shared server needs the whole Codex package beside the binary, and takes more than one SIGTERM to stop (it drains first). A TUI started while the old server drains fails with `Server is draining; retry after reconnecting (code -32600)`. The rig's teardown signals until no process is left, then sends SIGKILL.
 
 ## Verification notes
 

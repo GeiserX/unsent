@@ -1,0 +1,53 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"screen": "inline-empty"
+},
+{
+"type": "an inline draft, dummy"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line"
+},
+{
+"wait": 0.8
+},
+{
+"screen": "inline-draft"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]

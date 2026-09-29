@@ -81,7 +81,7 @@ type profile struct {
 }
 
 // profiles are the agents unsent can read.
-var profiles = []*profile{&claude}
+var profiles = []*profile{&claude, &codex}
 
 // profileFor returns the profile of the agent a command starts, or nil.
 func profileFor(command string) *profile {

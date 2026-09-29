@@ -1,0 +1,109 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"paste": "tab\there\tand two  \ntrailing spaces   \n\nafter a blank line, \u00f1and\u00fa, qu\u00e9, e\u0301, \ud83d\udc4d\ud83c\udffd \ud83c\uddea\ud83c\uddf8\n    four leading spaces\nlast line ends in a space ",
+"raw": true
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"paste": "tab\there\tand two  \ntrailing spaces   \n\nafter a blank line, \u00f1and\u00fa, qu\u00e9, e\u0301, \ud83d\udc4d\ud83c\udffd \ud83c\uddea\ud83c\uddf8\n    four leading spaces\nlast line ends in a space ",
+"raw": false
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"paste": "tabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\ttabs\tin a long paste\t\nsecond line\n",
+"raw": true
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"paste": "ends in a line break\n",
+"raw": true
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

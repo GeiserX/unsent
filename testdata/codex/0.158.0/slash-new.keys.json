@@ -1,0 +1,75 @@
+[
+{
+"until": "Ask Codex to do anything|Ask a follow-up",
+"timeout": 40
+},
+{
+"wait": 4
+},
+{
+"screen": "r7-restored"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "r7-ids-start"
+},
+{
+"type": "/new"
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "Where should the new conversation run",
+"timeout": 10
+},
+{
+"wait": 0.5
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 2.5
+},
+{
+"screen": "r7-after-new"
+},
+{
+"sh": "./ids.sh",
+"out": "r7-new-ids"
+},
+{
+"type": "typed after /new"
+},
+{
+"wait": 1.2
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"sh": "find xdg/state -type f | sort; for f in xdg/state/unsent/drafts/*.json; do echo; cat $f; done; echo",
+"out": "r7-new-store"
+}
+]

@@ -495,6 +495,13 @@ type session struct {
 	// window closed or unsent was asked to stop (see closing).
 	leftOnSubmit bool
 	closed       bool
+	// edited is set once a key other than the profile's recall keys, a
+	// paste (pasted, from the input side) or a restore has changed the box
+	// since the last submit or clear key. Until then a box that holds text
+	// while the draft is empty holds an entry of the agent's own history,
+	// brought back with a recall key, which the agent keeps: not a draft.
+	edited bool
+	pasted atomic.Bool
 
 	rec    *record
 	store  *store
@@ -542,6 +549,9 @@ func (s *session) input(keys []byte) {
 	}
 	defer s.guard()
 	typed := s.pastes.feed(keys)
+	if s.pastes.inPaste() || bytes.Contains(keys, pasteStart) || bytes.Contains(keys, pasteEnd) {
+		s.pasted.Store(true)
+	}
 	if s.rs.on && typedKeys(keys) {
 		s.rs.lastKey.Store(time.Now().UnixNano())
 	}
@@ -660,6 +670,7 @@ func (s *session) save() {
 	defer s.guard()
 	scr, events, answered := s.take()
 	if scr == nil {
+		s.lateSession()
 		return
 	}
 	// Read after the screen, so a box drawn for a session the agent just
@@ -679,22 +690,50 @@ func (s *session) save() {
 	// before they arrived was sent, even though they are in it by now.
 	for _, e := range events {
 		switch e.kind {
-		case keyOther:
+		case keyOther, keyRecall:
 			if s.armed && e.before != nil {
 				s.look(e.before)
 			}
 			s.armed = false
+			s.edited = s.edited || e.kind == keyOther
 		case keyClear:
-			s.armed, s.cleared = false, true
+			s.armed, s.cleared, s.edited = false, true, false
 		case keySubmit:
+			// What the key sends is a draft, even a history entry brought
+			// back with a recall key.
+			s.edited = true
 			s.armed = e.before != nil && s.look(e.before)
+			s.edited = false
 		}
+	}
+	if s.pasted.Swap(false) {
+		s.edited = true
 	}
 	if answered {
 		// Until the agent draws something after a submit key, the screen is
 		// the one that key was typed into, already read above.
 		s.seen = &seen
 		s.look(scr)
+	}
+}
+
+// lateSession gives a draft that has no session yet the one the agent
+// names now, when the screen has not changed since the draft was read.
+// Codex under its shared background server names its thread through a
+// process it starts a moment after the box is drawn, so a draft typed
+// first would otherwise wait for the next redraw. A switch to another
+// session redraws the box, so text read before one never gets here.
+func (s *session) lateSession() {
+	if s.ids == nil || s.broken.Load() || s.armed || s.rec.Draft == "" || s.rec.AgentSession != "" {
+		return
+	}
+	seen := s.ids.current()
+	s.seen = &seen
+	defer func() { s.seen = nil }()
+	if s.follow(false) {
+		if err := s.store.write(s.rec); err != nil {
+			s.store.warn(err)
+		}
 	}
 }
 
@@ -759,6 +798,11 @@ func (s *session) look(scr *screen) bool {
 	s.verifyRestore(draft, v.width)
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
+	}
+	if !s.edited && s.rec.Draft == "" && len(s.prof.keys.recall) > 0 {
+		// A history entry brought into the empty box: the agent keeps it,
+		// and it becomes a draft once it is edited.
+		return true
 	}
 	if draft == s.rec.Draft {
 		// Output that leaves the box as it was (a window title, a spinner
@@ -1034,7 +1078,11 @@ func shrunk(old, draft string) int {
 type keyset struct {
 	one, many, ahead []key
 	submit, clear    [][]key
-	suspend          []key
+	// recall are the keys that put an entry of the agent's own history
+	// in an empty box (Codex's Up and Down): what they bring is not a
+	// draft until it is edited.
+	recall  []key
+	suspend []key
 }
 
 // deletes returns how many characters the keys in b can delete, and

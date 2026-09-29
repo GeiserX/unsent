@@ -1,0 +1,61 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"type": "a prompt cleared, then sent from history, dummy"
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "recall-send-up"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 3.0
+},
+{
+"screen": "recall-send-sent"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]

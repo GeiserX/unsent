@@ -60,7 +60,7 @@ unsent status         # am I protected? one line per fact
 unsent setup --undo   # remove the block again
 ```
 
-Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude`, into a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, and a function of the same name is left alone. An alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path, skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
+Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude` and `codex`, into a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, and a function of the same name is left alone. An alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path, skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
 
 `UNSENT_NOTICE=0` turns off the notices and the line under the box, for sessions nobody watches. Drafts still go back into their conversation's box, and a line saying drafts are not being saved still shows.
 
@@ -156,8 +156,9 @@ To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_C
 
 | Agent | Status |
 | --- | --- |
-| Claude Code | Supported |
-| Codex CLI, Gemini CLI | Planned: each needs a small reader for its input box |
+| Claude Code | Supported, checked on 2.1.282 |
+| Codex CLI | Supported, checked on 0.158.0 on 2026-09-29: drafts, the sent log, and drafts put back into `codex resume <id>`, `codex resume --last` and the resume picker (see the limits below) |
+| Gemini CLI | Planned: it needs a small reader for its input box |
 
 Anything else runs through `unsent` unchanged; it just isn't saved yet.
 
@@ -167,7 +168,7 @@ Anything else runs through `unsent` unchanged; it just isn't saved yet.
 2. It keeps a hidden copy of the screen and, every 0.4 seconds, reads the text in the agent's input box off it.
 3. When the text changes, it writes it to disk: a temporary file, flushed with `fsync`, then renamed into place. A power cut leaves the previous save or the new one, never half a file.
 4. When you send the box, the message goes to the session's sent log. When you clear it, the draft moves to history. When the agent exits with text still in the box, the draft stays for `unsent restore`.
-5. Each draft remembers its conversation: Claude Code names it in `sessions/<pid>.json` under its config folder. When you reopen that conversation, `unsent` waits until the box has been on screen and empty for about two seconds, with nothing typed, then pastes the draft in. Any key you press first cancels it. It takes every escape code out of the draft, so nothing in it can end the paste and press Enter. Once a save reads the draft back from the box, the old copy moves to history; if it never reads back, the draft stays where it was. Two terminals that open one conversation get one paste between them.
+5. Each draft remembers its conversation: Claude Code names it in `sessions/<pid>.json` under its config folder, and Codex by the lock file in `thread-writer-locks/` under `$CODEX_HOME` that its process holds open. When you reopen that conversation, `unsent` waits until the box has been on screen and empty for about two seconds, with nothing typed, then pastes the draft in. Any key you press first cancels it. It takes every escape code out of the draft, so nothing in it can end the paste and press Enter. Once a save reads the draft back from the box, the old copy moves to history; if it never reads back, the draft stays where it was. Two terminals that open one conversation get one paste between them.
 
 **One promise.** `unsent` never throws away text you didn't delete. Text in view is read exactly. Text out of sight above or below the box is inferred, and an inference can be wrong, so while a draft is taller than the box every save that loses text first keeps the previous version. Whatever `unsent` gets wrong, a correct copy is in `unsent list --all`, marked "(earlier version)". Those copies are capped at 30 per session and deleted once the prompt is sent.
 
@@ -182,7 +183,7 @@ A few things make that more than a screenshot:
 
 ## Where your drafts live
 
-Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session, or per conversation for Claude Code. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
+Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` to move them. `drafts/` holds one file per session, and `history/` keeps the last 500 drafts you cleared, replaced or restored, plus the capped earlier versions. `sent/` holds one sent log per session, or per conversation for Claude Code and Codex. A log over 5 MB drops its oldest messages first, logs not written to for 90 days are deleted, and at most 2,000 are kept. Only you can read the folder, which is mode `0700` with `0600` files. Drafts are plain JSON and never leave your machine, since `unsent` makes no network connections.
 
 ## Limits
 
@@ -199,6 +200,10 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - A conversation you typed in but never sent can't be resumed, since Claude Code keeps no transcript for it. Its draft only comes back through the notice and `unsent restore`.
 - A draft goes back into the box only when the command line reads as a chat start: `claude` with its own options. Started with a prompt (`claude "fix it"`) or a subcommand, it gets the notice instead. With `--as` or `UNSENT_AGENT` the command's arguments are read the same way, so a launcher started bare or with Claude Code's options restores, and `npx @anthropic-ai/claude-code` gets the notice.
 - The line saying a draft was put back is drawn under the box only when Claude Code runs on the alternate screen. Otherwise the line printed after exit says it.
+- A draft goes back into a reopened Codex conversation only when `unsent` can tell which conversation the running Codex is in. With `-c`, `--enable`, `--disable`, `--search` or `--no-daemon`, Codex runs the conversation itself and names it. A plain `codex` hands it to a shared background server, which names it only when that `codex` started the server; one left running by an earlier `codex` names none. After `/new` one Codex holds two conversations and names neither. In those cases the notice and `unsent restore` reach the draft.
+- Codex draws a tab as one space and spaces at the end of a line as blank cells, so a draft saved from its box has spaces there.
+- Codex started with `--no-alt-screen` draws its box in a layout `unsent` doesn't read, and `unsent` says so after it exits.
+- An entry of Codex's history brought back with Up isn't saved as a draft until you edit it: Codex keeps it. Sending it puts it in the sent log.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.
 
 ## Development
