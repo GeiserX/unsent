@@ -30,8 +30,9 @@ func (st *stitcher) reset() {
 	*st = stitcher{}
 }
 
-// update merges a new view and returns the draft's text.
-func (st *stitcher) update(v view) string {
+// update merges a new view, whose rows the agent wrapped by rule u, and
+// returns the draft's text.
+func (st *stitcher) update(v view, u unwrapRule) string {
 	if v.empty {
 		st.reset()
 		return ""
@@ -42,7 +43,7 @@ func (st *stitcher) update(v view) string {
 		return st.text
 	}
 	st.last = &v
-	cur := unwrap(v.rows, v.width)
+	cur := u.unwrap(v.rows, v.width)
 	if !v.capped || st.text == "" {
 		// The whole draft is on screen.
 		return st.replace(cur)
@@ -358,6 +359,126 @@ func removed(str, word string) int {
 	return len(old) - prev[len(old)]
 }
 
+// unwrapRule is how an agent wraps the lines of a draft into the rows of
+// its box: its profile's wrap model (section 4 step 17 of docs/SPEC.md).
+// The stitcher unwraps with it, and the fuzz draws the box with it.
+type unwrapRule interface {
+	// wrap draws text in rows width columns wide, the way the agent does,
+	// and returns where each row starts in text. The insertion point at an
+	// offset sits on the last row that starts at or before it.
+	wrap(text string, width int) (rows []string, starts []int)
+	// unwrap joins rows read off the screen back into the lines typed.
+	unwrap(rows []string, width int) string
+}
+
+// wordWrap is word wrap with the space swallowed, as Claude Code and Codex
+// draw it (measured; see CLAUDE.md and docs/research/codex.md sections 3
+// and 10): greedy, at spaces, the space at a wrap left off both rows, and
+// a word longer than a row broken at the edge, or one column short where a
+// wide character would cross it.
+//
+// With endRow, a line that ends on a full row gets one more row, empty,
+// where the insertion point sits (Codex 0.151.0 and 0.158.0). That row
+// tells a line that ends at the edge from a wrap, which Claude Code's box
+// cannot.
+type wordWrap struct{ endRow bool }
+
+func (w wordWrap) wrap(text string, width int) (rows []string, starts []int) {
+	at := 0
+	for _, line := range strings.Split(text, "\n") {
+		rows, starts = wrapLine(rows, starts, line, at, width)
+		if w.endRow && width > 0 && runewidth.StringWidth(rows[len(rows)-1]) == width {
+			rows, starts = append(rows, ""), append(starts, at+len(line))
+		}
+		at += len(line) + 1
+	}
+	return rows, starts
+}
+
+func (w wordWrap) unwrap(rows []string, width int) string {
+	if !w.endRow {
+		return unwrap(rows, width)
+	}
+	// An empty row after a full one is where the line ended: drop it, and
+	// the next row starts a line of its own.
+	var lines []string
+	from := 0
+	for i := 0; i+1 < len(rows); i++ {
+		if width > 0 && rows[i+1] == "" && runewidth.StringWidth(rows[i]) == width {
+			lines = append(lines, unwrap(rows[from:i+1], width))
+			from = i + 2
+			i++
+		}
+	}
+	if from < len(rows) || len(lines) == 0 {
+		lines = append(lines, unwrap(rows[from:], width))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// wrapLine appends the rows of one line, which starts at offset at of the
+// text, to rows, and where each starts to starts.
+func wrapLine(rows []string, starts []int, line string, at, width int) ([]string, []int) {
+	if width <= 0 || runewidth.StringWidth(line) <= width {
+		return append(rows, line), append(starts, at)
+	}
+	cur, curAt, before := "", at, len(rows)
+	next := at // where the next word starts
+	for _, word := range strings.Split(line, " ") {
+		wordAt := next
+		next += len(word) + 1
+		broken := false
+		for runewidth.StringWidth(word) > width {
+			broken = true
+			if cur != "" {
+				rows, starts = append(rows, cur), append(starts, curAt)
+				cur = ""
+			}
+			head := runewidth.Truncate(word, width, "")
+			if head == "" {
+				// A character wider than the row: it gets a row to itself.
+				_, n := utf8.DecodeRuneInString(word)
+				head = word[:n]
+			}
+			rows, starts = append(rows, head), append(starts, wordAt)
+			word, wordAt = word[len(head):], wordAt+len(head)
+		}
+		if broken && word == "" {
+			continue
+		}
+		switch {
+		case cur == "":
+			cur, curAt = word, wordAt
+		case runewidth.StringWidth(cur)+1+runewidth.StringWidth(word) <= width:
+			cur += " " + word
+		default:
+			rows, starts = append(rows, cur), append(starts, curAt)
+			cur, curAt = word, wordAt
+		}
+	}
+	if cur != "" || len(rows) == before {
+		rows, starts = append(rows, cur), append(starts, curAt)
+	}
+	return rows, starts
+}
+
+// scrollModel is how a box at its height cap scrolls to keep the cursor in
+// view: its profile's scroll model (section 4 step 17 of docs/SPEC.md).
+// The stitcher needs none, since it lines each view up wherever it sits;
+// the fuzz draws the box with it.
+type scrollModel int
+
+const (
+	// scrollOneRow scrolls only as far as the cursor needs to stay in
+	// view, a row for each row it moves past the edge (Codex 0.151.0 and
+	// 0.158.0).
+	scrollOneRow scrollModel = iota
+	// scrollMidBox holds the cursor on the middle row while it moves over
+	// rows out of sight, scrolling a row per key, and scrolls one row when
+	// typing pushes past the edge (Claude Code 2.1.282).
+	scrollMidBox
+)
+
 // unwrap joins rows that the agent wrapped back into the lines typed.
 //
 // A row was wrapped when the next row's first word would not have fitted
@@ -431,18 +552,19 @@ func abs(x int) int {
 // byteExact reports whether got is the draft byte for byte, allowing only
 // the limit unwrap documents: a line break typed where the row before it
 // is full comes back as a space. Full means the next line's first word
-// would not have fitted after that row, so the screen shows a wrap. (The
-// fuzz never types a list item or a code fence, which unwrap keeps apart.)
-// It wraps with wrapText, not unwrap, so a broken unwrap cannot excuse
-// itself. The fuzz counts drafts with it, and a restore into the box is
-// read back with it.
-func byteExact(got, truth string, width int) bool {
+// would not have fitted after that row, so the screen shows a wrap; under
+// Codex's end row, a line that ends on a full row is not, since that row
+// shows where it ended. (The fuzz never types a list item or a code fence,
+// which unwrap keeps apart.) It wraps with u.wrap, not u.unwrap, so a
+// broken unwrap cannot excuse itself. The fuzz counts drafts with it, and
+// a restore into the box is read back with it.
+func byteExact(got, truth string, width int, u unwrapRule) bool {
 	if len(got) != len(truth) {
 		return false
 	}
 	lineStart := 0
 	for i := 0; i < len(truth); i++ {
-		if got[i] != truth[i] && (truth[i] != '\n' || got[i] != ' ' || !fullRowAt(truth, lineStart, i, width)) {
+		if got[i] != truth[i] && (truth[i] != '\n' || got[i] != ' ' || !fullRowAt(truth, lineStart, i, width, u)) {
 			return false
 		}
 		if truth[i] == '\n' {
@@ -454,59 +576,12 @@ func byteExact(got, truth string, width int) bool {
 
 // fullRowAt reports whether the line break at text[i], ending the line
 // that starts at lineStart, looks like a wrap on screen.
-func fullRowAt(text string, lineStart, i, width int) bool {
+func fullRowAt(text string, lineStart, i, width int, u unwrapRule) bool {
 	next, _, _ := strings.Cut(text[i+1:], "\n")
 	first, _, _ := strings.Cut(next, " ")
 	if i == lineStart || next == "" {
 		return false
 	}
-	rows := wrapText(text[lineStart:i], width)
+	rows, _ := u.wrap(text[lineStart:i], width)
 	return runewidth.StringWidth(rows[len(rows)-1])+1+runewidth.StringWidth(first) > width
-}
-
-// wrapText wraps text the way Claude Code does (measured; see CLAUDE.md): greedy, at word boundaries,
-// breaking words longer than a row.
-func wrapText(text string, width int) []string {
-	var rows []string
-	for _, line := range strings.Split(text, "\n") {
-		if width <= 0 || runewidth.StringWidth(line) <= width {
-			rows = append(rows, line)
-			continue
-		}
-		cur, before := "", len(rows)
-		for _, word := range strings.Split(line, " ") {
-			broken := false
-			for runewidth.StringWidth(word) > width {
-				broken = true
-				if cur != "" {
-					rows = append(rows, cur)
-					cur = ""
-				}
-				head := runewidth.Truncate(word, width, "")
-				if head == "" {
-					// A character wider than the row: it gets a row to itself.
-					_, n := utf8.DecodeRuneInString(word)
-					head = word[:n]
-				}
-				rows = append(rows, head)
-				word = word[len(head):]
-			}
-			if broken && word == "" {
-				continue
-			}
-			switch {
-			case cur == "":
-				cur = word
-			case runewidth.StringWidth(cur)+1+runewidth.StringWidth(word) <= width:
-				cur += " " + word
-			default:
-				rows = append(rows, cur)
-				cur = word
-			}
-		}
-		if cur != "" || len(rows) == before {
-			rows = append(rows, cur)
-		}
-	}
-	return rows
 }

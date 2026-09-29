@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"math/rand"
 	"os"
@@ -9,89 +10,54 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth"
 )
 
-// boxSim draws a draft the way Claude Code does: wrapped rows, a box that
-// stops growing at cap rows and scrolls to keep the cursor in sight. With
-// jump set it scrolls the way the real one was measured to, putting the
-// cursor mid-box; without, one row at a time.
+// boxSim draws a draft the way a profile's models say its agent does:
+// rows wrapped by its unwrap rule, and a box that stops growing at cap
+// rows and scrolls to keep the cursor in sight. With jump set it puts the
+// cursor mid-box when the cursor leaves the view; without, it scrolls one
+// row at a time.
 type boxSim struct {
 	text       string
 	cur        int // cursor, as a byte offset into text
 	width, cap int
 	top        int
 	jump       bool
+	wrap       unwrapRule
 	// edit is the byte range of the last change; seen says whether the
 	// last view showed all of it.
 	editFrom, editTo int
 	seen             bool
 }
 
-// rows wraps the text like wrapText and also returns where each row
+// rows wraps the text by the sim's rule and also returns where each row
 // starts. Widths are screen columns: a wide character takes two.
 func (b *boxSim) rows() ([]string, []int) {
-	width := runewidth.StringWidth
-	var rows []string
-	var starts []int
-	lineStart := 0
-	for _, line := range strings.Split(b.text, "\n") {
-		if width(line) <= b.width {
-			rows, starts = append(rows, line), append(starts, lineStart)
-			lineStart += len(line) + 1
-			continue
+	return b.wrap.wrap(b.text, b.width)
+}
+
+// rowAt returns the row the insertion point at offset off sits on.
+func rowAt(starts []int, off int) int {
+	cr := 0
+	for i, s := range starts {
+		if s <= off {
+			cr = i
 		}
-		rowStart, rowEnd := lineStart, lineStart
-		for i := 0; i <= len(line); i++ {
-			if i < len(line) && line[i] != ' ' {
-				continue
-			}
-			wordEnd := lineStart + i
-			switch {
-			case rowEnd == rowStart && width(b.text[rowStart:wordEnd]) > b.width:
-				// A word wider than a row: break it at the row's width.
-				for width(b.text[rowStart:wordEnd]) > b.width {
-					head := runewidth.Truncate(b.text[rowStart:wordEnd], b.width, "")
-					if head == "" {
-						_, n := utf8.DecodeRuneInString(b.text[rowStart:])
-						head = b.text[rowStart : rowStart+n]
-					}
-					rows, starts = append(rows, head), append(starts, rowStart)
-					rowStart += len(head)
-				}
-				rowEnd = wordEnd
-			case width(b.text[rowStart:wordEnd]) <= b.width:
-				rowEnd = wordEnd
-			default:
-				rows, starts = append(rows, b.text[rowStart:rowEnd]), append(starts, rowStart)
-				rowStart = rowEnd + 1
-				rowEnd = wordEnd
-			}
-		}
-		rows, starts = append(rows, b.text[rowStart:rowEnd]), append(starts, rowStart)
-		lineStart += len(line) + 1
 	}
-	return rows, starts
+	return cr
 }
 
 func (b *boxSim) view(t *testing.T) view {
 	rows, starts := b.rows()
-	if want := wrapText(b.text, b.width); !slices.Equal(rows, want) {
-		i := 0
-		for i < len(rows) && i < len(want) && rows[i] == want[i] {
-			i++
-		}
-		t.Fatalf("simulator rows differ from wrapText at row %d of %d/%d:\nsim  %q\nwrap %q\ntext %q",
-			i, len(rows), len(want), rows[i:min(len(rows), i+3)], want[i:min(len(want), i+3)], b.text[max(0, len(b.text)-80):])
-	}
-	cr := 0
-	for i, s := range starts {
-		if s <= b.cur {
-			cr = i
+	for i, r := range rows {
+		if starts[i] < 0 || starts[i]+len(r) > len(b.text) || b.text[starts[i]:starts[i]+len(r)] != r ||
+			(i > 0 && starts[i] < starts[i-1]) {
+			t.Fatalf("row %d %q does not start at %d of the text:\n%q", i, r, starts[i], b.text[max(0, len(b.text)-80):])
 		}
 	}
+	cr := rowAt(starts, b.cur)
 	h := min(len(rows), b.cap)
 	if cr < b.top || cr >= b.top+h {
 		if b.jump {
@@ -162,12 +128,7 @@ func (b *boxSim) deleteWord() int {
 // none left that way the cursor stays.
 func (b *boxSim) moveRows(d int) {
 	rows, starts := b.rows()
-	cr := 0
-	for i, s := range starts {
-		if s <= b.cur {
-			cr = i
-		}
-	}
+	cr := rowAt(starts, b.cur)
 	step := 1
 	if d < 0 {
 		step = -1
@@ -175,7 +136,10 @@ func (b *boxSim) moveRows(d int) {
 	ends := b.wordEnds()
 	for target := clamp(cr+d, 0, len(rows)-1); target >= 0 && target < len(rows); target += step {
 		for _, e := range ends {
-			if e >= starts[target] && e <= starts[target]+len(rows[target]) {
+			// (A word end that puts the cursor on another row, such as the
+			// end of a full line, where Codex's insertion point sits on
+			// the empty row after it, is not on this one.)
+			if e >= starts[target] && e <= starts[target]+len(rows[target]) && rowAt(starts, e) == target {
 				b.cur = e
 				return
 			}
@@ -243,13 +207,7 @@ func (r *stitchRun) budget(deleted int) int {
 // rowOf returns the row the cursor is on.
 func (b *boxSim) rowOf() int {
 	_, starts := b.rows()
-	cr := 0
-	for i, s := range starts {
-		if s <= b.cur {
-			cr = i
-		}
-	}
-	return cr
+	return rowAt(starts, b.cur)
 }
 
 func (r *stitchRun) check(what string) {
@@ -287,7 +245,7 @@ func (r *stitchRun) checkKeys(what string, deleted int) {
 	if r.sweeping {
 		return
 	}
-	if byteExact(got, r.sim.text, r.sim.width) {
+	if byteExact(got, r.sim.text, r.sim.width, r.sim.wrap) {
 		r.bytes++
 	}
 	if got == r.sim.text {
@@ -311,7 +269,7 @@ func (r *stitchRun) save(v view, what string) string {
 	r.t.Helper()
 	v.deleted = r.budget(v.deleted)
 	prev := r.last
-	got := r.st.update(v)
+	got := r.st.update(v, r.sim.wrap)
 	r.stitched = r.stitched || v.capped
 	history, version := keepOld(prev, got, r.stitched)
 	if history || version {
@@ -367,8 +325,9 @@ func (r *stitchRun) lostEverywhere(prev, got string) []string {
 }
 
 // fuzzStitch types a draft past the cap, then makes random edits all over
-// it, and checks after every save that not a word was lost or doubled.
-func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) *stitchRun {
+// it, and checks after every save that not a word was lost or doubled. The
+// box is drawn by prof's models.
+func fuzzStitch(t *testing.T, prof *profile, seed int64, vocab int, jump bool, mode string) *stitchRun {
 	rng := rand.New(rand.NewSource(seed))
 	word := func(n int) string {
 		if vocab > 0 {
@@ -376,7 +335,7 @@ func fuzzStitch(t *testing.T, seed int64, vocab int, jump bool, mode string) *st
 		}
 		return fmt.Sprintf("w%d", n)
 	}
-	sim := &boxSim{width: 40 + rng.Intn(60), cap: 5 + rng.Intn(10), jump: jump}
+	sim := &boxSim{width: 40 + rng.Intn(60), cap: 5 + rng.Intn(10), jump: jump, wrap: prof.unwrap}
 	r := &stitchRun{t: t, sim: sim, strict: vocab == 0, mode: mode}
 	n := 0
 	sim.insert(word(n))
@@ -485,14 +444,30 @@ func fuzzSeeds() int64 {
 // which catches lost and doubled line breaks; and identical, with no
 // allowance, which catches a line break at a full row the stitcher kept
 // before and now turns into a space. The floors sit at the rates measured
-// with blank-line edits, so they can only go up.
+// with blank-line edits, so they can only go up. Each profile's fuzz draws
+// the box by its own models and has floors of its own, the lowest rate
+// measured at 4 seeds (the race detector's), 50 (CI's) and 150. Codex's
+// box scrolls a row at a time on every seed, and its end row keeps more
+// line breaks: at 150 seeds 62% of its saves are identical, against 56%
+// for Claude Code, but only 56% at 4 seeds.
+
+// fuzzFloors are the floors each mode's rates must stay above.
+type fuzzFloors struct {
+	mode                       string
+	floor, byteFloor, rawFloor float64
+}
 
 func TestStitchFuzzUniqueWords(t *testing.T) {
-	for _, m := range []struct {
-		mode                       string
-		floor, byteFloor, rawFloor float64
-	}{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.95, 0.86, 0.55}} {
-		t.Run(m.mode, func(t *testing.T) { fuzzRate(t, 0, m.mode, m.floor, m.byteFloor, m.rawFloor) })
+	for _, c := range []struct {
+		prof   *profile
+		floors []fuzzFloors
+	}{
+		{&claude, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.95, 0.86, 0.55}}},
+		{&codex, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.96, 0.87, 0.56}}},
+	} {
+		for _, m := range c.floors {
+			t.Run(c.prof.name+"/"+m.mode, func(t *testing.T) { fuzzRate(t, c.prof, 0, m) })
+		}
 	}
 }
 
@@ -501,34 +476,41 @@ func TestStitchFuzzUniqueWords(t *testing.T) {
 // word identical to the next hidden word looks like that word having been
 // there all along.
 func TestStitchFuzzRepeatedWords(t *testing.T) {
-	fuzzRate(t, 40, "window", 0.95, 0.84, 0.56)
+	t.Run("claude", func(t *testing.T) { fuzzRate(t, &claude, 40, fuzzFloors{"window", 0.95, 0.84, 0.56}) })
+	t.Run("codex", func(t *testing.T) { fuzzRate(t, &codex, 40, fuzzFloors{"window", 0.94, 0.84, 0.63}) })
 }
 
-func fuzzRate(t *testing.T, vocab int, mode string, floor, byteFloor, rawFloor float64) {
+// fuzzRate runs the fuzz for prof over every seed. A profile whose box
+// scrolls mid-box is drawn both ways, alternating by seed: a jump that
+// puts the cursor mid-box, where moving over hidden rows leaves it, and
+// one row at a time, as typing past the edge scrolls. The simulator moves
+// the cursor several rows between saves, so it cannot draw the one-row
+// steps in between.
+func fuzzRate(t *testing.T, prof *profile, vocab int, f fuzzFloors) {
 	t.Helper()
 	exact, bytes, raw, saves := 0, 0, 0, 0
 	for seed := int64(1); seed <= fuzzSeeds(); seed++ {
-		r := fuzzStitch(t, seed, vocab, seed%2 == 0, mode)
+		r := fuzzStitch(t, prof, seed, vocab, prof.scroll == scrollMidBox && seed%2 == 0, f.mode)
 		exact, bytes, raw, saves = exact+r.exact, bytes+r.bytes, raw+r.raw, saves+r.exact+r.near
 	}
 	rate, byteRate, rawRate := float64(exact)/float64(saves), float64(bytes)/float64(saves), float64(raw)/float64(saves)
 	t.Logf("%d of %d saves exact (%.2f%%), %d byte-exact (%.2f%%), %d identical (%.2f%%)",
 		exact, saves, 100*rate, bytes, 100*byteRate, raw, 100*rawRate)
-	if rate < floor {
-		t.Fatalf("exact rate %.4f below %.4f", rate, floor)
+	if rate < f.floor {
+		t.Fatalf("exact rate %.4f below %.4f", rate, f.floor)
 	}
-	if byteRate < byteFloor {
-		t.Fatalf("byte-exact rate %.4f below %.4f", byteRate, byteFloor)
+	if byteRate < f.byteFloor {
+		t.Fatalf("byte-exact rate %.4f below %.4f", byteRate, f.byteFloor)
 	}
-	if rawRate < rawFloor {
-		t.Fatalf("identical rate %.4f below %.4f", rawRate, rawFloor)
+	if rawRate < f.rawFloor {
+		t.Fatalf("identical rate %.4f below %.4f", rawRate, f.rawFloor)
 	}
 }
 
 func TestStitchLongParagraphEditedWhileScrolledUp(t *testing.T) {
 	// The review's case: 80 columns, a box capped at 10 rows, one long
 	// paragraph, a word inserted near the top while the bottom is hidden.
-	sim := &boxSim{width: 76, cap: 10, jump: true}
+	sim := &boxSim{width: 76, cap: 10, jump: true, wrap: claude.unwrap}
 	r := &stitchRun{t: t, sim: sim, strict: true, mustBeExact: true}
 	for i := 0; i < 150; i++ {
 		sim.insert(fmt.Sprintf("word%03d ", i))
@@ -550,7 +532,7 @@ func TestStitchLongParagraphEditedWhileScrolledUp(t *testing.T) {
 }
 
 func TestStitchDeleteAtTheEnd(t *testing.T) {
-	sim := &boxSim{width: 60, cap: 10}
+	sim := &boxSim{width: 60, cap: 10, wrap: claude.unwrap}
 	r := &stitchRun{t: t, sim: sim, strict: true, mustBeExact: true}
 	for i := 1; i <= 30; i++ {
 		if i > 1 {
@@ -569,8 +551,8 @@ func TestStitchDeleteAtTheEnd(t *testing.T) {
 
 func TestStitchEmptyResets(t *testing.T) {
 	var st stitcher
-	st.update(view{rows: []string{"a"}, width: 10})
-	if got := st.update(view{empty: true}); got != "" {
+	st.update(view{rows: []string{"a"}, width: 10}, claude.unwrap)
+	if got := st.update(view{empty: true}, claude.unwrap); got != "" {
 		t.Fatalf("got %q", got)
 	}
 	if st.text != "" {
@@ -580,7 +562,7 @@ func TestStitchEmptyResets(t *testing.T) {
 
 func TestStitchNothingLinesUpStartsOver(t *testing.T) {
 	st := stitcher{text: "the draft we know about, long enough to anchor", a: 0, b: 10}
-	got := st.update(view{rows: []string{"completely different text here"}, width: 80, capped: true, cursor: 0})
+	got := st.update(view{rows: []string{"completely different text here"}, width: 80, capped: true, cursor: 0}, claude.unwrap)
 	if got != "completely different text here" {
 		t.Fatalf("got %q", got)
 	}
@@ -602,7 +584,7 @@ func TestStitchKeepsHiddenPartOfALongWord(t *testing.T) {
 	st := stitcher{text: "start " + long + " end of the draft here", a: 0, b: 12}
 	// Rows are 25 wide: the long word breaks after 25, and the view begins
 	// with its last 5 characters.
-	got := st.update(view{rows: []string{"xxxxx", "end of the draft here"}, width: 25, capped: true, cursor: 1})
+	got := st.update(view{rows: []string{"xxxxx", "end of the draft here"}, width: 25, capped: true, cursor: 1}, claude.unwrap)
 	if want := "start " + long + " end of the draft here"; !slices.Equal(strings.Fields(got), strings.Fields(want)) {
 		t.Fatalf("got %q", got)
 	}
@@ -672,10 +654,23 @@ func TestByteExact(t *testing.T) {
 		{"a changed word", "aa\nbc", "aa\nbb", false},
 	}
 	for _, c := range cases {
-		if got := byteExact(c.got, c.truth, 10); got != c.want {
+		if got := byteExact(c.got, c.truth, 10, claude.unwrap); got != c.want {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}
+	// A line that ends on a full row: Claude Code's screen shows a wrap
+	// there, Codex's the empty row that ends the line.
+	full, joined := "aaaaaaaaaa\nbb", "aaaaaaaaaa bb"
+	if !byteExact(joined, full, 10, claude.unwrap) || byteExact(joined, full, 10, codex.unwrap) {
+		t.Errorf("a break joined after a full line: excused for Claude %v, for Codex %v; want true, false",
+			byteExact(joined, full, 10, claude.unwrap), byteExact(joined, full, 10, codex.unwrap))
+	}
+}
+
+// wrapText wraps text the way Claude Code does: wordWrap's rows.
+func wrapText(text string, width int) []string {
+	rows, _ := wordWrap{}.wrap(text, width)
+	return rows
 }
 
 func TestWrapTextMatchesClaudeCode(t *testing.T) {
@@ -701,6 +696,48 @@ func TestWrapTextMatchesClaudeCode(t *testing.T) {
 	}
 }
 
+// Codex's wrap, measured on 0.158.0 (testdata/codex/0.158.0/wrap.rec): a
+// line that ends on a full row, a word two rows long included, gets one
+// empty row more; one a cell short, or with a word left to wrap, does not.
+func TestWordWrapEndRow(t *testing.T) {
+	q, s := strings.Repeat("q", 10), strings.Repeat("s", 20)
+	for _, c := range []struct {
+		text   string
+		rows   []string
+		starts []int
+		back   string // what the rows unwrap to, when not the text
+	}{
+		{q, []string{q, ""}, []int{0, 10}, ""},
+		{q + "\n\nnext", []string{q, "", "", "next"}, []int{0, 10, 11, 12}, ""},
+		{q + "\nnext", []string{q, "", "next"}, []int{0, 10, 11}, ""},
+		{"abcd efghi\nx", []string{"abcd efghi", "", "x"}, []int{0, 10, 11}, ""},
+		{s + "\nafter", []string{s[:10], s[10:], "", "after"}, []int{0, 10, 20, 21}, ""},
+		{strings.Repeat("a", 9) + "漢", []string{strings.Repeat("a", 9), "漢"}, []int{0, 9}, ""},
+		// A word that fills a row, then a wrap, reads as one word broken
+		// at the edge: the screen is the same (the known limit).
+		{q + " next", []string{q, "next"}, []int{0, 11}, q + "next"},
+		{"short\nx", []string{"short", "x"}, []int{0, 6}, ""},
+	} {
+		rows, starts := codex.unwrap.wrap(c.text, 10)
+		if !slices.Equal(rows, c.rows) || !slices.Equal(starts, c.starts) {
+			t.Errorf("%q: rows %q at %v, want %q at %v", c.text, rows, starts, c.rows, c.starts)
+		}
+		for _, r := range rows {
+			if runewidth.StringWidth(r) > 10 {
+				t.Errorf("%q: row %q wider than the box", c.text, r)
+			}
+		}
+		if want := cmp.Or(c.back, c.text); codex.unwrap.unwrap(rows, 10) != want {
+			t.Errorf("%q: unwrapped as %q, want %q", c.text, codex.unwrap.unwrap(rows, 10), want)
+		}
+	}
+	// Without the end row, Claude Code's rows join a full line with the
+	// next: the limit Codex's screen does not have.
+	if got := claude.unwrap.unwrap([]string{q, "next"}, 10); got != q+"next" {
+		t.Errorf("Claude Code's rows %q", got)
+	}
+}
+
 func TestStitchWideCharacterText(t *testing.T) {
 	// A paragraph with no spaces, scrolled through a 5-row box: the review
 	// found the word stitcher kept only what was on screen.
@@ -708,7 +745,7 @@ func TestStitchWideCharacterText(t *testing.T) {
 	for i := 0; i < 260; i++ {
 		text.WriteRune(rune(0x4e00 + i))
 	}
-	sim := &boxSim{width: 20, cap: 5}
+	sim := &boxSim{width: 20, cap: 5, wrap: claude.unwrap}
 	r := &stitchRun{t: t, sim: sim, strict: true, mustBeExact: true}
 	for _, ch := range text.String() {
 		sim.insert(string(ch))
@@ -723,9 +760,9 @@ func TestStitchWideCharacterText(t *testing.T) {
 func TestStitchSkipsAnUnchangedView(t *testing.T) {
 	var st stitcher
 	v := view{rows: []string{"a b c"}, width: 10}
-	st.update(v)
+	st.update(v, claude.unwrap)
 	st.text = "changed behind its back"
-	if got := st.update(v); got != "changed behind its back" {
+	if got := st.update(v, claude.unwrap); got != "changed behind its back" {
 		t.Fatalf("an unchanged view was merged again: %q", got)
 	}
 }
@@ -733,7 +770,7 @@ func TestStitchSkipsAnUnchangedView(t *testing.T) {
 func TestStitchEnterThenPauseKeepsSpacingExact(t *testing.T) {
 	// Found in tmux, which sends Enter and the next letters separately: a
 	// save between them saw an empty last row, and the line break doubled.
-	sim := &boxSim{width: 60, cap: 6}
+	sim := &boxSim{width: 60, cap: 6, wrap: claude.unwrap}
 	r := &stitchRun{t: t, sim: sim, strict: true, mustBeExact: true}
 	for i := 1; i <= 20; i++ {
 		if i > 1 {
@@ -760,7 +797,7 @@ func TestStitchEmptyTopRowReplacesTheSameBreak(t *testing.T) {
 	// below it. The blank row's line break is the one already in the text,
 	// not a new one.
 	st := stitcher{text: "one two\n\nthree four", a: len("one two\n"), b: len("one two\n\nthree four")}
-	got := st.update(view{rows: []string{"", "three four five"}, width: 40, capped: true, cursor: 1, cursorEnd: true})
+	got := st.update(view{rows: []string{"", "three four five"}, width: 40, capped: true, cursor: 1, cursorEnd: true}, claude.unwrap)
 	if want := "one two\n\nthree four five"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}

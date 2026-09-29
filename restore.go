@@ -265,7 +265,7 @@ func (s *session) clipboardInstead(r *record, why, claim string) {
 // back.
 func (s *session) verifyRestore(draft string, width int) {
 	inj := s.rs.inj
-	if inj == nil || draft != inj.text && !byteExact(draft, inj.text, width) {
+	if inj == nil || draft != inj.text && !byteExact(draft, inj.text, width, s.prof.unwrap) {
 		return
 	}
 	s.rs.inj = nil

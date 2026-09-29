@@ -1,6 +1,6 @@
 # Codex captures
 
-Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks; no reader test replays them yet, since `replay_test.go` reads only `testdata/claude`.
+Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks. `replay_test.go` replays `typed`, `multiline`, `accents`, `wrap`, `pastes` and the first Ctrl+G of `tall` through Codex's wrap, scroll and paste models, with a stand-in reader until Codex's own lands, and checks each draft against the editor copy.
 
 ## What each file is
 
@@ -46,6 +46,7 @@ Differences from that setup:
 | `resume-unsent-id` | `codex resume` of a thread that never sent anything: an error and exit status 1 |
 | `daemon-quit`, `daemon-killsession` | the shared background server: a quit, and a draft followed by `kill-session` |
 | `suspend`, `suspend-direct` | Ctrl+Z through unsent and `fg`; Ctrl+Z to Codex alone |
+| `wrap` | lines that end on a full row (117 columns at 120): before a blank line, before a line, a row of words, a word two rows long, and at the end of the draft; each gets an empty row after it. Recorded on its own on 2026-09-29 with a fresh scratch home, the same setup |
 
 ## Adding one
 

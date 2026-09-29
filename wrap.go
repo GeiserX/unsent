@@ -755,7 +755,7 @@ func (s *session) look(scr *screen) bool {
 	}
 	v.deleted, v.deletedAhead = s.deletes.recent()
 	before := s.stitch
-	draft := s.pastes.expand(s.stitch.update(v), s.rec.Draft, s.prof)
+	draft := s.pastes.expand(s.stitch.update(v, s.prof.unwrap), s.rec.Draft, s.prof)
 	s.verifyRestore(draft, v.width)
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)

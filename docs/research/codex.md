@@ -236,7 +236,9 @@ Unchanged and re-seen: the bold `›` at column 0 of the first visible row, cont
 
 ### Box, wrapping and text
 
-- Wrap width 117 at 120 columns, as before: 116 `a`s and then `漢字` put `漢` on the next row, leaving the first row one cell short; a 115-`x` word followed by ` ñandú` wrapped at the space [measured, `accents`]. The exact-width continuation row was not re-measured.
+- Wrap width 117 at 120 columns, as before: 116 `a`s and then `漢字` put `漢` on the next row, leaving the first row one cell short; a 115-`x` word followed by ` ñandú` wrapped at the space [measured, `accents`].
+- A line that ends on a full row still gets an empty row after it, where the insertion point sits: 117 `q`s at the end of the draft, and before a blank line; 117 `r`s before a line; a line of words 117 columns wide; a word of 234 characters, whose second row is full. A line one cell short does not. The Ctrl+G copy has no trailing space or extra break for any of them [measured, `wrap`, `screens/wrap.txt`, `wrap.editor-1.txt`]. So that row tells a line that ends at the edge from a wrap, which Claude Code's box cannot; unsent's Codex wrap model reads it that way (`wordWrap{endRow: true}` in `stitch.go`).
+- What the rows cannot tell, as for Claude Code: a line break before a word that would not fit after the row above, such as a word as wide as a row or wider starting a line, reads as a wrap [measured, `accents` and `wrap`: `done.` then 116 `a`s, and `after a blank line` then 117 `r`s, both typed with Ctrl+J between], and a space at the end of the draft is not drawn [measured, `pastes.editor-3.txt` ends in a space the screen does not show].
 - Precomposed accents (`ñandú`, `¿qué pasó?`, `Pingüino`), decomposed ones (`e` + U+0301, `n` + U+0303), `👍🏽` and the flag `🇪🇸` came back byte-identical through Ctrl+G [measured, `accents.editor-1.txt` against the typed bytes].
 - A 45-line draft: an edit 40 rows up scrolled the box to rows 05 to 40; going back down scrolled it to rows 10 to 45, and the editor copy still held the edit, now out of sight. A Ctrl+W 30 rows up changed only that row [measured, `tall.editor-1.txt`, `tall.editor-2.txt`].
 

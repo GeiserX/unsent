@@ -114,7 +114,7 @@ func TestClaudeCollapses(t *testing.T) {
 		{strings.Repeat("cell\t", 150), 40, true}, // 750 characters, 1,200 with the tabs as spaces
 		{strings.Repeat("cell ", 150), 40, false},
 	} {
-		if got := claude.collapses(c.paste, c.rows); got != c.want {
+		if got := claude.pastes[0].collapses(c.paste, c.rows); got != c.want {
 			t.Errorf("collapses(%d bytes, %d breaks, %d rows) = %v, want %v", len(c.paste), strings.Count(c.paste, "\n"), c.rows, got, c.want)
 		}
 	}
@@ -247,5 +247,66 @@ func TestPasteExpandSkipsAnotherNumbersPaste(t *testing.T) {
 	p.feed([]byte(string(pasteStart) + b + string(pasteEnd)))
 	if got := p.expand("typed [Pasted text #2]", "typed", &claude); got != "typed "+b {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// Codex's rule (docs/research/codex.md sections 4 and 10): a paste over
+// 1,000 characters shows as "[Pasted Content N chars]", N counting every
+// character with line breaks as LF, and a second one of the same size
+// still in the box as "... #2". Placeholders pair with pastes by that
+// count, the plain label with the first paste of its size and #2 with the
+// next, wherever each sits in the draft.
+func TestPasteExpandCodex(t *testing.T) {
+	a, b := strings.Repeat("a", 1001), strings.Repeat("b", 1001)
+	accents := strings.Repeat("é", 1001) // 2,002 bytes
+	lines := strings.Repeat(strings.Repeat("l", 89)+"\r", 11) + strings.Repeat("l", 89)
+	pasted := func() *pasteTracker {
+		var p pasteTracker
+		for _, text := range []string{strings.Repeat("s", 1000), a, b, accents, lines} {
+			p.feed([]byte(string(pasteStart) + text + string(pasteEnd)))
+		}
+		return &p
+	}
+	long := strings.ReplaceAll(lines, "\r", "\n") // 1,079 characters
+	for _, c := range []struct{ draft, want string }{
+		{"before [Pasted Content 1001 chars] after [Pasted Content 1001 chars] #2", "before " + a + " after " + b},
+		{"[Pasted Content 1001 chars] #2 then [Pasted Content 1001 chars]", b + " then " + a},
+		{"[Pasted Content 1079 chars]", long},
+		{"[Pasted Content 1000 chars] stays: that paste went in as text", "[Pasted Content 1000 chars] stays: that paste went in as text"},
+		{"[Pasted Content 999 chars] matches no paste", "[Pasted Content 999 chars] matches no paste"},
+	} {
+		if got := pasted().expand(c.draft, "", &codex); got != c.want {
+			t.Errorf("%q: got %.60q…", c.draft, got)
+		}
+	}
+	// The é paste is 1,001 characters, so it is one of the 1001s: third.
+	p := pasted()
+	if got := p.expand("[Pasted Content 1001 chars] [Pasted Content 1001 chars] #2 [Pasted Content 1001 chars] #3", "", &codex); got != a+" "+b+" "+accents {
+		t.Errorf("three of a size: got %.60q…", got)
+	}
+	// Once paired, a label keeps its paste: with the plain one deleted, #2
+	// is still b.
+	if got := p.expand("only [Pasted Content 1001 chars] #2", "", &codex); got != "only "+b {
+		t.Errorf("after a delete: got %.60q…", got)
+	}
+}
+
+// Codex gives the plain label back once no paste of that size is left in
+// the box: the next paste of that size shows under it, and a paste whose
+// label left the box fills nothing again.
+func TestPasteExpandCodexReusedLabel(t *testing.T) {
+	var p pasteTracker
+	a, b := strings.Repeat("a", 1001), strings.Repeat("b", 1001)
+	ph := "[Pasted Content 1001 chars]"
+	p.feed([]byte(string(pasteStart) + a + string(pasteEnd)))
+	if got := p.expand("x "+ph, "", &codex); got != "x "+a {
+		t.Fatalf("the first paste: got %.60q…", got)
+	}
+	if got := p.expand("x ", "x "+a, &codex); got != "x " {
+		t.Fatalf("its label deleted: got %.60q…", got)
+	}
+	p.feed([]byte(string(pasteStart) + b + string(pasteEnd)))
+	if got := p.expand("x "+ph, "x ", &codex); got != "x "+b {
+		t.Fatalf("the label back for the next paste: got %.60q…, want the b paste", got)
 	}
 }

@@ -11,8 +11,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/x/vt"
+	"github.com/mattn/go-runewidth"
 )
 
 // Replays of real Claude Code captures in testdata/claude/<version>/ (see
@@ -324,7 +326,7 @@ func TestReplayClaudeScreens(t *testing.T) {
 				t.Fatalf("box found %v, want %v (rows %q)", ok, c.ok, v.rows)
 			}
 			var st stitcher
-			if got := st.update(v); ok && got != c.draft {
+			if got := st.update(v, claude.unwrap); ok && got != c.draft {
 				t.Fatalf("draft %q, want %q", got, c.draft)
 			}
 		})
@@ -334,4 +336,217 @@ func TestReplayClaudeScreens(t *testing.T) {
 	if len(files) != len(claudeScreens) {
 		t.Fatalf("%d screens in testdata, %d checked", len(files), len(claudeScreens))
 	}
+}
+
+// Replays of real Codex 0.158.0 captures in testdata/codex/0.158.0 (see
+// the README there), through the same shadow screen, stitcher and paste
+// tracker as a live session, drawn by Codex's profile: its wrap model,
+// its scroll and its paste rule. At each Ctrl+G the draft must be the
+// next editor copy.
+
+// codexStandIn reads Codex 0.158.0's box for these replays until Codex's
+// own reader lands with its profile: on the alternate screen, the rows
+// from the lowest bold, not dim, not reversed › at column 0 down to the
+// padding row above the two footer rows, from column 2. Rows wrap at the
+// width minus 3, and the box stops growing at the height minus 4 rows
+// (counted one lower, the safe side). It knows nothing of menus or turns:
+// the replays below show neither with a draft in the box.
+func codexStandIn(s *screen) (view, bool) {
+	end := len(s.rows) - 3 // the padding row
+	if !s.alt || end < 1 || s.rows[end].text() != "" {
+		return view{}, false
+	}
+	for y := end - 1; y >= 0; y-- {
+		r := s.rows[y]
+		if r.cells[0] != "›" || !r.look[0].bold || r.look[0].reverse || r.faint[0] {
+			continue
+		}
+		v := view{cursor: -1, width: s.cols - 3, under: -1, capped: end-y >= len(s.rows)-5}
+		if end == y+1 && (r.textFrom(2) == "" || r.faintFrom(2)) {
+			v.empty = true
+			return v, true
+		}
+		for z := y; z < end; z++ {
+			v.rows = append(v.rows, s.rows[z].textFrom(2))
+		}
+		if s.curY >= y && s.curY < end {
+			v.cursor = s.curY - y
+			v.cursorEnd = s.curX >= 2+runewidth.StringWidth(v.rows[v.cursor])
+		}
+		return v, true
+	}
+	return view{}, false
+}
+
+// codexShows reports whether got is Codex's draft truth as far as Codex's
+// screen shows it: byte for byte, but for two things its rows cannot
+// tell. A line break before a word that would not fit after the row reads
+// as a wrap (byteExact's limit, here where a line starts with a word as
+// wide as a row, or wider), and spaces at the very end of the draft are
+// not drawn. Tolerated by Codex's measured drawing, not by the profile's
+// model, so a wrong model cannot excuse itself.
+func codexShows(got, truth string) bool {
+	return got == truth || byteExact(got, strings.TrimRight(truth, " "), 117, wordWrap{endRow: true})
+}
+
+// replayCodex replays name.rec through a session with prof, read by
+// codexStandIn while prof has no reader, and returns the first of the
+// first checks Ctrl+G (all when 0) whose editor copy the saved draft
+// differs from.
+func replayCodex(t *testing.T, prof *profile, name string, checks int) error {
+	t.Helper()
+	if prof.read == nil {
+		p := *prof
+		p.read = codexStandIn
+		prof = &p
+	}
+	folder := filepath.Join("testdata", "codex", "0.158.0")
+	data, err := os.ReadFile(filepath.Join(folder, name+".rec"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &session{
+		screen: vt.NewEmulator(120, 40),
+		rec:    newRecord([]string{"codex"}, "/w"),
+		store:  testStore(t),
+		pastes: &pasteTracker{},
+		prof:   prof,
+	}
+	go io.Copy(io.Discard, s.screen)
+	var now time.Time
+	s.deletes.now = func() time.Time { return now }
+	checked := 0
+	var failed error
+	eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+		now = at
+		switch dir {
+		case 'i':
+			if k := keysIn(chunk); len(k) == 1 && k[0].key == ctrl('g') {
+				checked++
+				want, err := os.ReadFile(filepath.Join(folder, fmt.Sprintf("%s.editor-%d.txt", name, checked)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if failed == nil && (checks == 0 || checked <= checks) && !codexShows(s.rec.Draft, string(want)) {
+					failed = fmt.Errorf("%s: at Ctrl+G %d the draft differs from Codex's:\n got %q\nwant %q", name, checked, s.rec.Draft, want)
+				}
+			}
+			s.input(chunk)
+		case 'o':
+			for len(chunk) > 0 {
+				k := len(chunk)
+				if i := bytes.Index(chunk, frameEnd); i >= 0 {
+					k = i + len(frameEnd)
+				}
+				s.write(chunk[:k])
+				chunk = chunk[k:]
+				if !s.inFrame {
+					if s.save(); s.broken.Load() {
+						t.Fatal("the session stopped saving")
+					}
+				}
+			}
+		}
+	})
+	copies, _ := filepath.Glob(filepath.Join(folder, name+".editor-*.txt"))
+	if failed == nil && (checked == 0 || checked != len(copies)) {
+		t.Fatalf("%s: %d Ctrl+G checks for %d editor copies", name, checked, len(copies))
+	}
+	return failed
+}
+
+// Recorded with keys and output together (testdata/codex/README.md):
+//   - typed: one line;
+//   - multiline: new lines by Ctrl+J, Alt+Enter and Shift+Enter, one blank;
+//   - accents: accents precomposed and decomposed, emoji, a wide character
+//     that does not fit at the edge of a word broken there, and a wrap at a
+//     space after a word 115 columns wide;
+//   - wrap: lines that end on a full row, each followed by Codex's empty
+//     row: before a blank line, before a line, a row of words, a word two
+//     rows long, and at the end of the draft;
+//   - pastes: pastes inline at 3 lines and 1,000 characters, two of 1,001
+//     characters as "[Pasted Content 1001 chars]" and "... #2", the box
+//     after the editor round trip showing them whole, and one of 1,079
+//     characters with 11 line breaks, sent with LF and with CR;
+//   - tall: 45 lines in a box of 36 that scrolls a row at a time, edited 40
+//     rows up and read back from the bottom, the edit out of sight. Only
+//     its first Ctrl+G: before the second, Ctrl+W deletes a word 30 rows
+//     up, which only Codex's delete keys, still to come with its profile,
+//     tell from a word scrolled away.
+var codexReplays = []struct {
+	name   string
+	checks int
+}{{"typed", 0}, {"multiline", 0}, {"accents", 0}, {"wrap", 0}, {"pastes", 0}, {"tall", 1}}
+
+func TestReplayCodex(t *testing.T) {
+	for _, r := range codexReplays {
+		t.Run(r.name, func(t *testing.T) {
+			if err := replayCodex(t, &codex, r.name, r.checks); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// A check that cannot fail is not a check: with Codex's wrap model swapped
+// for character wrap, or for Claude Code's word wrap with no end row, some
+// replay must go red.
+func TestReplayCodexCatchesAWrongWrapModel(t *testing.T) {
+	for _, m := range []struct {
+		name string
+		rule unwrapRule
+	}{{"character wrap", charWrap{}}, {"word wrap with no end row", wordWrap{}}} {
+		p := codex
+		p.unwrap = m.rule
+		var red []string
+		for _, r := range codexReplays {
+			if replayCodex(t, &p, r.name, r.checks) != nil {
+				red = append(red, r.name)
+			}
+		}
+		if len(red) == 0 {
+			t.Errorf("with %s every Codex replay stayed green", m.name)
+		}
+		t.Logf("with %s, red: %s", m.name, strings.Join(red, ", "))
+	}
+}
+
+// charWrap is character wrap, the model of aider and goose in docs/SPEC.md
+// section 4 step 17: rows break at the width wherever it falls, and a full
+// row runs on into the next with nothing between. Here it is only the
+// mutant the Codex replays must catch.
+type charWrap struct{}
+
+func (charWrap) wrap(text string, width int) (rows []string, starts []int) {
+	at := 0
+	for _, line := range strings.Split(text, "\n") {
+		for rest, pos := line, at; ; {
+			head := rest
+			if width > 0 && runewidth.StringWidth(rest) > width {
+				if head = runewidth.Truncate(rest, width, ""); head == "" {
+					_, n := utf8.DecodeRuneInString(rest)
+					head = rest[:n]
+				}
+			}
+			rows, starts = append(rows, head), append(starts, pos)
+			if rest, pos = rest[len(head):], pos+len(head); rest == "" {
+				break
+			}
+		}
+		at += len(line) + 1
+	}
+	return rows, starts
+}
+
+func (charWrap) unwrap(rows []string, width int) string {
+	var b strings.Builder
+	for i, r := range rows {
+		// A row a cell short of full is full too: a wide character did not
+		// fit at its end.
+		if i > 0 && runewidth.StringWidth(rows[i-1]) < width-1 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(r)
+	}
+	return b.String()
 }
