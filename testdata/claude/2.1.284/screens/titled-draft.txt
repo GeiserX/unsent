@@ -1,0 +1,40 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.284[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus 5.5 (1M context) · API Usage Billing[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/Volumes/Data/unsent-rra.jPBj/cases/a2/work[39m
+
+[38;5;174m▎[39m [1mAuto mode is now Claude Code's default permission mode.[0m
+[38;5;174m▎[39m [38;5;246mAuto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky actions and [39m
+[38;5;174m▎[39m [38;5;246mprompt injection before executing, runs the ones it assesses as lower-risk, and blocks the rest.[39m
+[38;5;174m▎[39m [38;5;246mhttps://code.claude.com/docs/en/permission-modes[39m
+
+[38;5;239m[48;5;237m❯[39m [38;5;231m/rename calls[39m [49m
+[38;5;246m  ⎿  [39mSession renamed to: calls
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[38;5;244m──────────────────────────────────────────────────────────────────────────────────────────────────────────────── calls ─
+[39m❯ a real prompt typed after the rename[7m [0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;246mstatus stub[39m
+  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle)[39m

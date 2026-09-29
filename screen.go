@@ -85,6 +85,23 @@ func (r screenRow) faintFrom(x int) bool {
 	return seen
 }
 
+// fgFrom reports whether every visible character from column x on is
+// drawn in the foreground colour fg, and there is one. Claude Code draws a
+// placeholder this way.
+func (r screenRow) fgFrom(x int, fg cellColor) bool {
+	seen := false
+	for i := x; i < len(r.cells); i++ {
+		if strings.TrimSpace(r.cells[i]) == "" {
+			continue
+		}
+		if r.look[i].fg != fg {
+			return false
+		}
+		seen = true
+	}
+	return seen
+}
+
 func snapshot(e *vt.Emulator) *screen {
 	w, h := e.Width(), e.Height()
 	s := &screen{rows: make([]screenRow, h), cols: w, alt: e.IsAltScreen()}

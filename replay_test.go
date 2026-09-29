@@ -238,6 +238,148 @@ func TestReplayClaudeSends(t *testing.T) {
 	}
 }
 
+// replayRun feeds a whole run recorded by unsent's raw log (keys in and
+// output out, `script -r` format) through a session at 120x40: keys through
+// its input path, output through the shadow screen, with a save after every
+// output frame (tick 0) or one every tick of recorded time, as a live
+// session saves. closed says the window closed at the end: the close comes
+// just before Claude Code's teardown (mouse reports off) that answers it.
+// Otherwise the agent left on the keys. It returns the finished session and
+// every draft saved on the way.
+func replayRun(t *testing.T, file string, tick time.Duration, closed bool) (sendSession, []string) {
+	t.Helper()
+	s := newSendSession(t, &claude)
+	s.screen = vt.NewEmulator(120, 40)
+	go io.Copy(io.Discard, s.screen)
+	drafts := []string{""}
+	save := func() {
+		s.save()
+		if d := s.rec.Draft; d != drafts[len(drafts)-1] {
+			drafts = append(drafts, d)
+		}
+	}
+	var next time.Time
+	eachChunk(t, readFixture(t, file), func(at time.Time, dir byte, chunk []byte) {
+		for tick > 0 && !next.IsZero() && !at.Before(next) {
+			save()
+			next = next.Add(tick)
+		}
+		if next.IsZero() {
+			next = at.Add(tick)
+		}
+		switch dir {
+		case 'i':
+			s.input(chunk)
+		case 'o':
+			if closed && !s.closed && bytes.Contains(chunk, []byte("\x1b[?1006l")) {
+				s.closing()
+			}
+			for len(chunk) > 0 {
+				k := len(chunk)
+				if i := bytes.Index(chunk, frameEnd); i >= 0 {
+					k = i + len(frameEnd)
+				}
+				s.write(chunk[:k])
+				chunk = chunk[k:]
+				if tick == 0 && !s.inFrame {
+					save()
+				}
+			}
+		}
+	})
+	if closed && !s.closed {
+		t.Fatal("no teardown to close the window on")
+	}
+	save()
+	s.finish()
+	return s, drafts
+}
+
+// Runs of Claude Code 2.1.284 with slash commands and a named session,
+// recorded by unsent's raw log in a scratch config (docs/research/claude.md
+// section 13). After /rename, Claude Code writes the session's name into
+// the box's top rule; a reader that took only a plain rule for the box lost
+// it for the rest of the run, kept the /rename line as the draft and left
+// it behind as an orphan, and saved nothing typed after it. Each case says
+// what the store holds once the agent is gone: the sent log, history, and
+// the draft left behind (the orphan, "" for none).
+//   - rename-enter: /rename calls, Enter, Ctrl+C twice;
+//   - rename-after-esc: /rename, Esc closes the command menu, " calls",
+//     Enter, then /exit and Enter;
+//   - title-in-rule: /rename alpha-notes, Enter, Ctrl+C twice;
+//   - rename-then-typed: a prompt typed under the titled rule, then Ctrl+C
+//     twice, which clears it first;
+//   - rename-main-screen: the same on the main-screen renderer, the window
+//     closed with the prompt half typed;
+//   - resumed-named: claude --resume alpha-notes, whose box has the titled
+//     rule from its first frame, a prompt typed and Ctrl+C twice;
+//   - resume-picker-close: /resume, a search typed into the picker, Esc,
+//     the window closed with the picker open;
+//   - slash-clear, slash-help, slash-model: the command, Enter, Esc, /exit;
+//   - agents-view: /rename alpha-notes, Enter, ← to the agents view, whose
+//     box shows a grey placeholder, Esc back, a message sent, ← again and
+//     Ctrl+C twice; its output also sets the window title "✳ alpha-notes";
+//   - rename-long-name: /rename with a name wider than the window, which
+//     the rule shows cut with an ellipsis and no rule before it, then a
+//     prompt typed under it and Ctrl+C twice, which clears it first;
+//   - resume-picker-ctrlc: a message sent, /resume, Ctrl+C twice, which
+//     leaves the picker open, the window closed;
+//   - model-ctrlc: /model, Ctrl+C twice, which leaves the dialog open, the
+//     window closed;
+//   - control: a prompt half typed, the window closed.
+func TestReplayClaudeSlashCommandsAndNames(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		closed  bool
+		sent    []string
+		history []string
+		left    string
+	}{
+		{"rename-enter", false, []string{"/rename calls"}, nil, ""},
+		{"rename-after-esc", false, []string{"/rename calls", "/exit"}, nil, ""},
+		{"title-in-rule", false, []string{"/rename alpha-notes"}, nil, ""},
+		{"rename-then-typed", false, []string{"/rename calls"}, []string{"a real prompt typed after the rename"}, ""},
+		{"rename-main-screen", true, []string{"/rename alpha-notes"}, nil, "half typed after rename"},
+		{"resumed-named", false, nil, []string{"typed in the resumed named session"}, ""},
+		{"resume-picker-close", true, nil, []string{"/resume"}, ""},
+		{"slash-clear", false, []string{"/clear", "/exit"}, nil, ""},
+		{"slash-help", false, []string{"/exit"}, []string{"/help"}, ""},
+		{"slash-model", false, []string{"/exit"}, []string{"/model"}, ""},
+		{"agents-view", false, []string{"/rename alpha-notes", "hello there"}, nil, ""},
+		{"rename-long-name", false, []string{"/rename " + strings.Repeat("long-name-", 14) + "end"}, []string{"typed after long rename"}, ""},
+		{"resume-picker-ctrlc", true, []string{"hello"}, []string{"/resume"}, ""},
+		{"model-ctrlc", true, nil, []string{"/model"}, ""},
+		{"control", true, nil, nil, "please refactor the parser so that"},
+	} {
+		for _, tick := range []time.Duration{0, saveInterval} {
+			t.Run(fmt.Sprint(c.name, " save every ", tick), func(t *testing.T) {
+				s, drafts := replayRun(t, "2.1.284/"+c.name+".rec", tick, c.closed)
+				s.expect(c.sent, c.history)
+				var left []string
+				for _, r := range s.store.load(false) {
+					left = append(left, r.Draft)
+				}
+				if want := []string{c.left}; c.left == "" && len(left) > 0 || c.left != "" && !slices.Equal(left, want) {
+					t.Errorf("left behind %q, want %q", left, c.left)
+				}
+				// Nothing but typed text is ever a draft: not the session's
+				// name, from the rule or the window title, not a picker's
+				// search, not a placeholder.
+				for _, d := range drafts {
+					switch d := strings.TrimSpace(d); {
+					case d == "calls", d == "alpha-notes", d == "alph", d == "describe a task for a new session",
+						strings.HasSuffix(d, "…"):
+						t.Errorf("saved %q as a draft (all: %q)", d, drafts)
+					}
+				}
+				if l := s.exitLines(); l != nil {
+					t.Errorf("exit lines %q", l)
+				}
+			})
+		}
+	}
+}
+
 func readFixture(t *testing.T, path string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", "claude", path))
@@ -337,6 +479,11 @@ var claudeScreens = []struct {
 	{"2.1.282/screens/leading-break.txt", true, "\nafter a leading break"},
 	{"2.1.282/screens/trust-dialog.txt", false, ""},
 	{"2.1.282/screens/blank-top.txt", true, "\npara two line 01\npara two line 02\npara two line 03\npara two line 04\npara two line 05\npara two line 06\npara two line 07\npara two line 08\npara two line 09\npara two line 10\npara two line 11\npara two line 12\npara two line 13\npara two line 14"},
+	{"2.1.284/screens/titled-empty.txt", true, ""},
+	{"2.1.284/screens/titled-draft.txt", true, "a real prompt typed after the rename"},
+	{"2.1.284/screens/titled-draft-main.txt", true, "half typed after rename"},
+	{"2.1.284/screens/resume-picker.txt", false, ""},
+	{"2.1.284/screens/agents-view.txt", true, ""},
 	{"2.1.280/screens/empty.txt", true, ""},
 	{"2.1.280/screens/draft.txt", true, "do nothing; reply ok\ntwo[Pasted text #1 +3 lines]"},
 	{"2.1.280/screens/scrolled.txt", true, "r8\nr9\nr10\nr11\nr12\nr13\nr14\nr15\nr16\nr17\nr18\nr19\nr20\nr21\nr22"},
