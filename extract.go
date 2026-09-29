@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 )
 
 // view is what an extractor sees of the input box on one screen.
@@ -66,6 +67,14 @@ type profile struct {
 	// the shell gets its keys as it expects them; the agent must turn them
 	// on again as it repaints after the resume. Nil writes nothing.
 	suspended []byte
+	// hidesCursor is set for an agent that sends no synchronized-output
+	// marks but brackets each of its paints with ESC[?25l … ESC[?25h
+	// (agy): those marks then tell a complete frame, and a save waits for
+	// one to close as it waits for a synchronized frame. quietGap is how
+	// long output outside any paint must have been quiet before a save
+	// reads the screen, for the same agents; zero waits for nothing.
+	hidesCursor bool
+	quietGap    time.Duration
 	// verified is the agent version the reader was last checked against,
 	// and version the arguments that make the agent print its own: when
 	// the reader never finds the box, the user learns both.
@@ -81,7 +90,7 @@ type profile struct {
 }
 
 // profiles are the agents unsent can read.
-var profiles = []*profile{&claude, &codex, &pi}
+var profiles = []*profile{&claude, &codex, &pi, &agy}
 
 // profileFor returns the profile of the agent a command starts, or nil.
 func profileFor(command string) *profile {

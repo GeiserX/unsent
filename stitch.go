@@ -5,9 +5,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth"
+	"github.com/rivo/uniseg"
 )
 
 // stitcher rebuilds a draft that is taller than the input box.
@@ -236,11 +238,23 @@ const minShared = 4
 // the end rather than its neighbour retyped.
 func align(old, seen []word, shownA, shownB, width, deleted int) (p, q, shared int) {
 	m := len(old)
+	// Where a stretch of old starting at word f sits. A word longer than a
+	// row is cut by the top edge of the box, so a stretch that starts with
+	// the visible part of one starts mid-word: without that, a view
+	// scrolled a row into such a word looks a whole word away from where
+	// the last one sat, and the tie between matching that word and taking
+	// its visible part for a new one is broken the wrong way.
+	startOf := func(f int) int {
+		if len(seen) > 0 && cutAtEdge(seen[0].s, old[f].s, true, false, width) {
+			return old[f].end - len(seen[0].s)
+		}
+		return old[f].start
+	}
 	gapFrom := func(f int) int {
 		if f >= m {
 			return abs(old[m-1].end - shownA)
 		}
-		return abs(old[f].start - shownA)
+		return abs(startOf(f) - shownA)
 	}
 	drop := func(w string) int {
 		if utf8.RuneCountInString(w) <= deleted {
@@ -600,4 +614,191 @@ func fullRowAt(text string, lineStart, i, width int, u unwrapRule) bool {
 	}
 	rows, _ := u.wrap(text[lineStart:i], width)
 	return runewidth.StringWidth(rows[len(rows)-1])+1+runewidth.StringWidth(first) > width
+}
+
+// fitWrap is the wrap of an editor that keeps the space at a wrap on the
+// upper row: greedy, over grapheme clusters, a paste placeholder as one
+// (marks matches it). A row may break after the last run of spaces that
+// leaves the rest of its word room on the next row, the spaces staying at
+// the end of the upper row, where the screen shows none; or between two
+// characters where either is CJK. Where no such break fits, the row
+// breaks at the edge, also in the middle of a run of spaces, which then
+// starts the next row. So a word that ends right at the edge and has a
+// space after it moves to the next row, which Claude Code's wrap keeps on
+// the full one. Rows are returned as the screen shows them, with spaces
+// at their ends trimmed.
+//
+// It is pi's wrap (wordWrapLine in editor.js, 0.87.1) and agy's
+// (measured on 1.2.13, the wrap capture: "a"x114 then " bb cc" at 117
+// columns puts "bb cc" on the second row, where Claude Code's wrap keeps
+// "bb" on the first). The CJK rule is pi's; for agy only a wide character
+// at the edge of a row was measured.
+type fitWrap struct{ marks *regexp.Regexp }
+
+func (w fitWrap) wrap(text string, width int) (rows []string, starts []int) {
+	at := 0
+	for _, line := range strings.Split(text, "\n") {
+		chunks := w.wrapLine(line, width)
+		for _, c := range chunks {
+			rows = append(rows, strings.TrimRight(line[c[0]:c[1]], " "))
+			starts = append(starts, at+c[0])
+		}
+		at += len(line) + 1
+	}
+	return rows, starts
+}
+
+// wrapLine returns the byte ranges of the rows one line wraps into.
+func (w fitWrap) wrapLine(line string, width int) [][2]int {
+	if line == "" || width <= 0 || runewidth.StringWidth(line) <= width {
+		return [][2]int{{0, len(line)}}
+	}
+	segs := w.segments(line)
+	var chunks [][2]int
+	cur, start := 0, 0
+	opp, oppWidth := -1, 0
+	for i, sg := range segs {
+		g := line[sg[0]:sg[1]]
+		gw := runewidth.StringWidth(g)
+		marker := sg[2] == 1
+		ws := !marker && wrapSpace(g)
+		if cur+gw > width {
+			switch {
+			case opp >= 0 && cur-oppWidth+gw <= width:
+				chunks = append(chunks, [2]int{start, opp})
+				start = opp
+				cur -= oppWidth
+			case start < sg[0]:
+				chunks = append(chunks, [2]int{start, sg[0]})
+				start = sg[0]
+				cur = 0
+			}
+			opp = -1
+		}
+		if gw > width {
+			// Wider than a row (a placeholder in a narrow window): it takes
+			// rows of its own, broken at the edge.
+			sub := w.wrapLine(g, width)
+			for _, c := range sub[:len(sub)-1] {
+				chunks = append(chunks, [2]int{sg[0] + c[0], sg[0] + c[1]})
+			}
+			last := sub[len(sub)-1]
+			start = sg[0] + last[0]
+			cur = runewidth.StringWidth(g[last[0]:last[1]])
+			opp = -1
+			continue
+		}
+		cur += gw
+		if i+1 >= len(segs) {
+			continue
+		}
+		next := segs[i+1]
+		ng := line[next[0]:next[1]]
+		nextMarker := next[2] == 1
+		switch {
+		case ws && (nextMarker || !wrapSpace(ng)):
+			opp, oppWidth = next[0], cur
+		case !ws && !wrapSpace(ng) && ((!marker && wrapCJK(g)) || (!nextMarker && wrapCJK(ng))):
+			opp, oppWidth = next[0], cur
+		}
+	}
+	return append(chunks, [2]int{start, len(line)})
+}
+
+// segments splits a line into grapheme clusters, each paste placeholder
+// kept as one: its byte range, and 1 in the third field for a placeholder.
+func (w fitWrap) segments(line string) [][3]int {
+	var segs [][3]int
+	marks := w.marks.FindAllStringIndex(line, -1)
+	pos := 0
+	for pos < len(line) {
+		if len(marks) > 0 && marks[0][0] == pos {
+			segs = append(segs, [3]int{pos, marks[0][1], 1})
+			pos = marks[0][1]
+			marks = marks[1:]
+			continue
+		}
+		end := len(line)
+		if len(marks) > 0 {
+			end = marks[0][0]
+		}
+		g, _, _, _ := uniseg.FirstGraphemeClusterInString(line[pos:end], -1)
+		if g == "" {
+			g = line[pos : pos+1]
+		}
+		segs = append(segs, [3]int{pos, pos + len(g), 0})
+		pos += len(g)
+	}
+	return segs
+}
+
+// wrapSpace reports whether a grapheme holds white space, as JavaScript's
+// \s finds it.
+func wrapSpace(g string) bool {
+	return strings.IndexFunc(g, func(r rune) bool { return unicode.IsSpace(r) || r == '\uFEFF' }) >= 0
+}
+
+// wrapCJK reports whether a grapheme holds a character after which, or
+// before which, a row may break: Han, kana, Hangul or Bopomofo.
+func wrapCJK(g string) bool {
+	return strings.IndexFunc(g, func(r rune) bool {
+		return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul, unicode.Bopomofo)
+	}) >= 0
+}
+
+// unwrap joins rows pi wrapped back into the lines typed. Each row starts
+// afresh, as pi's wrap does, so the break between two rows was a wrap
+// exactly when wrapping the two joined gives them back: joined with the
+// space the upper row hid, or with nothing (a word longer than a row, a
+// CJK break, a row that starts with a space). A break both explain is a
+// wrap at a space, unless a CJK character sits at it. Anything else is a
+// line break typed there. Two or more spaces at a wrap come back as one.
+func (w fitWrap) unwrap(rows []string, width int) string {
+	if len(rows) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(rows[0])
+	for i := 1; i < len(rows); i++ {
+		b.WriteString(w.join(rows[i-1], rows[i], width))
+		b.WriteString(rows[i])
+	}
+	return b.String()
+}
+
+// hidesBreak reports whether a line break between line and next reads
+// as a wrap on pi's screen (see byteExact).
+func (w fitWrap) hidesBreak(line, next string, width int) bool {
+	a, _ := w.wrap(line, width)
+	b, _ := w.wrap(next, width)
+	return w.join(a[len(a)-1], b[0], width) == " "
+}
+
+// join is what stood between two rows on the screen: " " or "" for a
+// wrap, "\n" for a line break.
+func (w fitWrap) join(prev, next string, width int) string {
+	if width <= 0 || prev == "" || next == "" {
+		return "\n"
+	}
+	space, none := w.rewraps(prev+" "+next, prev, next, width), w.rewraps(prev+next, prev, next, width)
+	switch {
+	case space && none:
+		last, _ := utf8.DecodeLastRuneInString(prev)
+		first, _ := utf8.DecodeRuneInString(next)
+		if wrapCJK(string(last)) || wrapCJK(string(first)) {
+			return ""
+		}
+		return " "
+	case space:
+		return " "
+	case none:
+		return ""
+	}
+	return "\n"
+}
+
+// rewraps reports whether text wraps into exactly the rows a and b.
+func (w fitWrap) rewraps(text, a, b string, width int) bool {
+	c := w.wrapLine(text, width)
+	return len(c) == 2 && strings.TrimRight(text[c[0][0]:c[0][1]], " ") == a && strings.TrimRight(text[c[1][0]:c[1][1]], " ") == b
 }

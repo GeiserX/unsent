@@ -125,7 +125,7 @@ func cleanPaste(draft string) string {
 // watchBox runs on the output side, under s.mu, after each chunk: it notes
 // when the box came into view, and forgets it while the box is out of view.
 func (s *session) watchBox() {
-	if !s.rs.on || s.inFrame {
+	if !s.rs.on || s.drawing() {
 		return
 	}
 	if _, ok := s.prof.read(snapshot(s.screen)); !ok {
@@ -240,7 +240,7 @@ func (s *session) tryRestore() {
 func (s *session) restoreView() (*screen, time.Time, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.inFrame {
+	if s.drawing() {
 		return nil, time.Time{}, false
 	}
 	return snapshot(s.screen), s.shown, s.bracketed

@@ -474,6 +474,11 @@ var (
 	// tail covers a split one.
 	bracketOn  = []byte("\x1b[?2004h")
 	bracketOff = []byte("\x1b[?2004l")
+	// An agent that sends no synchronized-output marks may hide the cursor
+	// for each paint instead (agy, profile.hidesCursor): between these the
+	// screen is half drawn, as it is between the frame marks.
+	cursorHide = []byte("\x1b[?25l")
+	cursorShow = []byte("\x1b[?25h")
 )
 
 // maxFrameWait is how long a save waits for an open frame to close. Frames
@@ -483,12 +488,17 @@ const maxFrameWait = 100 * time.Millisecond
 
 // session holds the live state of one wrapped agent.
 type session struct {
-	mu        sync.Mutex
-	screen    *vt.Emulator
-	strings   stringSeqs
-	dirty     bool
-	inFrame   bool
-	frameTail []byte
+	mu      sync.Mutex
+	screen  *vt.Emulator
+	strings stringSeqs
+	dirty   bool
+	// inSync is true while the output stands between the agent's
+	// synchronized-output marks, and inPaint between the cursor marks of
+	// an agent that brackets its paints with those instead; lastOut is
+	// when the last chunk arrived. See drawing.
+	inSync, inPaint bool
+	lastOut         time.Time
+	frameTail       []byte
 	// broken is set when reading or saving code panics (see fail): the
 	// session is plain passthrough from then on.
 	broken   atomic.Bool
@@ -511,6 +521,9 @@ type session struct {
 	// is partly inferred, and every loss keeps a safety copy.
 	stitched bool
 	deletes  deleteLog
+	// now is the clock the quiet gap goes by: time.Now, and the recorded
+	// clock while a replay feeds a capture back in its own time.
+	now func() time.Time
 	// keys holds the submit and clear keys typed since the last save;
 	// armed and cleared are what they say so far (see look).
 	keys    keyLog
@@ -643,7 +656,7 @@ func (s *session) write(chunk []byte) {
 	// Keys waiting for the agent's answer were typed into the screen as it
 	// stands now: keep it before this output changes it.
 	s.keys.answer(func() *screen {
-		if s.inFrame {
+		if s.drawing() {
 			return nil
 		}
 		return snapshot(s.screen)
@@ -654,16 +667,27 @@ func (s *session) write(chunk []byte) {
 	s.watchBox()
 }
 
-// trackFrames notes whether the output so far ends inside a frame.
+// trackFrames notes whether the output so far ends inside a synchronized
+// frame, and, for an agent that brackets each paint with its cursor marks
+// (profile.hidesCursor), whether it ends on a complete paint.
 func (s *session) trackFrames(chunk []byte) {
 	data := append(s.frameTail, chunk...)
 	b, e := bytes.LastIndex(data, frameBegin), bytes.LastIndex(data, frameEnd)
 	switch {
 	case b > e:
-		s.inFrame = true
+		s.inSync = true
 	case e > b:
-		s.inFrame = false
+		s.inSync = false
 	}
+	if s.prof != nil && s.prof.hidesCursor {
+		switch h, v := bytes.LastIndex(data, cursorHide), bytes.LastIndex(data, cursorShow); {
+		case h > v:
+			s.inPaint = true
+		case v > h:
+			s.inPaint = false
+		}
+	}
+	s.lastOut = s.clock()
 	switch on, off := bytes.LastIndex(data, bracketOn), bytes.LastIndex(data, bracketOff); {
 	case on > off:
 		s.bracketed = true
@@ -742,7 +766,8 @@ func (s *session) save() {
 			switch {
 			case e.kind == keyOther:
 				s.edited, s.recalled = true, false
-			case e.kind == keyRecall && (s.prof.keys.browses || !s.edited && s.rec.Draft == ""):
+			case e.kind == keyRecall && (s.prof.keys.browses ||
+				(s.prof.keys.empties || !s.edited) && s.rec.Draft == ""):
 				s.recalled = true
 			}
 		case keyClear:
@@ -796,7 +821,7 @@ func (s *session) take() (scr *screen, events []*keyEvent, answered bool) {
 	// If the agent is halfway through drawing, give it a moment to finish.
 	for deadline := time.Now().Add(maxFrameWait); ; time.Sleep(5 * time.Millisecond) {
 		s.mu.Lock()
-		if !s.inFrame || time.Now().After(deadline) {
+		if !s.drawing() || time.Now().After(deadline) {
 			break
 		}
 		s.mu.Unlock()
@@ -807,14 +832,44 @@ func (s *session) take() (scr *screen, events []*keyEvent, answered bool) {
 	}
 	s.dirty = false
 	scr = snapshot(s.screen)
-	inFrame := s.inFrame
+	// A frame that stays open does not hold the save back for ever: the
+	// screen is read as it stands, and the keys waiting for the agent's
+	// answer keep waiting.
+	drawing := s.drawing()
 	events, answered = s.keys.take(func() *screen {
-		if inFrame {
+		if drawing {
 			return nil
 		}
 		return scr
 	})
 	return scr, events, answered
+}
+
+// clock is the session's own time: the recorded one while a replay feeds
+// a capture back, else now.
+func (s *session) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
+// drawing reports whether the agent is halfway through drawing, so the
+// screen must not be read yet: between its synchronized-output marks, or
+// inside a paint that is still arriving, for an agent that brackets its
+// paints with the cursor marks instead (profile.hidesCursor). agy keeps
+// its cursor hidden for as long as a dialog is on screen, so an open
+// paint alone cannot mean a half-drawn screen: the screen is read once
+// the bytes have stopped coming for the profile's quiet gap. The caller
+// holds s.mu.
+func (s *session) drawing() bool {
+	if s.inSync {
+		return true
+	}
+	if !s.inPaint || s.prof == nil {
+		return false
+	}
+	return s.clock().Before(s.lastOut.Add(s.prof.quietGap))
 }
 
 // look reads the box off one screen and writes the draft to disk when it
@@ -845,6 +900,10 @@ func (s *session) look(scr *screen) bool {
 	if v.empty {
 		sent = armed && !s.cleared
 		s.cleared = false
+		// Nothing is in the box, whatever keys came before this read: the
+		// next recall key brings an entry of the agent's own history, not
+		// a draft (agy, where Esc cancels a turn after a send).
+		s.edited = false
 	}
 	v.deleted, v.deletedAhead = s.deletes.recent()
 	if s.recalled && s.rec.Draft != "" && s.prof.keys.browses {
@@ -1180,10 +1239,14 @@ type keyset struct {
 	// aside until they bring it back (pi: Up with the cursor at the start
 	// of a draft's first row), and also after keys that typed nothing
 	// (pi's Esc, which cancels a turn): the box then shows no draft until
-	// another key.
-	recall  []key
-	browses bool
-	suspend []key
+	// another key. empties is true when the recall keys bring history
+	// into an empty box whatever keys came before, and nothing into a box
+	// that holds a draft (agy: Esc, which cancels a turn, types nothing,
+	// and Up after it still recalls, while Up in a draft only moves the
+	// insertion point).
+	recall           []key
+	browses, empties bool
+	suspend          []key
 }
 
 // deletes returns how many characters the keys in b can delete, and

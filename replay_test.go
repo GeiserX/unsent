@@ -101,6 +101,10 @@ func replayRecordAs(t *testing.T, prof *profile, name string) {
 	drainScreen(t, s.screen)
 	var now time.Time
 	s.deletes.now = func() time.Time { return now }
+	// The quiet gap of a profile that has one (agy) goes by the record's
+	// own clock, so a replay reads the screen exactly where a live session
+	// would have.
+	s.now = func() time.Time { return now }
 	save := func() {
 		if s.save(); s.broken.Load() {
 			t.Fatal("the session stopped saving")
@@ -127,7 +131,7 @@ func replayRecordAs(t *testing.T, prof *profile, name string) {
 				}
 				s.write(chunk[:k])
 				chunk = chunk[k:]
-				if !s.inFrame {
+				if !s.drawing() {
 					save()
 				}
 			}
@@ -223,7 +227,7 @@ func TestReplayClaudeSends(t *testing.T) {
 						}
 						s.write(chunk[:k])
 						chunk = chunk[k:]
-						if tick == 0 && !s.inFrame {
+						if tick == 0 && !s.drawing() {
 							s.save()
 						}
 					}
@@ -281,7 +285,7 @@ func replayRun(t *testing.T, file string, tick time.Duration, closed bool) (send
 				}
 				s.write(chunk[:k])
 				chunk = chunk[k:]
-				if tick == 0 && !s.inFrame {
+				if tick == 0 && !s.drawing() {
 					save()
 				}
 			}
@@ -591,6 +595,10 @@ func replayCaptureSession(t *testing.T, prof *profile, set captureSet, name stri
 	drainScreen(t, s.screen)
 	var now time.Time
 	s.deletes.now = func() time.Time { return now }
+	// The quiet gap of a profile that has one (agy) goes by the record's
+	// own clock, so a replay reads the screen exactly where a live session
+	// would have.
+	s.now = func() time.Time { return now }
 	checked := 0
 	var failed error
 	save := func() {
@@ -602,7 +610,22 @@ func replayCaptureSession(t *testing.T, prof *profile, set captureSet, name stri
 		}
 	}
 	var next time.Time
+	// Every chunk, with when the one after it arrived: a save between two
+	// chunks runs at the later time, as the save loop's own does, so a
+	// profile that reads after a quiet gap (agy) sees the gaps the agent
+	// left.
+	var all []recChunk
+	var dirs []byte
 	eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+		all = append(all, recChunk{at, chunk})
+		dirs = append(dirs, dir)
+	})
+	for i := range all {
+		at, dir, chunk := all[i].at, dirs[i], all[i].b
+		after := at.Add(time.Second)
+		if i+1 < len(all) {
+			after = all[i+1].at
+		}
 		for set.tick > 0 && !next.IsZero() && !at.Before(next) {
 			now = next
 			save()
@@ -634,17 +657,26 @@ func replayCaptureSession(t *testing.T, prof *profile, set captureSet, name stri
 		case 'o':
 			for len(chunk) > 0 {
 				k := len(chunk)
-				if i := bytes.Index(chunk, frameEnd); i >= 0 {
-					k = i + len(frameEnd)
+				if j := bytes.Index(chunk, frameEnd); j >= 0 {
+					k = j + len(frameEnd)
 				}
 				s.write(chunk[:k])
 				chunk = chunk[k:]
-				if set.tick == 0 && !s.inFrame {
+				now = at
+				if set.tick == 0 && !s.drawing() {
+					save()
+				}
+			}
+			if set.tick == 0 {
+				// The screen as it stands when the next chunk arrives: the
+				// gap before it may be what says the frame is complete.
+				now = after
+				if !s.drawing() {
 					save()
 				}
 			}
 		}
-	})
+	}
 	copies, _ := filepath.Glob(filepath.Join(folder, name+".editor-*.txt"))
 	if failed == nil && checked != len(copies) {
 		t.Fatalf("%s: %d Ctrl+G checks for %d editor copies", name, checked, len(copies))
@@ -785,8 +817,8 @@ func firstRedReplay(t *testing.T, prof *profile) string {
 // it on. The model only draws the fuzz's box (stitch_test.go), where a
 // wrong one would make the fuzz easier or harder than the agent without a
 // test noticing. The captures scroll both ways: Codex's tall moves 40 rows
-// up and back down a row at a time, pi's scroll-steps 16, a key at a time,
-// and Claude Code's tall-wrapped,
+// up and back down a row at a time, pi's scroll-steps 16 and agy's 20, a
+// key at a time, and Claude Code's tall-wrapped,
 // deletes and bursts move up over rows out of sight mid-box, and
 // trailing-rows deletes rows at the end. So, as a check that can fail,
 // each profile with the other model must go red.
@@ -801,6 +833,9 @@ func TestReplayScrollModel(t *testing.T) {
 	claudeRec := func(name string) func(*testing.T, *profile) {
 		return func(t *testing.T, p *profile) { replayRecordAs(t, p, name) }
 	}
+	agyRec := func(name string) func(*testing.T, *profile) {
+		return func(t *testing.T, p *profile) { replayAgy(t, p, name) }
+	}
 	for _, c := range []struct {
 		prof     *profile
 		other    scrollModel
@@ -810,6 +845,8 @@ func TestReplayScrollModel(t *testing.T) {
 		{&pi, scrollMidBox, []func(*testing.T, *profile){piRec("scroll-steps"), piRec("tall"), piRec("edge-deletes")}},
 		{&claude, scrollOneRow, []func(*testing.T, *profile){
 			claudeBin("tall-wrapped"), claudeRec("deletes"), claudeRec("bursts"), claudeRec("trailing-rows")}},
+		{&agy, scrollMidBox, []func(*testing.T, *profile){
+			agyRec("scroll-steps"), agyRec("tall"), agyRec("edge-deletes")}},
 	} {
 		t.Run(c.prof.name, func(t *testing.T) {
 			t.Parallel()

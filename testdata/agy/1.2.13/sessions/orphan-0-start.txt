@@ -1,0 +1,89 @@
+--- tmux
+alt=0 dead=0
+--- ps
+16103 16101 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+16151 16103 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+--- open under the scratch home
+txt RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+1w RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001622.log
+2w RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001622.log
+4u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+8w RIG/home-profile/.gemini/antigravity-cli/crashes/crash_16151_a7eadc95-470b-4685-8bf0-37eab8a4ceff.log
+12u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+13u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+14u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+15u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+16u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+20r RIG/home-profile/.gemini/antigravity-cli
+21r RIG/home-profile/.gemini/antigravity-cli/bin
+22r RIG/home-profile/.gemini/antigravity-cli/brain
+23r RIG/home-profile/.gemini/antigravity-cli/builtin
+24r RIG/home-profile/.gemini/antigravity-cli/cache
+25r RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001622.log
+26r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+27r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+28r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+29r RIG/home-profile/.gemini/antigravity-cli/conversations
+30r RIG/home-profile/.gemini/antigravity-cli/crashes
+31r RIG/home-profile/.gemini/antigravity-cli/implicit
+32r RIG/home-profile/.gemini/antigravity-cli/installation_id
+33r RIG/home-profile/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+34r RIG/home-profile/.gemini/antigravity-cli/jetski_state.pbtxt
+35r RIG/home-profile/.gemini/antigravity-cli/last_check.timestamp
+36r RIG/home-profile/.gemini/antigravity-cli/log
+37r RIG/home-profile/.gemini/antigravity-cli/presence
+38r RIG/home-profile/.gemini/antigravity-cli/settings.json
+39r RIG/home-profile/.gemini/antigravity-cli/updater
+43r RIG/home-profile/.gemini/config
+44r RIG/home-profile/.gemini/config/.migrated
+45r RIG/home-profile/.gemini/config/mcp_config.json
+46r RIG/home-profile/.gemini/config/projects
+50r RIG/home-profile/.gemini/config/projects
+51r RIG/home-profile/.gemini/config/projects/default-cli-project.json
+60u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+61u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+62u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+66r RIG/home-profile/.gemini/config
+67r RIG/home-profile/.gemini/config/.migrated
+68r RIG/home-profile/.gemini/config/mcp_config.json
+69r RIG/home-profile/.gemini/config/projects
+--- conversations
+drwxr-xr-x   2 rig     staff   64 Sep 30 00:11 .
+drwxr-xr-x  21 rig     staff  672 Sep 30 00:16 ..
+--- history.jsonl
+--- unsent drafts
+drwx------  3 rig     staff   96 Sep 30 00:16 .
+drwx------  5 rig     staff  160 Sep 30 00:11 ..
+-rw-------  1 rig     staff    0 Sep 30 00:16 20260930-001622-16103.lock
+--- unsent records
+RIG/unsent-home2/history/20260930-001117.779464-71668.json:
+{
+  "format": 1,
+  "id": "20260930-001117.779464-71668",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 71668,
+  "started": "2026-09-30T00:11:10.971193+02:00",
+  "updated": "2026-09-30T00:11:13.380158+02:00",
+  "draft": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwafter a full row"
+}
+RIG/unsent-home2/history/20260930-001122.978955-71668.json:
+{
+  "format": 1,
+  "id": "20260930-001122.978955-71668",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 71668,
+  "started": "2026-09-30T00:11:10.971193+02:00",
+  "updated": "2026-09-30T00:11:18.577706+02:00",
+  "draft": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nbb cc"
+}
+--- unsent sent logs

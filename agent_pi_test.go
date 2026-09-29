@@ -33,7 +33,7 @@ func piShows(got, truth string) bool {
 		}
 		return strings.Join(lines, "\n")
 	}
-	return got == truth || byteExact(trim(got), trim(truth), 119, piWrap{})
+	return got == truth || byteExact(trim(got), trim(truth), 119, pi.unwrap)
 }
 
 // replayPi replays name.rec through a session with prof and returns the
@@ -230,7 +230,7 @@ var piTyped = map[string][]string{
 // nil.
 func piScreensCheck(t *testing.T, frames frameSet) error {
 	t.Helper()
-	get := func(record string) []*screen { return frames.get(t, piCaptures.folder, record) }
+	get := func(record string) []*screen { return frames.get(t, &pi, piCaptures.folder, record) }
 	for _, c := range piNotABox {
 		f := firstFrame(t, get(c.record), c.shows)
 		if v, ok := piBox(f); ok {
@@ -315,18 +315,18 @@ func TestPiNegativeScreens(t *testing.T) {
 // them: the cursor's row, the empty box, and the rows the labels say are
 // out of sight.
 func TestPiBoxFrames(t *testing.T) {
-	empty := firstFrame(t, captureFrames(t, piCaptures.folder, "typed"), "(auto)")
+	empty := firstFrame(t, captureFrames(t, &pi, piCaptures.folder, "typed"), "(auto)")
 	if v, ok := piBox(empty); !ok || !v.empty {
 		t.Fatalf("the first frame's box: %+v, %v", v, ok)
 	}
-	tall := captureFrames(t, piCaptures.folder, "tall")
+	tall := captureFrames(t, &pi, piCaptures.folder, "tall")
 	f := lastFrame(t, tall, "↑ 4 more", "↓ 29 more")
 	v, ok := piBox(f)
 	if !ok || len(v.rows) != 12 || !v.capped || v.cursor != 0 || v.width != 119 ||
 		v.rows[0] != "tall row 05 dummy words here EDITED" {
 		t.Fatalf("the box scrolled up: %+v, %v", v, ok)
 	}
-	retry := lastFrame(t, captureFrames(t, piCaptures.folder, "identity"), "Retrying", "a draft typed during")
+	retry := lastFrame(t, captureFrames(t, &pi, piCaptures.folder, "identity"), "Retrying", "a draft typed during")
 	if v, ok := piBox(retry); !ok || v.rows[0] != "a draft typed during the retries" {
 		t.Fatalf("the box under pi's working status: %+v, %v", v, ok)
 	}
@@ -835,7 +835,7 @@ func TestPiWrap(t *testing.T) {
 		// Two spaces at a wrap come back as one.
 		{"aaaa bbbb  cc dd", 12, []string{"aaaa bbbb", "cc dd"}, "aaaa bbbb cc dd"},
 	} {
-		rows, _ := piWrap{}.wrap(c.text, c.width)
+		rows, _ := pi.unwrap.wrap(c.text, c.width)
 		if !slices.Equal(rows, c.rows) {
 			t.Errorf("%q: rows %q, want %q", c.text, rows, c.rows)
 		}
@@ -843,7 +843,7 @@ func TestPiWrap(t *testing.T) {
 		if want == "" {
 			want = c.text
 		}
-		if got := (piWrap{}).unwrap(rows, c.width); got != want {
+		if got := pi.unwrap.unwrap(rows, c.width); got != want {
 			t.Errorf("%q: unwrapped as %q", c.text, got)
 		}
 	}

@@ -55,7 +55,7 @@ var codexTyped = map[string][]string{
 // above, or nil.
 func codexScreensCheck(t *testing.T, frames frameSet) error {
 	t.Helper()
-	get := func(record string) []*screen { return frames.get(t, codexCaptures.folder, record) }
+	get := func(record string) []*screen { return frames.get(t, &codex, codexCaptures.folder, record) }
 	for _, c := range codexNotABox {
 		f := lastFrame(t, get(c.record), c.shows)
 		if v, ok := codexBox(f); ok {
@@ -539,7 +539,7 @@ func TestCodexSessionReadsTheHeldLock(t *testing.T) {
 	os.WriteFile(filepath.Join(locks, "01a0eb00-0000-7000-8000-000000000000.lock"), nil, 0o644)
 	hold(".coordination.lock")
 	pid := os.Getpid()
-	codexHeld = heldLocks{}
+	codexHeld = heldFiles{}
 	if id, found := codexSession(pid, time.Now()); found || id != "" {
 		t.Fatalf("no thread lock held: %q, %v", id, found)
 	}
@@ -582,7 +582,7 @@ func TestCodexSessionCachesTheAnswer(t *testing.T) {
 		asked++
 		return []string{filepath.Join(real, filepath.Base(a)), "/dev/null"}
 	}
-	codexHeld = heldLocks{}
+	codexHeld = heldFiles{}
 	for range 3 {
 		codexSession(42, time.Now())
 	}
@@ -668,7 +668,7 @@ func TestCodexRestoreReplays(t *testing.T) {
 			if at < 0 {
 				t.Fatal("no restore paste in the record")
 			}
-			r.replayRestore(codexUntilKey(t, data, at+len(paste)), paste)
+			r.replayRestore(recordUntilKey(t, data, at+len(paste)), paste)
 			if got := r.pasted(); got != paste {
 				t.Fatalf("pasted %q, want %q", got, paste)
 			}
@@ -734,14 +734,19 @@ func codexRestoreRig(t *testing.T, thread string) *restoreRig {
 // made in the recording (skip), which the rig makes again.
 func (r *restoreRig) replayRestore(data []byte, skip string) {
 	r.t.Helper()
-	var last time.Time
+	var last, now time.Time
+	// The record's own clock, for a profile that reads after a quiet gap.
+	r.now = func() time.Time { return now }
 	eachChunk(r.t, data, func(at time.Time, dir byte, chunk []byte) {
+		now = at
 		if last.IsZero() {
 			last = at
 		}
 		for ; !at.Before(last.Add(saveInterval)); last = last.Add(saveInterval) {
+			now = last.Add(saveInterval)
 			r.ticks(1)
 		}
+		now = at
 		switch dir {
 		case 'i':
 			if skip == "" || string(chunk) != skip {
@@ -759,6 +764,7 @@ func (r *restoreRig) replayRestore(data []byte, skip string) {
 		}
 	})
 	// The save loop ticks on after the record ends.
+	now = now.Add(time.Second)
 	r.ticks(1)
 }
 
@@ -791,9 +797,9 @@ func cloneScreen(s *screen) *screen {
 	return &c
 }
 
-// codexUntilKey is a record cut before the first input chunk that starts
+// recordUntilKey is a record cut before the first input chunk that starts
 // at or after offset from.
-func codexUntilKey(t *testing.T, data []byte, from int) []byte {
+func recordUntilKey(t *testing.T, data []byte, from int) []byte {
 	t.Helper()
 	for off := 0; off+24 <= len(data); {
 		n := int(binary.LittleEndian.Uint64(data[off:]))

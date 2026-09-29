@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -157,4 +160,120 @@ var processParents = func() map[int]int {
 		}
 	}
 	return parents
+}
+
+// heldFiles keeps the last answer to which of an agent's files a process
+// holds open, for the profiles whose agent names the session it is in by
+// the file it holds (Codex's thread lock, agy's conversation database).
+// Asking runs lsof on macOS, so it is asked again only when the folder
+// changed (a file taken or let go) or recheck has passed.
+type heldFiles struct {
+	mu  sync.Mutex
+	pid int
+	mod time.Time
+	at  time.Time
+	ids []string
+}
+
+// of lists the ids, by idOf of each file's name, of the files in dir that
+// process pid holds open.
+func (h *heldFiles) of(pid int, dir string, recheck time.Duration, idOf func(name string) string) []string {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return nil
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if pid == h.pid && fi.ModTime().Equal(h.mod) && time.Since(h.at) < recheck {
+		return h.ids
+	}
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil
+	}
+	var ids []string
+	for _, p := range openFiles(pid) {
+		if filepath.Dir(p) != real {
+			continue
+		}
+		if id := idOf(filepath.Base(p)); id != "" && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	h.pid, h.mod, h.at, h.ids = pid, fi.ModTime(), time.Now(), ids
+	return ids
+}
+
+// openFiles lists the paths of the files process pid holds open: from
+// /proc where there is one (Linux), else from lsof (macOS). Empty when
+// neither can tell, and never slower than a second.
+var openFiles = func(pid int) []string {
+	fds := filepath.Join("/proc", strconv.Itoa(pid), "fd")
+	if entries, err := os.ReadDir(fds); err == nil {
+		var out []string
+		for _, e := range entries {
+			if p, err := os.Readlink(filepath.Join(fds, e.Name())); err == nil {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	if _, err := os.Stat("/proc/self/fd"); err == nil {
+		return nil // Linux, and the process is gone or not ours
+	}
+	out, _ := lsof("-n", "-P", "-w", "-Fn", "-p", strconv.Itoa(pid))
+	var paths []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if p, ok := strings.CutPrefix(line, "n"); ok && strings.HasPrefix(p, "/") {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
+// holders lists the processes that hold any of files open.
+var holders = func(files []string) []int {
+	var pids []int
+	if procs, err := os.ReadDir("/proc"); err == nil {
+		for _, p := range procs {
+			pid, err := strconv.Atoi(p.Name())
+			if err != nil {
+				continue
+			}
+			for _, f := range openFiles(pid) {
+				if slices.Contains(files, f) {
+					pids = append(pids, pid)
+					break
+				}
+			}
+		}
+		return pids
+	}
+	out, _ := lsof(append([]string{"-n", "-P", "-w", "-t", "--"}, files...)...)
+	for f := range strings.FieldsSeq(out) {
+		if pid, err := strconv.Atoi(f); err == nil && !slices.Contains(pids, pid) {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
+}
+
+// lsof runs lsof with args and returns what it printed. A stalled lsof
+// must not hold the save loop.
+func lsof(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, lsofPath(), args...)
+	cmd.WaitDelay = time.Second
+	out, err := cmd.Output()
+	return string(out), err
+}
+
+// lsofPath is lsof on PATH, or where macOS keeps it when PATH leaves
+// /usr/sbin out.
+func lsofPath() string {
+	if p, err := exec.LookPath("lsof"); err == nil {
+		return p
+	}
+	return "/usr/sbin/lsof"
 }

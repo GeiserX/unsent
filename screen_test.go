@@ -21,7 +21,7 @@ import (
 // screen and returns a snapshot at the end of every frame, in order.
 func codexFrames(t *testing.T, name string) []*screen {
 	t.Helper()
-	return captureFrames(t, codexCaptures.folder, name)
+	return captureFrames(t, &codex, codexCaptures.folder, name)
 }
 
 // frameSet holds the frames of the captures one test reads, so a record
@@ -36,45 +36,66 @@ func codexFrames(t *testing.T, name string) []*screen {
 type frameSet map[string][]*screen
 
 // get returns folder/name.rec's frames, decoding them the first time.
-func (f frameSet) get(t *testing.T, folder, name string) []*screen {
+func (f frameSet) get(t *testing.T, prof *profile, folder, name string) []*screen {
 	t.Helper()
 	if f[name] == nil {
-		f[name] = captureFrames(t, folder, name)
+		f[name] = captureFrames(t, prof, folder, name)
 	}
 	return f[name]
 }
 
 // captureFrames replays folder/name.rec's output through a shadow screen
 // and returns the screen after every complete frame.
-func captureFrames(t *testing.T, folder, name string) []*screen {
+func captureFrames(t *testing.T, prof *profile, folder, name string) []*screen {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(folder, name+".rec"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &session{screen: vt.NewEmulator(120, 40)}
+	s := &session{screen: vt.NewEmulator(120, 40), prof: prof}
 	defer drainScreen(t, s.screen)()
 	var frames []*screen
-	eachChunk(t, data, func(_ time.Time, dir byte, chunk []byte) {
-		if dir != 'o' {
-			return
+	// The record's own clock, and each chunk read at the moment the next
+	// one arrives, as a save loop between two chunks does: a profile that
+	// reads after a quiet gap (agy) then sees the gaps the agent left.
+	var now time.Time
+	s.now = func() time.Time { return now }
+	var out []recChunk
+	eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+		if dir == 'o' {
+			out = append(out, recChunk{at, chunk})
 		}
+	})
+	for i, c := range out {
+		now = c.at
+		chunk := c.b
 		for len(chunk) > 0 {
 			k := len(chunk)
-			if i := bytes.Index(chunk, frameEnd); i >= 0 {
-				k = i + len(frameEnd)
+			if j := bytes.Index(chunk, frameEnd); j >= 0 {
+				k = j + len(frameEnd)
 			}
 			s.write(chunk[:k])
 			chunk = chunk[k:]
-			if !s.inFrame {
-				frames = append(frames, snapshot(s.screen))
-			}
 		}
-	})
+		if i+1 < len(out) {
+			now = out[i+1].at
+		} else {
+			now = now.Add(time.Second)
+		}
+		if !s.drawing() {
+			frames = append(frames, snapshot(s.screen))
+		}
+	}
 	if s.broken.Load() {
 		t.Fatal("the shadow screen broke")
 	}
 	return frames
+}
+
+// recChunk is one chunk of a record: when it arrived and its bytes.
+type recChunk struct {
+	at time.Time
+	b  []byte
 }
 
 // lastFrame returns the last frame whose text holds every want.

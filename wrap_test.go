@@ -1361,8 +1361,8 @@ func TestSessionWaitsForTheFrameToEnd(t *testing.T) {
 		s.write([]byte("l")) // the end mark split across two writes
 	}()
 	s.save()
-	if reads != 1 || s.inFrame {
-		t.Fatalf("reads %d, in frame %v: the save did not wait for the frame to close", reads, s.inFrame)
+	if reads != 1 || s.inSync {
+		t.Fatalf("reads %d, in frame %v: the save did not wait for the frame to close", reads, s.inSync)
 	}
 	// A frame that stays open does not hold a save back for long.
 	s.write([]byte("\x1b[?2026hstill drawing"))

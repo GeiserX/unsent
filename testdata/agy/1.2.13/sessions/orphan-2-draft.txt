@@ -1,0 +1,122 @@
+--- tmux
+alt=0 dead=0
+--- ps
+16103 16101 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+16151 16103 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+--- open under the scratch home
+txt RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+txt RIG/home-profile/.gemini/antigravity-cli/conversations/31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db-shm
+1w RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001622.log
+2w RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001622.log
+4u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+8w RIG/home-profile/.gemini/antigravity-cli/crashes/crash_16151_a7eadc95-470b-4685-8bf0-37eab8a4ceff.log
+12u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+13u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+14u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+15u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+16u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+20r RIG/home-profile/.gemini/antigravity-cli
+21r RIG/home-profile/.gemini/antigravity-cli/bin
+22r RIG/home-profile/.gemini/antigravity-cli/brain
+23r RIG/home-profile/.gemini/antigravity-cli/builtin
+24r RIG/home-profile/.gemini/antigravity-cli/cache
+25r RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001622.log
+26r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+27r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+28r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+29r RIG/home-profile/.gemini/antigravity-cli/conversations
+30r RIG/home-profile/.gemini/antigravity-cli/crashes
+31r RIG/home-profile/.gemini/antigravity-cli/implicit
+32r RIG/home-profile/.gemini/antigravity-cli/installation_id
+33r RIG/home-profile/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+34r RIG/home-profile/.gemini/antigravity-cli/jetski_state.pbtxt
+35r RIG/home-profile/.gemini/antigravity-cli/last_check.timestamp
+36r RIG/home-profile/.gemini/antigravity-cli/log
+37r RIG/home-profile/.gemini/antigravity-cli/presence
+38r RIG/home-profile/.gemini/antigravity-cli/settings.json
+39r RIG/home-profile/.gemini/antigravity-cli/updater
+43r RIG/home-profile/.gemini/config
+44r RIG/home-profile/.gemini/config/.migrated
+45r RIG/home-profile/.gemini/config/mcp_config.json
+46r RIG/home-profile/.gemini/config/projects
+50r RIG/home-profile/.gemini/config/projects
+51r RIG/home-profile/.gemini/config/projects/default-cli-project.json
+60u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+61u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+62u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+66r RIG/home-profile/.gemini/config
+67r RIG/home-profile/.gemini/config/.migrated
+68r RIG/home-profile/.gemini/config/mcp_config.json
+69r RIG/home-profile/.gemini/config/projects
+73r RIG/home-profile/.gemini/antigravity-cli/history.jsonl
+74u RIG/home-profile/.gemini/antigravity-cli/conversations/31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db
+75u RIG/home-profile/.gemini/antigravity-cli/conversations/31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db-wal
+76u RIG/home-profile/.gemini/antigravity-cli/conversations/31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db-shm
+77r RIG/home-profile/.gemini/antigravity-cli/brain/31cd68fa-6ec5-4c28-8ea8-f4723962edf2
+78r RIG/home-profile/.gemini/antigravity-cli/brain/31cd68fa-6ec5-4c28-8ea8-f4723962edf2/.user_uploaded
+79r RIG/home-profile/.gemini/antigravity-cli/brain/31cd68fa-6ec5-4c28-8ea8-f4723962edf2/scratch
+80u RIG/home-profile/.gemini/antigravity-cli/presence/31cd68fa-6ec5-4c28-8ea8-f4723962edf2.lock
+81r RIG/home-profile/.gemini/antigravity-cli/brain/31cd68fa-6ec5-4c28-8ea8-f4723962edf2/.system_generated
+--- conversations
+drwxr-xr-x   5 rig     staff     160 Sep 30 00:16 .
+drwxr-xr-x  22 rig     staff     704 Sep 30 00:16 ..
+-rw-------   1 rig     staff   49152 Sep 30 00:16 31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db
+-rw-------   1 rig     staff   32768 Sep 30 00:16 31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db-shm
+-rw-------   1 rig     staff  127752 Sep 30 00:16 31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db-wal
+--- history.jsonl
+{"display":"first prompt of the restore chain rig","timestamp":1790720183955,"workspace":"/Volumes/Data/unsent-072.VIQD/work"}
+--- unsent drafts
+drwx------  4 rig     staff  128 Sep 30 00:16 .
+drwx------  5 rig     staff  160 Sep 30 00:11 ..
+-rw-------  1 rig     staff  397 Sep 30 00:16 20260930-001622-16103.json
+-rw-------  1 rig     staff    0 Sep 30 00:16 20260930-001622-16103.lock
+--- unsent records
+RIG/unsent-home2/drafts/20260930-001622-16103.json:
+{
+  "format": 1,
+  "id": "20260930-001622-16103",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "31cd68fa-6ec5-4c28-8ea8-f4723962edf2",
+  "cwd": "RIG/work",
+  "pid": 16103,
+  "started": "2026-09-30T00:16:22.006553+02:00",
+  "updated": "2026-09-30T00:16:30.009035+02:00",
+  "draft": "orphan draft for the restore, ñandú\nsecond line of the orphan"
+}
+RIG/unsent-home2/history/20260930-001117.779464-71668.json:
+{
+  "format": 1,
+  "id": "20260930-001117.779464-71668",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 71668,
+  "started": "2026-09-30T00:11:10.971193+02:00",
+  "updated": "2026-09-30T00:11:13.380158+02:00",
+  "draft": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwafter a full row"
+}
+RIG/unsent-home2/history/20260930-001122.978955-71668.json:
+{
+  "format": 1,
+  "id": "20260930-001122.978955-71668",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 71668,
+  "started": "2026-09-30T00:11:10.971193+02:00",
+  "updated": "2026-09-30T00:11:18.577706+02:00",
+  "draft": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nbb cc"
+}
+--- unsent sent logs
+RIG/unsent-home2/sent/20260930-001622-16103.jsonl:
+{"format":1,"session":"20260930-001622-16103","agent":"agy","agent_session":"","cwd":"RIG/work","started":"2026-09-30T00:16:22.006553+02:00"}
+{"time":"2026-09-30T00:16:24.062609+02:00","text":"first prompt of the restore chain rig"}
