@@ -36,12 +36,11 @@ func replayBytesAs(t *testing.T, prof *profile, cols, rows int, data []byte) []s
 	s := &session{
 		screen: vt.NewEmulator(cols, rows),
 		rec:    newRecord([]string{"claude"}, "/w"),
-		store:  testStore(t),
+		store:  replayStore(t),
 		pastes: &pasteTracker{},
 		prof:   prof,
 	}
-	// Claude Code queries the terminal; the emulator's answers must drain.
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	drafts := []string{""}
 	for len(data) > 0 {
 		n := len(data)
@@ -61,6 +60,23 @@ func replayBytesAs(t *testing.T, prof *profile, cols, rows int, data []byte) []s
 	return drafts
 }
 
+// drainScreen reads and drops what the emulator answers the agent's
+// terminal queries with, as the real terminal does in a session, until the
+// test ends. Then it closes the emulator's input pipe, so the reader
+// returns and the emulator (4 MB of parse buffer alone) can be freed: a
+// reader left blocked holds it for the rest of the run, and with a few
+// hundred replays the race run's peak memory passed 10 GB. The pipe is
+// closed, not the emulator, whose Close writes a flag its Read reads
+// unguarded, a data race. The returned func closes it sooner, for a
+// helper done with the emulator before its test ends.
+func drainScreen(t *testing.T, e *vt.Emulator) (stop func()) {
+	t.Helper()
+	go io.Copy(io.Discard, e)
+	stop = func() { e.InputPipe().(io.Closer).Close() }
+	t.Cleanup(stop)
+	return stop
+}
+
 // replayRecord feeds a session recorded with `script -r` (keys in and
 // output out, in the order they happened) through a session: keys go
 // through its input path, output through the shadow screen, and a save
@@ -78,11 +94,11 @@ func replayRecordAs(t *testing.T, prof *profile, name string) {
 	s := &session{
 		screen: vt.NewEmulator(120, 40),
 		rec:    newRecord([]string{"claude"}, "/w"),
-		store:  testStore(t),
+		store:  replayStore(t),
 		pastes: &pasteTracker{},
 		prof:   prof,
 	}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	var now time.Time
 	s.deletes.now = func() time.Time { return now }
 	save := func() {
@@ -186,7 +202,7 @@ func TestReplayClaudeSends(t *testing.T) {
 		t.Run(fmt.Sprint("save every ", tick), func(t *testing.T) {
 			s := newSendSession(t, &claude)
 			s.screen = vt.NewEmulator(120, 40)
-			go io.Copy(io.Discard, s.screen)
+			drainScreen(t, s.screen)
 			var next time.Time
 			eachChunk(t, readFixture(t, "2.1.282/sends.rec"), func(at time.Time, dir byte, chunk []byte) {
 				for tick > 0 && !next.IsZero() && !at.Before(next) {
@@ -331,7 +347,7 @@ func TestReplayClaudeScreens(t *testing.T) {
 		t.Run(c.file, func(t *testing.T) {
 			text := strings.TrimSuffix(string(readFixture(t, c.file)), "\n")
 			e := vt.NewEmulator(120, 40)
-			go io.Copy(io.Discard, e)
+			drainScreen(t, e)
 			e.Write([]byte("\x1b[H\x1b[2J" + strings.ReplaceAll(text, "\n", "\r\n")))
 			v, ok := claudeBox(snapshot(e))
 			if ok != c.ok {
@@ -394,11 +410,11 @@ func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...in
 	s := &session{
 		screen: vt.NewEmulator(120, 40),
 		rec:    newRecord([]string{"codex"}, "/w"),
-		store:  testStore(t),
+		store:  replayStore(t),
 		pastes: &pasteTracker{},
 		prof:   prof,
 	}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	var now time.Time
 	s.deletes.now = func() time.Time { return now }
 	checked := 0
@@ -508,6 +524,7 @@ var codexReplays = []struct {
 func TestReplayCodex(t *testing.T) {
 	for _, r := range codexReplays {
 		t.Run(r.name, func(t *testing.T) {
+			t.Parallel()
 			if err := replayCodex(t, &codex, r.name, r.recalled...); err != nil {
 				t.Fatal(err)
 			}
@@ -518,6 +535,7 @@ func TestReplayCodex(t *testing.T) {
 	// reader must find no box in it at all, and the user learns at exit
 	// that nothing was saved.
 	t.Run("inline", func(t *testing.T) {
+		t.Parallel()
 		s, err := replayCodexSession(t, &codex, "inline", 1)
 		if err != nil || s.matched {
 			t.Fatalf("the inline box was read: %v, matched %v", err, s.matched)
@@ -551,17 +569,26 @@ func TestReplayCodexCatchesAWrongWrapModel(t *testing.T) {
 	}{{"character wrap", charWrap{}}, {"word wrap with no end row", wordWrap{}}} {
 		p := codex
 		p.unwrap = m.rule
-		var red []string
-		for _, r := range codexReplays {
-			if replayCodex(t, &p, r.name, r.recalled...) != nil {
-				red = append(red, r.name)
-			}
-		}
-		if len(red) == 0 {
+		red := firstRedReplay(t, &p)
+		if red == "" {
 			t.Errorf("with %s every Codex replay stayed green", m.name)
 		}
-		t.Logf("with %s, red: %s", m.name, strings.Join(red, ", "))
+		t.Logf("with %s, red: %s", m.name, red)
 	}
+}
+
+// firstRedReplay replays codexReplays with prof in order and returns the
+// name of the first that goes red, or "" when all stay green. A mutant
+// needs one red replay to be caught; replaying the rest costs a full set
+// of captures per mutant and proves nothing more.
+func firstRedReplay(t *testing.T, prof *profile) string {
+	t.Helper()
+	for _, r := range codexReplays {
+		if replayCodex(t, prof, r.name, r.recalled...) != nil {
+			return r.name
+		}
+	}
+	return ""
 }
 
 // Each profile's scroll model must be the one its agent's captures show:
@@ -591,6 +618,7 @@ func TestReplayScrollModel(t *testing.T) {
 			claudeBin("tall-wrapped"), claudeRec("deletes"), claudeRec("bursts"), claudeRec("trailing-rows")}},
 	} {
 		t.Run(c.prof.name, func(t *testing.T) {
+			t.Parallel()
 			var all []boxScroll
 			for _, run := range c.captures {
 				all = append(all, scrollsIn(replayViews(t, c.prof, run))...)

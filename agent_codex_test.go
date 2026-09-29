@@ -113,7 +113,9 @@ func TestCodexNegativeScreens(t *testing.T) {
 }
 
 // A check that cannot fail is not a check: each part of the reader,
-// mutated, turns a replay or a negative screen red.
+// mutated, turns a replay or a negative screen red. One red is the proof,
+// so each mutant stops at the first: the screens, then the replays in
+// order.
 func TestCodexReaderMutations(t *testing.T) {
 	good := codexLayout
 	t.Cleanup(func() { codexLayout = good })
@@ -135,19 +137,15 @@ func TestCodexReaderMutations(t *testing.T) {
 			m.mutate(&bad)
 			codexLayout = bad
 			defer func() { codexLayout = good }()
-			var red []string
 			if err := codexScreensCheck(t); err != nil {
-				red = append(red, "screens")
+				t.Logf("red: screens (%v)", err)
+				return
 			}
-			for _, r := range codexReplays {
-				if replayCodex(t, &codex, r.name, r.recalled...) != nil {
-					red = append(red, r.name)
-				}
+			if red := firstRedReplay(t, &codex); red != "" {
+				t.Logf("red: %s", red)
+				return
 			}
-			if len(red) == 0 {
-				t.Fatal("every Codex replay and screen stayed green")
-			}
-			t.Logf("red: %s", strings.Join(red, ", "))
+			t.Fatal("every Codex replay and screen stayed green")
 		})
 	}
 }
@@ -168,6 +166,7 @@ func TestCodexKeyMutations(t *testing.T) {
 		{"keys that delete after the cursor", func(k *keyset) { k.ahead = nil }},
 	} {
 		t.Run(m.name, func(t *testing.T) {
+			t.Parallel()
 			p := codex
 			m.drop(&p.keys)
 			if replayCodex(t, &p, "edge-deletes") == nil {
@@ -176,6 +175,7 @@ func TestCodexKeyMutations(t *testing.T) {
 		})
 	}
 	t.Run("recall keys", func(t *testing.T) {
+		t.Parallel()
 		p := codex
 		p.keys.recall = nil
 		if replayCodex(t, &p, "ctrlc-history", 1) == nil || replayCodex(t, &p, "placeholder", 2) == nil {
@@ -183,6 +183,7 @@ func TestCodexKeyMutations(t *testing.T) {
 		}
 	})
 	t.Run("submit keys", func(t *testing.T) {
+		t.Parallel()
 		p := codex
 		p.keys.submit = nil
 		if codexSendCheck(t, &p) == nil {

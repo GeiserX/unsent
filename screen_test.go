@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"image/color"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,8 +26,7 @@ func codexFrames(t *testing.T, name string) []*screen {
 		t.Fatal(err)
 	}
 	s := &session{screen: vt.NewEmulator(120, 40)}
-	// Codex queries the terminal; the emulator's answers must drain.
-	go io.Copy(io.Discard, s.screen)
+	defer drainScreen(t, s.screen)()
 	var frames []*screen
 	eachChunk(t, data, func(_ time.Time, dir byte, chunk []byte) {
 		if dir != 'o' {
