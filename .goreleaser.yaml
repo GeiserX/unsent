@@ -35,7 +35,7 @@ brews:
     directory: Formula
     homepage: https://github.com/GeiserX/unsent
     description: AutoRecover for your AI agent prompts
-    license: GPL-3.0-only
+    license: GPL-3.0-or-later
     # Without the tap token the formula is only written to dist/ and the
     # release goes on. With it, prerelease tags (v0.3.0-rc1) still stay out
     # of the tap.
