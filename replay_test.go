@@ -549,14 +549,41 @@ func replayCodex(t *testing.T, prof *profile, name string, recalled ...int) erro
 // replayCodexSession is replayCodex, and also returns the session.
 func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...int) (*session, error) {
 	t.Helper()
-	folder := filepath.Join("testdata", "codex", "0.158.0")
+	return replayCaptureSession(t, prof, codexCaptures, name, recalled...)
+}
+
+// A captureSet is one agent version's captures made with unsent capture
+// (testdata/<agent>/<version>): where they are, the command they ran, and
+// how the agent's screen shows a draft (shows: whether got is the editor
+// copy truth as far as the screen can tell).
+type captureSet struct {
+	folder, command string
+	shows           func(got, truth string) bool
+	// saved, when set, sees the session after every save.
+	saved func(*session)
+	// tick, when set, saves once every tick of recorded time, as a live
+	// session saves, instead of after every output frame.
+	tick time.Duration
+}
+
+var codexCaptures = captureSet{folder: filepath.Join("testdata", "codex", "0.158.0"), command: "codex", shows: codexShows}
+
+// replayCaptureSession replays name.rec of set through a session with prof,
+// with a save after every output frame (or every set.tick), and returns the session and the
+// first Ctrl+G whose editor copy the saved draft differs from. At the
+// Ctrl+G numbers in recalled the box holds an entry of the agent's history
+// brought back with Up, which is not a draft: the draft must be the empty
+// box's.
+func replayCaptureSession(t *testing.T, prof *profile, set captureSet, name string, recalled ...int) (*session, error) {
+	t.Helper()
+	folder := set.folder
 	data, err := os.ReadFile(filepath.Join(folder, name+".rec"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := &session{
 		screen: vt.NewEmulator(120, 40),
-		rec:    newRecord([]string{"codex"}, "/w"),
+		rec:    newRecord([]string{set.command}, "/w"),
 		store:  replayStore(t),
 		pastes: &pasteTracker{},
 		prof:   prof,
@@ -566,7 +593,24 @@ func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...in
 	s.deletes.now = func() time.Time { return now }
 	checked := 0
 	var failed error
+	save := func() {
+		if s.save(); s.broken.Load() {
+			t.Fatal("the session stopped saving")
+		}
+		if set.saved != nil {
+			set.saved(s)
+		}
+	}
+	var next time.Time
 	eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+		for set.tick > 0 && !next.IsZero() && !at.Before(next) {
+			now = next
+			save()
+			next = next.Add(set.tick)
+		}
+		if next.IsZero() {
+			next = at.Add(set.tick)
+		}
 		now = at
 		switch dir {
 		case 'i':
@@ -582,8 +626,8 @@ func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...in
 					if s.rec.Draft != "" {
 						failed = fmt.Errorf("%s: at Ctrl+G %d the box holds a history entry, saved as the draft %q", name, checked, s.rec.Draft)
 					}
-				case !codexShows(s.rec.Draft, string(want)):
-					failed = fmt.Errorf("%s: at Ctrl+G %d the draft differs from Codex's:\n got %q\nwant %q", name, checked, s.rec.Draft, want)
+				case !set.shows(s.rec.Draft, string(want)):
+					failed = fmt.Errorf("%s: at Ctrl+G %d the draft differs from %s's:\n got %q\nwant %q", name, checked, set.command, s.rec.Draft, want)
 				}
 			}
 			s.input(chunk)
@@ -595,10 +639,8 @@ func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...in
 				}
 				s.write(chunk[:k])
 				chunk = chunk[k:]
-				if !s.inFrame {
-					if s.save(); s.broken.Load() {
-						t.Fatal("the session stopped saving")
-					}
+				if set.tick == 0 && !s.inFrame {
+					save()
 				}
 			}
 		}
@@ -743,12 +785,16 @@ func firstRedReplay(t *testing.T, prof *profile) string {
 // it on. The model only draws the fuzz's box (stitch_test.go), where a
 // wrong one would make the fuzz easier or harder than the agent without a
 // test noticing. The captures scroll both ways: Codex's tall moves 40 rows
-// up and back down a row at a time, and Claude Code's tall-wrapped,
+// up and back down a row at a time, pi's scroll-steps 16, a key at a time,
+// and Claude Code's tall-wrapped,
 // deletes and bursts move up over rows out of sight mid-box, and
 // trailing-rows deletes rows at the end. So, as a check that can fail,
 // each profile with the other model must go red.
 func TestReplayScrollModel(t *testing.T) {
 	codexTall := func(t *testing.T, p *profile) { replayCodex(t, p, "tall") }
+	piRec := func(name string) func(*testing.T, *profile) {
+		return func(t *testing.T, p *profile) { replayPi(t, p, name) }
+	}
 	claudeBin := func(name string) func(*testing.T, *profile) {
 		return func(t *testing.T, p *profile) { replayBytesAs(t, p, 120, 40, readFixture(t, "2.1.282/"+name+".bin")) }
 	}
@@ -761,6 +807,7 @@ func TestReplayScrollModel(t *testing.T) {
 		captures []func(*testing.T, *profile)
 	}{
 		{&codex, scrollMidBox, []func(*testing.T, *profile){codexTall}},
+		{&pi, scrollMidBox, []func(*testing.T, *profile){piRec("scroll-steps"), piRec("tall"), piRec("edge-deletes")}},
 		{&claude, scrollOneRow, []func(*testing.T, *profile){
 			claudeBin("tall-wrapped"), claudeRec("deletes"), claudeRec("bursts"), claudeRec("trailing-rows")}},
 	} {

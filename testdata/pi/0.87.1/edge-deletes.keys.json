@@ -1,0 +1,398 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "edge row 01 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 02 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 03 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 04 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 05 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 06 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 07 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 08 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 09 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 10 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 11 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 12 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 13 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 14 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 15 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 16 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 17 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 18 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 19 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "edge row 20 dummy words here",
+"gap": 0.05
+},
+{
+"wait": 0.6
+},
+{
+"screen": "edge-full"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-w"
+]
+},
+{
+"keys": [
+"C-w"
+]
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "edge-after-ctrl-w"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"M-BSpace"
+]
+},
+{
+"keys": [
+"C-u"
+]
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "edge-after-ctrl-u"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left"
+]
+},
+{
+"keys": [
+"C-k"
+]
+},
+{
+"keys": [
+"Left",
+"Left",
+"Left",
+"Left"
+]
+},
+{
+"keys": [
+"DC"
+]
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "edge-after-ctrl-k"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left",
+"Left"
+]
+},
+{
+"keys": [
+"M-d"
+]
+},
+{
+"keys": [
+"M-DC"
+]
+},
+{
+"keys": [
+"S-DC"
+]
+},
+{
+"keys": [
+"S-BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "edge-after-alt-d"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

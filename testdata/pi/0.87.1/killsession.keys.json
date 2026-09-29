@@ -1,0 +1,30 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "kill session draft yak"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line of it"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "killsession-before"
+},
+{
+"sh": "./ids.sh > snaps/id-ks-before.txt; ./t kill-session -t rig; sleep 2; pgrep -fl 'unsent-071-pi' || echo 'no pi left'; pgrep -fl 'bin/unsent' || echo 'no unsent left'; grep -rl 'yak' agentdir home tmp 2>/dev/null || echo 'yak: in no file of the scratch pi dirs'",
+"out": "ks-kill"
+}
+]

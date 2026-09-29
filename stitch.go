@@ -24,6 +24,9 @@ type stitcher struct {
 	text string // the whole draft as far as we know it
 	a, b int    // where the last view sat in text
 	last *view  // the last view merged, to skip work when nothing changed
+	// restarted is set when the last view of a box at its cap lined up
+	// with nothing known, so the draft is only what it shows.
+	restarted bool
 }
 
 func (st *stitcher) reset() {
@@ -43,6 +46,7 @@ func (st *stitcher) update(v view, u unwrapRule) string {
 		return st.text
 	}
 	st.last = &v
+	st.restarted = false
 	cur := u.unwrap(v.rows, v.width)
 	if !v.capped || st.text == "" {
 		// The whole draft is on screen.
@@ -58,6 +62,7 @@ func (st *stitcher) update(v view, u unwrapRule) string {
 		// recalled from history. Start over from the screen; the caller
 		// archives the old draft. (A view full of new words is fine: a
 		// paste or fast typing, as long as some known text lines up.)
+		st.restarted = true
 		return st.replace(cur)
 	}
 	a, b := old[p].start, old[q-1].end
@@ -575,6 +580,13 @@ func byteExact(got, truth string, width int, u unwrapRule) bool {
 	return true
 }
 
+// A breakHider is a wrap rule that says itself which line breaks its
+// agent's screen shows as a wrap at a space (pi's, whose rows break by
+// other rules than the next word fitting).
+type breakHider interface {
+	hidesBreak(line, next string, width int) bool
+}
+
 // fullRowAt reports whether the line break at text[i], ending the line
 // that starts at lineStart, looks like a wrap on screen.
 func fullRowAt(text string, lineStart, i, width int, u unwrapRule) bool {
@@ -582,6 +594,9 @@ func fullRowAt(text string, lineStart, i, width int, u unwrapRule) bool {
 	first, _, _ := strings.Cut(next, " ")
 	if i == lineStart || next == "" {
 		return false
+	}
+	if h, ok := u.(breakHider); ok {
+		return h.hidesBreak(text[lineStart:i], next, width)
 	}
 	rows, _ := u.wrap(text[lineStart:i], width)
 	return runewidth.StringWidth(rows[len(rows)-1])+1+runewidth.StringWidth(first) > width

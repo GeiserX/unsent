@@ -1,0 +1,100 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "edgeword1 edgeword2 edgeword3 edgeword4 edgeword5 edgeword6 edgeword7 edgeword8 edgeword9 edgewordA edgewordB edgewordC and these words move on"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz tail after a long word"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "fullrowAA fullrowBB fullrowCC fullrowDD fullrowEE fullrowFF fullrowGG fullrowHH fullrowII fullrowJJ fullrowKK fullrowLL"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "after the blank line"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww "
+},
+{
+"paste": "wrap paste line 01 dummy\nwrap paste line 02 dummy\nwrap paste line 03 dummy\nwrap paste line 04 dummy\nwrap paste line 05 dummy\nwrap paste line 06 dummy\nwrap paste line 07 dummy\nwrap paste line 08 dummy\nwrap paste line 09 dummy\nwrap paste line 10 dummy\nwrap paste line 11 dummy",
+"raw": true
+},
+{
+"wait": 0.6
+},
+{
+"type": " end of the draft"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "wrap"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "wrap-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

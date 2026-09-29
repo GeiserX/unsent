@@ -1,0 +1,85 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "first line of a dummy draft"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "fourth, after a blank line"
+},
+{
+"keys": [
+"S-Enter"
+]
+},
+{
+"type": "fifth via Shift+Enter"
+},
+{
+"type": "\\"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"type": "sixth via backslash Enter"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "multiline"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "multiline-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

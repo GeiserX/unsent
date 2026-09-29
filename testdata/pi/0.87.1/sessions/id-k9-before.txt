@@ -1,0 +1,16 @@
+pane pid: 29034
+  PID  PPID COMMAND
+29034 29018 unsent capture pi
+child: 29111 29034 pi 
+  files the child holds open under the scratch folder:
+    work
+agent dir (PI_CODING_AGENT_DIR):
+       dir 15:49:17 agentdir/
+         2 15:48:44 agentdir/auth.json
+         2 15:48:44 agentdir/models-store.json
+       dir 15:48:44 agentdir/sessions/
+       dir 15:48:44 agentdir/sessions/--Volumes-Data-unsent-071.hggN-work--/
+        38 15:48:44 agentdir/settings.json
+== agentdir/settings.json: {  "lastChangelogVersion": "0.87.1"}
+== agentdir/auth.json: {}
+== agentdir/models-store.json: {}

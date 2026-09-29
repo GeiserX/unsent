@@ -1,0 +1,8 @@
+  0.00s box: no
+  0.00s picker: no
+  0.01s session files: 2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl 9517B
+  0.61s child pid: 53125
+  0.61s held open: work
+  0.75s child pid: 53181
+  0.97s box: drawn
+  4.53s session files: 2026-09-29T13-55-21-526Z_01a0ed72-d735-77d5-9a17-81331e615add.jsonl 10319B

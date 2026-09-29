@@ -1,0 +1,40 @@
+unsent: no reader for "pi" yet, running it without saving drafts
+
+ [1m[38;5;109mpi[0m[38;5;241m v0.87.1[39m
+ [38;5;241mescape[38;5;244m interrupt · [38;5;241mctrl+c/ctrl+d[38;5;244m clear/exit · [38;5;241m/[38;5;244m commands · [38;5;241m![38;5;244m bash · [38;5;241mctrl+o[38;5;244m more[39m
+ [38;5;241mPress ctrl+o to show full startup help and loaded resources.[39m
+
+ [38;5;241mPi can explain its own features and look up its docs. Ask it how to use or extend Pi.[39m
+
+
+ [38;5;226mWarning: fd not found. Offline mode enabled, skipping download.[39m
+ [38;5;226mWarning: ripgrep not found. Offline mode enabled, skipping download.[39m
+
+ [1mSession Info[0m
+
+ [38;5;241mFile:[39m
+ /Volumes/Data/unsent-071.hggN/agentdir-deadport/sessions/--Volumes-Data-unsent-071.hggN-work--/2026-09-29T13-57-09-875
+ Z_01a0ed74-7e72-7317-8d76-7494dfb4a739.jsonl
+ [38;5;241mID:[39m 01a0ed74-7e72-7317-8d76-7494dfb4a739
+
+ [1mMessages[0m
+ [38;5;241mTotal:[39m 0
+ [38;5;241mUser:[39m 0
+ [38;5;241mAssistant:[39m 0
+ [38;5;241mTools:[39m 0 calls, 0 results
+
+ [1mTokens[0m
+ [38;5;241mInput:[39m 0
+ [38;5;241mOutput:[39m 0
+ [38;5;241mTotal:[39m 0
+
+ [1mCache Warming[0m
+ [38;5;241mMode:[39m streaming
+ [38;5;241mStatus:[39m Inactive (waiting for first request)
+
+
+[38;5;239m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[7m[39m [0m
+[38;5;239m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;241m/Volumes/Data/unsent-071.hggN/work[39m
+[38;5;241m0.0%/128k (auto)                                                                                             dummy-model

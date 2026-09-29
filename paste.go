@@ -39,6 +39,18 @@ type pasteRule struct {
 	// fills nothing after. A placeholder missing from one read, the box
 	// scrolled or the stitcher starting over, keeps its paste.
 	reuses bool
+	// renumbers is true when the agent renumbers its placeholders as one
+	// is deleted (pi: Backspace over "[paste #1 ...]" makes #2 the new #1),
+	// so an id names a paste only in the read that shows it. The numbers
+	// still show the pastes in the order they came, so each read pairs its
+	// placeholders, lowest number first, with pastes in that order; where
+	// that leaves a choice, as between two pastes of one size after one of
+	// them was deleted, the one that sits where the last read showed it
+	// (renumber).
+	renumbers bool
+	// holds is what the agent keeps of a paste, the text a placeholder
+	// stands for; nil for the paste as it came.
+	holds func(paste string) string
 }
 
 // pasteKey is a placeholder's id under the rule, by its index in the
@@ -76,6 +88,9 @@ type pasteTracker struct {
 	spent map[int]bool
 	shown map[pasteKey]int
 	cuts  map[string]string
+	// lastShown holds, for each renumbering rule by its index, the
+	// placeholders the last read showed (see renumber).
+	lastShown map[int][]shownPaste
 }
 
 // feed takes keystrokes as they arrive, and returns the bytes that were
@@ -158,7 +173,7 @@ func (p *pasteTracker) resize(rows int) {
 func (p *pasteTracker) reset() {
 	p.mu.Lock()
 	p.pastes, p.heights = nil, nil
-	p.nums, p.spent, p.shown, p.cuts = nil, nil, nil, nil
+	p.nums, p.spent, p.shown, p.cuts, p.lastShown = nil, nil, nil, nil, nil
 	p.mu.Unlock()
 }
 
@@ -239,6 +254,10 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 	if rule.rank != nil {
 		slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(rule.rank(ms[a]), rule.rank(ms[b])) })
 	}
+	if rule.renumbers {
+		p.renumber(out, draft, r, rule, at, ms, order, fills, used, held)
+		order = nil
+	}
 	for _, k := range order {
 		id := rule.id(ms[k])
 		key := pasteKey{r, id}
@@ -249,7 +268,7 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 			continue
 		}
 		for i, text := range p.pastes {
-			if n, ok := held[i]; used[i] || p.spent[i] || (ok && n != key) || strings.Contains(draft, text) ||
+			if n, ok := held[i]; used[i] || p.spent[i] || (ok && n != key) || strings.Contains(draft, rule.kept(text)) ||
 				(rule.collapses != nil && !rule.collapses(text, p.heights[i])) || !rule.fits(ms[k], text) {
 				// Already paired, or spent, or another placeholder's paste,
 				// or a paste the agent took in as typed text, or turned into
@@ -262,7 +281,7 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 				p.nums = map[pasteKey]int{}
 			}
 			p.nums[key] = i
-			fills[k] = text
+			fills[k] = rule.kept(text)
 			break
 		}
 	}
@@ -278,6 +297,152 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 	}
 	b.WriteString(out[last:])
 	return b.String()
+}
+
+// kept is what the agent holds of paste (pasteRule.holds).
+func (rule pasteRule) kept(paste string) string {
+	if rule.holds == nil {
+		return paste
+	}
+	return rule.holds(paste)
+}
+
+// renumber fills the placeholders of a renumbering rule (pasteRule.renumbers),
+// profile.pastes[r], whose matches in out are at and ms, taken lowest
+// number first in order: it pairs them with the pastes in the order the
+// pastes came, each with one it fits, as many as it can. Among the
+// pairings that fill as many it takes, in turn, the one whose pastes sit
+// where the last read showed them, by the text around each placeholder
+// (placeholders read alike whatever their number, as renumbering changes
+// only that); the one that keeps each paste's number from the last read,
+// as a forward delete, which renumbers nothing, does; and the newest
+// pastes, since one deleted before any read showed it is older than the
+// one pasted after. The caller holds p.mu.
+func (p *pasteTracker) renumber(out, draft string, r int, rule pasteRule, at [][]int, ms [][]string, order []int, fills []string, used []bool, held map[int]pasteKey) {
+	var cands []int
+	for i, text := range p.pastes {
+		_, ok := held[i]
+		if used[i] || p.spent[i] || ok || strings.Contains(draft, rule.kept(text)) ||
+			(rule.collapses != nil && !rule.collapses(text, p.heights[i])) {
+			continue
+		}
+		cands = append(cands, i)
+	}
+	shown := make([]shownPaste, len(at))
+	for k, loc := range at {
+		shown[k] = shownPaste{
+			before: lastBytes(rule.placeholder.ReplaceAllString(out[:loc[0]], "\x00"), placeContext),
+			after:  firstBytes(rule.placeholder.ReplaceAllString(out[loc[1]:], "\x00"), placeContext),
+			number: rule.rank(ms[k]),
+			paste:  -1,
+		}
+	}
+	defer func() {
+		if p.lastShown == nil {
+			p.lastShown = map[int][]shownPaste{}
+		}
+		p.lastShown[r] = shown
+	}()
+	n, m := len(order), len(cands)
+	if n == 0 || m == 0 {
+		return
+	}
+	last := map[int]shownPaste{} // paste index to where the last read showed it
+	for _, sp := range p.lastShown[r] {
+		if sp.paste >= 0 {
+			last[sp.paste] = sp
+		}
+	}
+	type score struct{ filled, place, same, newest int }
+	better := func(a, b score) bool {
+		switch {
+		case a.filled != b.filled:
+			return a.filled > b.filled
+		case a.place != b.place:
+			return a.place > b.place
+		case a.same != b.same:
+			return a.same > b.same
+		}
+		return a.newest > b.newest
+	}
+	// best[k][j] is the best pairing of the placeholders from order[k] on
+	// with the pastes from cands[j] on.
+	best := make([][]score, n+1)
+	for k := range best {
+		best[k] = make([]score, m+1)
+	}
+	pair := func(k, j int) (score, bool) {
+		sp, i := shown[order[k]], cands[j]
+		if !rule.fits(ms[order[k]], p.pastes[i]) {
+			return score{}, false
+		}
+		s := best[k+1][j+1]
+		s.filled++
+		if l, ok := last[i]; ok {
+			s.place += 1 + commonSuffix(sp.before, l.before) + commonPrefix(sp.after, l.after)
+			if l.number == sp.number {
+				s.same++
+			}
+		}
+		s.newest += j
+		return s, true
+	}
+	for k := n - 1; k >= 0; k-- {
+		for j := m - 1; j >= 0; j-- {
+			s := best[k+1][j]
+			if t := best[k][j+1]; better(t, s) {
+				s = t
+			}
+			if t, ok := pair(k, j); ok && better(t, s) {
+				s = t
+			}
+			best[k][j] = s
+		}
+	}
+	for k, j := 0, 0; k < n && j < m; {
+		switch t, ok := pair(k, j); {
+		case ok && t == best[k][j]:
+			i := cands[j]
+			used[i] = true
+			fills[order[k]] = rule.kept(p.pastes[i])
+			shown[order[k]].paste = i
+			k, j = k+1, j+1
+		case best[k][j+1] == best[k][j]:
+			j++
+		default:
+			k++
+		}
+	}
+}
+
+// shownPaste is one placeholder of a renumbering rule as a read showed it:
+// the text around it with every placeholder as one NUL byte, its number,
+// and the paste it was paired with, or -1.
+type shownPaste struct {
+	before, after string
+	number, paste int
+}
+
+// placeContext is how much text around a placeholder renumber compares.
+const placeContext = 64
+
+func lastBytes(s string, n int) string  { return s[max(0, len(s)-n):] }
+func firstBytes(s string, n int) string { return s[:min(len(s), n)] }
+
+func commonSuffix(a, b string) int {
+	n := 0
+	for n < len(a) && n < len(b) && a[len(a)-1-n] == b[len(b)-1-n] {
+		n++
+	}
+	return n
+}
+
+func commonPrefix(a, b string) int {
+	n := 0
+	for n < len(a) && n < len(b) && a[n] == b[n] {
+		n++
+	}
+	return n
 }
 
 // reuse finds the placeholders a reusing agent gave again (pasteRule.reuses).

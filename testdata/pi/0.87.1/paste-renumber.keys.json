@@ -1,0 +1,233 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "one "
+},
+{
+"paste": "alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword x",
+"raw": true
+},
+{
+"wait": 0.5
+},
+{
+"type": " two "
+},
+{
+"paste": "bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword y",
+"raw": true
+},
+{
+"wait": 0.5
+},
+{
+"type": " three"
+},
+{
+"wait": 0.4
+},
+{
+"screen": "renumber-two-markers"
+},
+{
+"keys": [
+"C-a"
+]
+},
+{
+"keys": [
+"Right"
+]
+},
+{
+"keys": [
+"Right"
+]
+},
+{
+"keys": [
+"Right"
+]
+},
+{
+"keys": [
+"Right"
+]
+},
+{
+"keys": [
+"Right"
+]
+},
+{
+"wait": 0.3
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "renumber-first-deleted"
+},
+{
+"keys": [
+"C-e"
+]
+},
+{
+"type": " four "
+},
+{
+"paste": "charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX z",
+"raw": true
+},
+{
+"wait": 0.5
+},
+{
+"screen": "renumber-pasted-again"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"type": "five "
+},
+{
+"paste": "alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword alphaword x",
+"raw": true
+},
+{
+"wait": 0.5
+},
+{
+"type": " six "
+},
+{
+"paste": "bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword bravoword y",
+"raw": true
+},
+{
+"wait": 0.5
+},
+{
+"type": " seven"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"C-e"
+]
+},
+{
+"keys": [
+"Left"
+]
+},
+{
+"keys": [
+"Left"
+]
+},
+{
+"keys": [
+"Left"
+]
+},
+{
+"keys": [
+"Left"
+]
+},
+{
+"keys": [
+"Left"
+]
+},
+{
+"keys": [
+"Left"
+]
+},
+{
+"wait": 0.3
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "renumber-second-deleted"
+},
+{
+"keys": [
+"C-e"
+]
+},
+{
+"type": " eight "
+},
+{
+"paste": "charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX charlieXX z",
+"raw": true
+},
+{
+"wait": 0.5
+},
+{
+"screen": "renumber-second-pasted-again"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

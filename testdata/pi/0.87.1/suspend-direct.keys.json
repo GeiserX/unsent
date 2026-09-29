@@ -1,0 +1,115 @@
+[
+{
+"wait": 1.0
+},
+{
+"type": "UNSENT_CAPTURE_TO=$PWD/../out/suspend-direct script -q -r -t 0 ../out/suspend-direct.rec pi"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "draft before ctrl z, dummy"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "suspend-direct-draft"
+},
+{
+"keys": [
+"C-z"
+]
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-direct-after-z"
+},
+{
+"sh": "ps -o pid,ppid,pgid,sess,stat,command -t $(./t display -p -t rig '#{pane_tty}' | sed 's|/dev/tty||') | cut -c1-90; echo; for p in $(pgrep -f 'unsent-071-pi/node_modules/.bin/pi|^pi'); do ps -o pid,ppid,pgid,stat,tty,command -p $p | cut -c1-90; done",
+"out": "suspend-direct-ps"
+},
+{
+"type": "typed while stopped"
+},
+{
+"wait": 1.0
+},
+{
+"screen": "suspend-direct-typed"
+},
+{
+"sh": "for p in $(pgrep -x pi); do echo SIGCONT to $p; kill -CONT $p; done",
+"out": "suspend-direct-cont"
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-direct-after-cont"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "suspend-direct-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+},
+{
+"wait": 1.0
+},
+{
+"screen": "suspend-direct-shell-after"
+},
+{
+"type": "exit"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+}
+]

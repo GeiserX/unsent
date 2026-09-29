@@ -1,0 +1,83 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "/session"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "slash-resume-new-session"
+},
+{
+"sh": "./ids.sh",
+"out": "id-slash-resume-before"
+},
+{
+"type": "/resume"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "slash-resume-picker"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-slash-resume-chosen"
+},
+{
+"type": "/session"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "slash-resume-session"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

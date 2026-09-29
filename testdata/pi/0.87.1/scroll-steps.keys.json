@@ -1,0 +1,434 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "step row 01 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 02 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 03 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 04 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 05 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 06 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 07 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 08 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 09 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 10 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 11 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 12 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 13 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 14 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 15 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 16 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 17 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 18 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 19 dummy words here",
+"gap": 0.05
+},
+{
+"keys": [
+"C-j"
+],
+"gap": 0.05
+},
+{
+"type": "step row 20 dummy words here",
+"gap": 0.05
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Up"
+],
+"gap": 0.2
+},
+{
+"screen": "steps-up"
+},
+{
+"type": " EDITED"
+},
+{
+"wait": 0.3
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"keys": [
+"Down"
+],
+"gap": 0.2
+},
+{
+"screen": "steps-down"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

@@ -1,0 +1,41 @@
+
+ [1m[38;5;109mpi[0m[38;5;241m v0.87.1[39m
+ [38;5;241mescape[38;5;244m interrupt · [38;5;241mctrl+c/ctrl+d[38;5;244m clear/exit · [38;5;241m/[38;5;244m commands · [38;5;241m![38;5;244m bash · [38;5;241mctrl+o[38;5;244m more[39m
+ [38;5;241mPress ctrl+o to show full startup help and loaded resources.[39m
+
+ [38;5;241mPi can explain its own features and look up its docs. Ask it how to use or extend Pi.[39m
+
+
+ [38;5;226mWarning: fd not found. Offline mode enabled, skipping download.[39m
+ [38;5;226mWarning: ripgrep not found. Offline mode enabled, skipping download.[39m
+
+ [38;5;226mWarning: No models available. Use /login to log into a provider via OAuth or API key. See:
+[39m [38;5;226m  /Volumes/Data/unsent-071-pi/node_modules/@earendil-works/pi-coding-agent/docs/providers.md
+[39m [38;5;226m  /Volumes/Data/unsent-071-pi/node_modules/@earendil-works/pi-coding-agent/docs/models.md[39m
+
+ [38;5;167mError: No API key found for the selected model.
+[39m [38;5;167m
+[39m [38;5;167mUse /login to log into a provider via OAuth or API key. See:
+[39m [38;5;167m  /Volumes/Data/unsent-071-pi/node_modules/@earendil-works/pi-coding-agent/docs/providers.md
+[39m [38;5;167m  /Volumes/Data/unsent-071-pi/node_modules/@earendil-works/pi-coding-agent/docs/models.md[39m
+
+ [38;5;167mError: No API key found for the selected model.
+[39m [38;5;167m
+[39m [38;5;167mUse /login to log into a provider via OAuth or API key. See:
+[39m [38;5;167m  /Volumes/Data/unsent-071-pi/node_modules/@earendil-works/pi-coding-agent/docs/providers.md
+[39m [38;5;167m  /Volumes/Data/unsent-071-pi/node_modules/@earendil-works/pi-coding-agent/docs/models.md[39m
+
+[38;5;239m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m
+[38;5;239m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;241m/Volumes/Data/unsent-071.hggN/work[39m
+[38;5;241m0.0%/0 (auto)                                                                                                    unknown
+
+[39munsent: no reader for "pi" yet, running it without saving drafts
+unsent: captured pi 0.87.1 in /Volumes/Data/unsent-071.hggN/work/testdata/pi/0.87.1/capture-20260929-155026.rec (keys an
+d output), /Volumes/Data/unsent-071.hggN/work/testdata/pi/0.87.1/capture-20260929-155026.json (window sizes) and 2 edito
+r copies. Check every file for real prompt text, names, paths and keys before committing.
+
+
+
+Pane is dead (status 0, Tue Sep 29 15:50:52 2026)

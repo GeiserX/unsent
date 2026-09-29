@@ -1,0 +1,41 @@
+unsent: no reader for "pi" yet, running it without saving drafts
+[31mNo session found matching '01a0ed00-0000-7000-8000-000000000000'[39m
+unsent: no reader for "pi" yet, running it without saving drafts
+unsent: captured pi 0.87.1 in /Volumes/Data/unsent-071.hggN/work/testdata/pi/0.87.1/capture-20260929-155734.rec (keys an
+d output), /Volumes/Data/unsent-071.hggN/work/testdata/pi/0.87.1/capture-20260929-155734.json (window sizes) and 0 edito
+r copies. Check every file for real prompt text, names, paths and keys before committing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 1, Tue Sep 29 15:57:34 2026)
