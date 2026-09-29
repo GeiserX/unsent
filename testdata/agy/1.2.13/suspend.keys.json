@@ -1,0 +1,214 @@
+{
+ "name": "suspend",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "draft before the suspend"
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "keys": [
+    "C-z"
+   ]
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "screen": "after-ctrl-z"
+  },
+  {
+   "sh": "ps -o pid,stat,command -ax | grep -E 'bin/agy|bin/unsent' | grep -v grep",
+   "save": "stat-after-ctrl-z"
+  },
+  {
+   "type": "typed while it is stopped"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "typed-while-stopped"
+  },
+  {
+   "kill": "pkill -CONT -f \"/Volumes/Data/unsent-072.VIQD/bin/agy\"; pkill -CONT -f \"/Volumes/Data/unsent-072.VIQD/bin/unsent\""
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "screen": "after-sigcont"
+  },
+  {
+   "sh": "ps -o pid,stat,command -ax | grep -E 'bin/agy|bin/unsent' | grep -v grep",
+   "save": "stat-after-cont"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.17,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.67,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.68,
+   "step": "type",
+   "detail": "draft before the suspend"
+  },
+  {
+   "t": 2.64,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 2.66,
+   "step": "keys",
+   "detail": "C-z"
+  },
+  {
+   "t": 4.81,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 4.82,
+   "step": "screen",
+   "detail": "after-ctrl-z"
+  },
+  {
+   "t": 4.86,
+   "step": "sh",
+   "detail": "stat-after-ctrl-z"
+  },
+  {
+   "t": 4.86,
+   "step": "type",
+   "detail": "typed while it is stopped"
+  },
+  {
+   "t": 6.02,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 6.02,
+   "step": "screen",
+   "detail": "typed-while-stopped"
+  },
+  {
+   "t": 6.06,
+   "step": "kill",
+   "detail": "pkill -CONT -f \"/Volumes/Data/unsent-072.VIQD/bin/agy\"; pkill -CONT -f \"/Volumes/Data/unsent-072.VIQD/bin/unsent\" -> "
+  },
+  {
+   "t": 8.21,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 8.22,
+   "step": "screen",
+   "detail": "after-sigcont"
+  },
+  {
+   "t": 8.27,
+   "step": "sh",
+   "detail": "stat-after-cont"
+  },
+  {
+   "t": 8.27,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 11.23,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 11.24,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 11.41,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 12.17,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 12.18,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 14.34,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

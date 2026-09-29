@@ -1,0 +1,30 @@
+--- tmux
+alt=0 dead=0
+--- ps
+32394 56574 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+32459 32394 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+61865 56574 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+61883 61865 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+--- open under the scratch home
+1w RIG/home/.gemini/antigravity-cli/log/cli-20260929_224716.log
+2w RIG/home/.gemini/antigravity-cli/log/cli-20260929_224716.log
+8w RIG/home/.gemini/antigravity-cli/crashes/crash_32459_7f23862c-ec29-4cb0-9472-215dc753739c.log
+--- agent folder
+20480 RIG/home/.gemini/antigravity-cli/conversation_summaries.db
+503 RIG/home/.gemini/antigravity-cli/jetski_state.pbtxt
+0 RIG/home/.gemini/antigravity-cli/last_check.timestamp
+36 RIG/home/.gemini/antigravity-cli/installation_id
+103 RIG/home/.gemini/antigravity-cli/settings.json
+401 RIG/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+32768 RIG/home/.gemini/antigravity-cli/conversation_summaries.db-shm
+8272 RIG/home/.gemini/antigravity-cli/conversation_summaries.db-wal
+--- conversations
+drwxr-xr-x   2 rig     staff   64 Sep 29 22:49 .
+drwxr-xr-x  21 rig     staff  672 Sep 29 22:49 ..
+--- last_conversations.json
+
+--- history.jsonl
+--- update_status.json
+{"success":false,"message":"Update failed, please install from website"}
+--- agy binary
+ef3728208834483754b06fd99963b4b6320740bf237212768dfed5256ae24ddb  /Volumes/Data/unsent-072.VIQD/agy/antigravity

@@ -1,0 +1,3 @@
+line 1 of a paste with a tab    here
+line 2 of a paste with a tab    here
+line 3 of a paste with a tab    here

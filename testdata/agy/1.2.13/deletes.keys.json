@@ -1,0 +1,857 @@
+{
+ "name": "deletes",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "alpha beta gamma delta"
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "before"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "keys": [
+    "C-h"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d1-backspace-ctrl-h"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-w"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d2-ctrl-w"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "M-BSpace"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d3-alt-backspace"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-BSpace"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d4-ctrl-backspace"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "Home"
+   ]
+  },
+  {
+   "keys": [
+    "DC"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d5-delete"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d6-ctrl-d"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "M-d"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d7-alt-d"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-DC"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d8-ctrl-delete"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "M-DC"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d9-alt-delete"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "S-BSpace"
+   ]
+  },
+  {
+   "keys": [
+    "S-DC"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d10-shift-backspace-delete"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-k"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d11-ctrl-k"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d12-ctrl-u"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-y"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d13-ctrl-y"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "type": "undo target"
+  },
+  {
+   "wait": 0.4
+  },
+  {
+   "keys": [
+    "C-_"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d14-ctrl-underscore"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "C-S-z"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "d15-redo"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "after-deletes"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.69,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.7,
+   "step": "type",
+   "detail": "alpha beta gamma delta"
+  },
+  {
+   "t": 2.36,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 2.37,
+   "step": "screen",
+   "detail": "before"
+  },
+  {
+   "t": 2.37,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 5.34,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 5.35,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 5.51,
+   "step": "keys",
+   "detail": "C-h"
+  },
+  {
+   "t": 6.16,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 6.17,
+   "step": "screen",
+   "detail": "d1-backspace-ctrl-h"
+  },
+  {
+   "t": 6.18,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 9.13,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 9.14,
+   "step": "keys",
+   "detail": "C-w"
+  },
+  {
+   "t": 9.8,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 9.81,
+   "step": "screen",
+   "detail": "d2-ctrl-w"
+  },
+  {
+   "t": 9.82,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 12.78,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 12.79,
+   "step": "keys",
+   "detail": "M-BSpace"
+  },
+  {
+   "t": 13.44,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 13.45,
+   "step": "screen",
+   "detail": "d3-alt-backspace"
+  },
+  {
+   "t": 13.46,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 16.42,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 16.43,
+   "step": "keys",
+   "detail": "C-BSpace"
+  },
+  {
+   "t": 17.09,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 17.1,
+   "step": "screen",
+   "detail": "d4-ctrl-backspace"
+  },
+  {
+   "t": 17.11,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 20.07,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 20.08,
+   "step": "keys",
+   "detail": "Home"
+  },
+  {
+   "t": 20.24,
+   "step": "keys",
+   "detail": "DC"
+  },
+  {
+   "t": 20.91,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 20.91,
+   "step": "screen",
+   "detail": "d5-delete"
+  },
+  {
+   "t": 20.92,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 23.88,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 23.89,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 24.54,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 24.55,
+   "step": "screen",
+   "detail": "d6-ctrl-d"
+  },
+  {
+   "t": 24.56,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 27.51,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 27.52,
+   "step": "keys",
+   "detail": "M-d"
+  },
+  {
+   "t": 28.18,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 28.19,
+   "step": "screen",
+   "detail": "d7-alt-d"
+  },
+  {
+   "t": 28.2,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 31.15,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 31.17,
+   "step": "keys",
+   "detail": "C-DC"
+  },
+  {
+   "t": 31.83,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 31.84,
+   "step": "screen",
+   "detail": "d8-ctrl-delete"
+  },
+  {
+   "t": 31.85,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 34.81,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 34.81,
+   "step": "keys",
+   "detail": "M-DC"
+  },
+  {
+   "t": 35.47,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 35.48,
+   "step": "screen",
+   "detail": "d9-alt-delete"
+  },
+  {
+   "t": 35.49,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 38.45,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 38.46,
+   "step": "keys",
+   "detail": "S-BSpace"
+  },
+  {
+   "t": 38.62,
+   "step": "keys",
+   "detail": "S-DC"
+  },
+  {
+   "t": 39.28,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 39.29,
+   "step": "screen",
+   "detail": "d10-shift-backspace-delete"
+  },
+  {
+   "t": 39.3,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 42.25,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 42.26,
+   "step": "keys",
+   "detail": "C-k"
+  },
+  {
+   "t": 42.92,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 42.93,
+   "step": "screen",
+   "detail": "d11-ctrl-k"
+  },
+  {
+   "t": 42.94,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 45.9,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 45.91,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 46.07,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 46.73,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 46.74,
+   "step": "screen",
+   "detail": "d12-ctrl-u"
+  },
+  {
+   "t": 46.75,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 49.7,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 49.71,
+   "step": "keys",
+   "detail": "C-y"
+  },
+  {
+   "t": 50.37,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 50.38,
+   "step": "screen",
+   "detail": "d13-ctrl-y"
+  },
+  {
+   "t": 50.39,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 53.35,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 53.36,
+   "step": "type",
+   "detail": "undo target"
+  },
+  {
+   "t": 53.92,
+   "step": "wait",
+   "detail": "0.4"
+  },
+  {
+   "t": 53.92,
+   "step": "keys",
+   "detail": "C-_"
+  },
+  {
+   "t": 54.58,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 54.6,
+   "step": "screen",
+   "detail": "d14-ctrl-underscore"
+  },
+  {
+   "t": 54.6,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 57.56,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 57.57,
+   "step": "keys",
+   "detail": "C-S-z"
+  },
+  {
+   "t": 58.23,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 58.23,
+   "step": "screen",
+   "detail": "d15-redo"
+  },
+  {
+   "t": 58.24,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 61.21,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 61.68,
+   "step": "sh",
+   "detail": "after-deletes"
+  },
+  {
+   "t": 61.69,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 61.86,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 62.61,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 62.62,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 64.78,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

@@ -1,0 +1,3 @@
+before paste line 1
+paste line 2
+paste line 3

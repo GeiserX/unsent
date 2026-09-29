@@ -251,6 +251,333 @@ Everything in this section is **measured**, except where a line is marked as an 
 - What turns on `SetVirtualCursor`, and does Vim mode change the glyph or indent?
 - Which value, if any, makes `AGY_CLI_DISABLE_AUTO_UPDATE` work?
 
+## Capture run on agy 1.2.13 (measured 2026-09-29)
+
+**Environment.** agy 1.2.13, published 2026-09-29 and the newest release that
+day. The `agy_cli_mac_arm64.tar.gz` tarball was downloaded straight into a
+scratch folder on a Mac mini with macOS 26.6.1, unpacked there and run by its
+full path through a symlink named `agy`; `install.sh` was never run and
+`~/.local/bin/agy` was never touched. It ran in a private tmux 3.6b server
+(`tmux -L unsent-072 -f <scratch conf>`, `TERM=tmux-256color`, 120x40, one
+capture at 120x20) with `extended-keys on` and `extended-keys-format csi-u`,
+under `unsent capture agy` with `UNSENT_DEBUG_DIR` set. unsent has no agy
+reader, so it printed its not-protected line and passed every byte through
+while logging both directions; the debug folder stayed empty, and the capture's
+own record is the raw log. The environment was `env -i` with a scratch `HOME`,
+`TMPDIR` and XDG folders, `modelProvider: "gemini"` in the scratch
+`~/.gemini/antigravity-cli/settings.json`, `GEMINI_API_KEY=fake-not-a-key`,
+`GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:9`, `HTTPS_PROXY`, `HTTP_PROXY` and
+`ALL_PROXY` on the same dead port, `AGY_CLI_DISABLE_AUTO_UPDATE=1`, no other
+provider key, no `GITHUB_TOKEN`, `GH_TOKEN` or `CI`, and `USER` and `LOGNAME`
+set to `rig`. `$EDITOR` and `$VISUAL` were unsent's copy-and-exit script. No
+prompt ever reached a model: every submit failed on the dead endpoint. The 23
+captures, 144 screens and 39 probes are in
+[`testdata/agy/1.2.13/`](../../testdata/agy/1.2.13/), described in
+[its README](../../testdata/agy/README.md); every conversation id below belongs
+to a throwaway home.
+
+**It did not replace itself.** The binary's SHA-256 is
+`ef3728208834483754b06fd99963b4b6320740bf237212768dfed5256ae24ddb` before the
+first run and after the last, with the same size and mtime, and no `.old` file
+appeared beside it. The updater did try: `updater/update_status.json` reads
+`{"success":false,"message":"Update failed, please install from website"}`, and
+`updater/update.lock` was created. The dead proxy, not
+`AGY_CLI_DISABLE_AUTO_UPDATE=1`, is what stopped it, so the research's warning
+stands: block the network if the version has to stay put [measured, every
+`sessions/*` probe].
+
+### What 1.2.13 changes from the 1.2.11 profile above
+
+| The profile above says | 1.2.13 does | Evidence |
+| --- | --- | --- |
+| It wraps redraws in `?2026h … ?2026l` | **No synchronized-output marks at all**: 0 in 23 records, although it still queries `ESC[?2026$p` and `ESC[?2027$p` once per start. tmux answered neither query through unsent. So an agy reader needs the quiet-gap read of [SPEC 2.11](../SPEC.md#211-performance) | every `.rec` |
+| Ctrl+U deletes to the start of the line, Ctrl+K to the end, Alt+D and Ctrl+D delete a word or a character forward | Only Backspace, Ctrl+H, Ctrl+W, Alt+Backspace, Delete and Ctrl+U delete anything. **Ctrl+K, Ctrl+D, Alt+D, Ctrl+Delete, Alt+Delete, Ctrl+Backspace, Shift+Backspace and Shift+Delete do nothing** in the box; the shortcuts panel binds Ctrl+K to `Approve subagent fast` and Ctrl+D to `Exit` | `deletes.editor-1` to `-16` |
+| A second Ctrl+C exits and the draft is lost | Still true, and **one Ctrl+D on an empty box only warns** `press ctrl+d again to exit`; the second quits with status 0. There is no key that clears the draft: Ctrl+C and Esc both keep it | `exit-ctrl-c`, `exit-ctrl-d`, `typed` |
+| `[Pasted text #N +M lines]` and one Backspace deletes a placeholder whole | Both hold. Adds: **the numbering never renumbers** when an earlier placeholder is deleted, it keeps counting up within a session, and **the external editor round trip expands every placeholder into the box and resets the counter to 1** | `pastes`, `pastes2` |
+| `conversationId` is a field of `history.jsonl` | It is, but **only from the second submit on**: the entry a new conversation's first submit writes has `display`, `timestamp` and `workspace` and no id, because the conversation is created by that submit | `identity`, `submit` |
+| 1.2.11 draws inline by default, after an alternate-screen flash at start | Inline confirmed, in every probe taken with the box showing. The flash is **not always there**: 10 of 23 records enter and leave the alternate screen once, 13 never touch it | every `.rec`, every `sessions/*` probe |
+
+Unchanged and re-seen: the two full-width U+2500 rules, the ASCII `>` and one
+space, continuation rows indented two, text width `cols − 3`, word wrap with
+wide characters never split, a cap of `floor(rows/2)` text rows, `↑ N more
+lines` and `↓ N more lines` counting wrapped screen rows, the footer
+`? for shortcuts` on an empty box and `Gemini 3.1 Pro · low` on the right, the
+mode hints after Shift+Tab, bash mode's `!` glyph, and the paste thresholds
+[measured, `tall`, `accents`, `scroll-steps`, `dialogs`, `pastes`].
+
+### Screen, modes and frames
+
+- **Inline on the main screen.** tmux's `alternate_on` was 0 in every probe
+  taken with the box showing, and the not-protected line unsent prints before
+  the start is still above the box on the screen and in the scrollback at exit
+  [measured, every probe and every `-exit` screen].
+- **The startup flash**, when it happens, is one
+  `ESC[>4m ESC[?1049h ESC[?25l ESC[?5W ESC[?2004h ESC[>4;2m ESC[>1u ESC[?u ESC[H ESC[2J`,
+  the logo, then `?1049l` and the inline frame. 10 records of 23 have exactly
+  one `?1049h`/`?1049l` pair, and what decides it is not known [measured].
+- **A first run stays on the alternate screen** for the colour-scheme picker,
+  the terms screen and the trust dialog, and leaves it when the box is drawn
+  [measured, `first-run`].
+- **Input modes.** It asks for bracketed paste (`?2004h`), modifyOtherKeys 2
+  (`ESC[>4;2m`) and kitty flags 1 (`ESC[>1u`), sends the kitty query `ESC[?u`,
+  and re-asserts `?2004h ESC[>4;2m` while idle: 525 and 536 times in 23
+  records. It turns on no mouse tracking at all. On exit it writes
+  `ESC[>4m ESC[<1u`, then `\r\n\n ESC[J ESC[?2004l ESC[0 q`, which erases the
+  rows below the box and leaves the box and the draft in the scrollback
+  [measured].
+- **The box is drawn about 0.1 s after start** once the config folder exists:
+  the first frame holding `? for shortcuts` is at 0.09 s in `identity` and
+  0.11 s in `typed` [measured]. A first run takes as long as the person
+  answering the onboarding screens.
+- **Reading a frame.** agy brackets each paint with `ESC[?25l` … `ESC[?25h`:
+  1,235 paints in the 23 records, every one of them closed. 73 chunks continued
+  a paint that had started, 12 of those being the idle mode re-assert and 61
+  real output, and 18 of those 61 arrived more than 50 ms after the chunk
+  before, up to 1.68 s, all of them inside a large panel such as the shortcuts
+  list. So a plain quiet-gap read tears those panels, while `ESC[?25h` marks
+  the end of every paint [measured, all records]. The quiet gap between one
+  paint's end and the next paint's start has a median of 83 ms, but that
+  measures the rig's typing pace, not agy.
+
+### Box, wrapping and text
+
+- Text width 117 at 120 columns: 115 `a`s and then `漢字` put `漢` at the edge
+  and `字` on the next row, leaving nothing behind; a 114-`x` word followed by
+  ` ñandú` wrapped at the space [measured, `accents`].
+- Precomposed accents (`ñandú`, `¿qué pasó?`, `Pingüino`), decomposed ones
+  (`e` + U+0301, `n` + U+0303, `u` + U+0308), `👍🏽` and the flag `🇪🇸` came
+  back byte-identical through Ctrl+G [measured, `accents.editor-1.txt`].
+- **Height cap `floor(rows/2)` text rows**, plus an indicator row above and
+  below when there is more: at 40 rows a 45-line draft showed
+  `> ↑ 4 more lines`, 20 text rows and `  ↓ 21 more lines` between the rules
+  [measured, `tall`].
+- **The indicators count wrapped screen rows, not logical lines**: a draft of
+  27 lines, one of them 250 characters wide and so three rows, showed
+  `↑ 9 more lines` with 20 rows visible, which is 29 − 20 [measured,
+  `scroll-steps`].
+- **The view follows the insertion point.** After 40 Up presses in a 45-line
+  draft the cursor's row was the first visible one and the box had scrolled by
+  exactly that much; Up, PageUp and Down inside the visible rows move nothing.
+  Ctrl+Home jumps to the top (`↓ 9 more lines` under the last row) and
+  Ctrl+End back to the bottom [measured, `tall`, `scroll-steps`].
+- A 45-line draft keeps what is out of sight: an edit typed 40 rows up and a
+  Ctrl+W 30 rows up were both in the editor copy taken after scrolling back
+  down [measured, `tall.editor-1.txt`, `tall.editor-2.txt`].
+
+### Keys as they reached agy in tmux (modifyOtherKeys 2, `extended-keys-format csi-u`)
+
+| Key | Bytes | What agy did (editor copy or screen) |
+| --- | --- | --- |
+| Enter | `CR` | **submit** |
+| Ctrl+J | `ESC[106;5u` | new line |
+| Alt+Enter | `ESC[13;3u` | new line |
+| Shift+Enter | `ESC[13;2u` | new line |
+| Esc then Enter | `ESC CR` in one read | new line |
+| `\` then Enter | `\`, then `CR` | new line, `\` dropped |
+| Backspace | `0x7f` | one character back |
+| Ctrl+H | `ESC[104;5u` | one character back |
+| Ctrl+W | `ESC[119;5u` | one word back, the trailing space stays |
+| Alt+Backspace | `ESC[127;3u` | one word back |
+| Ctrl+Backspace | `ESC[127;5u` | nothing |
+| Delete | `ESC[3~` | one character forward |
+| Ctrl+D (in a draft) | `ESC[100;5u` | nothing |
+| Alt+D, Ctrl+Delete, Alt+Delete | `ESC[100;3u`, `ESC[3;5~`, `ESC[3;3~` | nothing |
+| Shift+Backspace, Shift+Delete | `ESC[127;2u`, `ESC[3;2~` | nothing |
+| Ctrl+U | `ESC[117;5u` | kills to the start of the line; at column 0 it eats the newline, so it is the only way to clear a draft |
+| Ctrl+K | `ESC[107;5u` | nothing (`Approve subagent fast`) |
+| Ctrl+Y | `ESC[121;5u` | yanks the last Ctrl+U kill back |
+| Ctrl+_ | `ESC[95;5u` | undo |
+| Ctrl+Shift+Z | `ESC[122;6u` | redo |
+| Ctrl+C | `ESC[99;5u` | keeps the draft, `press ctrl+c again to exit`; the second quits |
+| Esc | `ESC` | keeps the draft; closes a panel; interrupts a running turn |
+| Ctrl+D (empty box) | `ESC[100;5u` | `press ctrl+d again to exit`; the second quits, status 0 |
+| Ctrl+G | `ESC[103;5u` | external editor |
+| Ctrl+Z | `ESC[122;5u` | nothing (below) |
+| Home, End, Ctrl+Home, Ctrl+End | `ESC[1~`, `ESC[4~`, `ESC[1;5H`, `ESC[1;5F` | move the insertion point |
+
+[measured, `deletes.rec`, `multiline.rec`, `submit.rec`, `typed.rec`,
+`exit-ctrl-c`, `exit-ctrl-d`; the effects from `deletes.editor-1` to `-16`,
+`multiline.editor-1` and the screens]. tmux does not answer `ESC[?u`, so these
+are tmux's modifyOtherKeys 2 encodings in its CSI-u form and no kitty release
+event was seen.
+
+**Enter is the only submit key.** Alt+Enter, Shift+Enter, Ctrl+J, Esc then
+Enter and `\` then Enter all make a new line, each checked on a draft that was
+then left in the box [measured, `submit`, `multiline`]. That matters for
+[SPEC 2.13](../SPEC.md#213-sent-drafts-and-the-sent-log): agy's profile lists
+one submit key, and the `ESC CR` pair that pi reads as a submit is a new line
+here.
+
+**Ctrl+Z.** The shortcuts panel binds it to `Suspend CLI`, but under tmux's
+extended keys it arrives as `ESC[122;5u`: unsent does not match that form and
+agy did not act on it either, so the draft stayed and the typing that followed
+went into the box [measured, `suspend`]. As the lone byte `0x1a` unsent takes
+it, writes nothing (agy has no profile yet) and asks the kernel to stop the
+process group; in the rig that group has no job-control shell, so the kernel
+dropped the SIGTSTP and agy repainted when unsent continued it, the same trap
+pi's run hit [measured, `suspend-legacy`]. What a real terminal under a shell
+does was not measured.
+
+### Pastes
+
+- **Line rule.** More than `min(15, floor(rows/2))` logical lines becomes
+  `[Pasted text #N +M lines]`, where M is the line count. At 40 rows 15 lines
+  stayed inline and 16 became a placeholder; at 20 rows 10 stayed inline and 11
+  became one [measured, `pastes`, `pastes-20rows`].
+- **Character rule.** A line over 1,000 characters becomes
+  `[Pasted text #N M chars]`: 1,000 stayed inline and 1,001 gave
+  `[Pasted text #1 1001 chars]` [measured, `pastes`, `pastes2`].
+- **Numbering.** It counts up per session and does not renumber: with
+  `#1 keep #2` in the box, one Backspace over `#1` left `#2` as `#2`, and the
+  next paste took `#3`. Deleting a placeholder and pasting again from an empty
+  box gave `#2` then `#3` [measured, `pastes`, `pastes2`]. **A Ctrl+G round
+  trip resets the counter to 1**, because it leaves no placeholder in the box
+  [measured, `pastes`].
+- **One Backspace right after a placeholder deletes it whole**, for both forms
+  [measured, `pastes2`: `chars-1001` then `after-backspace` empty, `lines-16`
+  then `lines-16-after-backspace` empty].
+- **Editing inside a placeholder works on the pasted text.** Ctrl+U at the end
+  of a `+16 lines` placeholder killed it in one press; after a Ctrl+G had
+  expanded the same paste into plain text, five Ctrl+U left 13 lines drawn
+  inline [measured, `pastes`].
+- **A trailing newline is dropped**: `one\ntwo\n` pasted gives the two lines and
+  a 7-byte editor copy [measured, `pastes`, `pastes2`].
+- **Line breaks arrive as `\n` either way**: a paste sent with CR (tmux's
+  default) and one sent with LF (`paste-buffer -r`) both gave `one\ntwo`
+  [measured, `pastes2`].
+- **A tab becomes four spaces in agy's own buffer**: the editor copy of a paste
+  holding `\t` has four spaces where the tab was [measured,
+  `pastes2.editor-2.txt`]. A draft with a tab cannot go back into agy
+  faithfully, which [SPEC 2.3](../SPEC.md#23-restore-in-box) condition 8 asks
+  each profile to say.
+- **The editor copy expands every placeholder**: a draft of
+  `[Pasted text #1 1001 chars] middle [Pasted text #2 1001 chars]` gave exactly
+  2,010 bytes [measured, `pastes.editor-4.txt`].
+
+### External editor (ground truth)
+
+Ctrl+G writes the draft to a file in `$TMPDIR` and runs `$EDITOR`. Every one of
+the 42 copies in these captures is the exact draft, placeholders expanded, with
+no trailing newline, and it works on a non-empty box and during a running turn
+[measured, every `*.editor-*.txt`, `submit.editor-1.txt`]. After the editor
+returns, the box holds the expanded text.
+
+### A send that fails
+
+Enter draws the prompt above the box under a shorter rule, with
+`⡿  Generating...` under it and `esc to cancel` in the footer, and empties the
+box at once. Against the dead endpoint it spins for at least 30 s with no error
+message. Typing during the turn works and Ctrl+G copies that draft. Esc
+interrupts and the transcript shows
+`⎿  Interrupted · What should Antigravity CLI do instead?`, leaving the draft
+in the box [measured, `submit`, `identity`, `ctrlc-history`].
+
+### Session identity
+
+| When | What is under `~/.gemini/antigravity-cli` | What another process can read | Tag |
+| --- | --- | --- | --- |
+| Start, before any key | `settings.json`, `installation_id`, `jetski_state.pbtxt`, `conversation_summaries.db`, an empty `conversations/` folder and a `log/cli-<time>.log`. No `history.jsonl`, no `cache/last_conversations.json` | the process holds its log, its crash log, `conversation_summaries.db` and the config folders open; nothing names a conversation | measured, `identity-id-0-start` |
+| Typed, not sent; after Ctrl+C | nothing new | nothing new | measured, `id-1-typed`, `id-2-ctrl-c` |
+| 0.3 s after the first submit | `conversations/<id>.db` with its `-wal` and `-shm`, `cache/last_conversations.json` mapping the working folder to `<id>`, and one `history.jsonl` line `{"display","timestamp","workspace"}` **with no `conversationId`** | the process holds `conversations/<id>.db` open, and the file name is the id | measured, `id-3-submit-0.3s`, `poll-identity.txt` |
+| After a second submit | a second `history.jsonl` line, this one carrying `"conversationId":"<id>"` | the same | measured, `id-6-second-submit` |
+| At exit | nothing more; the box and the draft stay in the scrollback | nothing | measured, `id-7-after-exit`, every `-exit` screen |
+
+**So the running conversation's id can be read from outside**: list the files
+the child pid holds open and take the `conversations/<id>.db`. For a new
+conversation it appears with the first submit, 0.3 s after Enter; for a resumed
+one it is open before the box is drawn [measured, `poll-resume-c.txt`,
+`poll-resume-conversation.txt`]. `cache/last_conversations.json` holds the same
+id keyed by the working folder, but it is shared by every agy in that folder,
+so the open file is the one to read. Nothing is keyed by pid.
+
+**Resume forms.**
+
+| How it was opened | What it runs | What another process sees | Tag |
+| --- | --- | --- | --- |
+| `agy -c` (`--continue`) | the newest conversation of the folder, its earlier prompts redrawn above the box | its `conversations/<id>.db` open 0.37 s after start, before the box at 0.49 s | measured, `resume-c` |
+| `agy --conversation <id>` | that conversation | its database open by the time the box is drawn, both at 0.11 s | measured, `resume-conversation` |
+| `agy --conversation <unknown id>` | prints `warning: conversation "<id>" not found` above the banner and **starts a new conversation anyway**, which nothing on disk names until its first submit | nothing | measured, `resume-unknown` |
+| `/resume` inside a session (aliases `switch`, `conversation`) | a picker drawn under the bottom rule, `Conversations`, with a `CLI` and an `Other` tab; on a home with no conversation it reads `No conversations available. Press Enter to return.` | not measured with a conversation to choose | measured, `dialogs` |
+
+`agy --help` also lists `--new-project`, `--project`, `--agent`, `--model`,
+`--effort`, `--mode`, `--sandbox`, `--add-dir`, `-p`/`--print` and `-i`, and the
+subcommands `agent(s)`, `changelog`, `help`, `install`, `mcp`, `mic-serve`,
+`models`, `plugin(s)`, `remote-control` and `update`. The chat starts are the
+bare command, `-c`, `--conversation` and `-i`; the rest are not a chat box
+[source, `agy --help`].
+
+### Kill, close and what is never written
+
+- `kill -9` of agy: unsent died with it, by the same signal, and the draft
+  (`kill nine draft zebra`) is in no file under the scratch home or `TMPDIR`.
+  unsent's exit lines printed over the draft's last row [measured, `kill9`].
+- tmux `kill-session`: agy wrote its teardown on the hangup, both processes
+  exited, none was left, and the draft is in no file [measured, `killsession`].
+- Two Ctrl+C with a draft in the box: agy quits with status 0 and the draft is
+  in no file [measured, `exit-ctrl-c`].
+- **agy saves no unsent draft anywhere**, which is the whole reason unsent
+  exists here: `history.jsonl` holds submitted prompts only, and a draft typed
+  and never submitted left no trace in any of these runs [measured,
+  `identity`, `kill9`, `killsession`, `exit-ctrl-c`].
+
+### Negative screens
+
+Each of these is a frame a reader must not take for a draft [measured,
+`dialogs`, `first-run`, `ctrlc-history`]:
+
+- the `?` shortcuts panel, drawn under the bottom rule with its own tabs
+  (`Antigravity CLI`, `general`, `commands`, `shortcuts`);
+- the `/` menu and the `@` file picker, both drawn **under** the bottom rule
+  with rows that start `> `, while the box itself holds only the `/` or `@`
+  that was typed;
+- the mode hints inside the box after Shift+Tab
+  (`Accept-edits mode: …`, `Plan mode: …`), which sit where the draft would be;
+- bash mode: the glyph becomes `!` and the footer reads
+  `activated bash mode · esc to cancel`;
+- `/settings`, `/model`, `/context`, `/resume` and Ctrl+R (an `Artifacts`
+  panel), all drawn under the bottom rule while the box stays empty;
+- the first-run colour-scheme picker, the terms screen and the trust dialog,
+  all on the alternate screen, none of which has the two rules.
+
+### History browsing
+
+Up on an empty box recalls the newest submitted prompt, Up again the one
+before, and Down walks back; the entries come from `history.jsonl`, so they
+include prompts from earlier sessions in the same home. **Up in a typed draft
+leaves the draft alone** [measured, `ctrlc-history`, `editor-1` to `-3`].
+
+### Open questions from above, answered where this run could
+
+- **The default screen mode outside tmux:** still open. Inside tmux 1.2.13 is
+  inline, with an alternate-screen flash at start in 10 of 23 records.
+- **Where the box sits once a conversation exists:** in the same place,
+  inline, under the redrawn prompts of the conversation [measured, `resume-c`].
+- **`\`+Enter and `shift+enter` delivery:** both keyed, both make a new line.
+- **Is the trailing-newline drop general:** yes in both cases tried.
+- **Does placeholder numbering reset after a submit:** it resets after a Ctrl+G
+  round trip; a submit was not tried with a placeholder still in the box.
+- **16 lines at 80 rows:** not tried; 11 lines at 20 rows confirms the
+  `floor(rows/2)` half of the rule.
+- **Which value makes `AGY_CLI_DISABLE_AUTO_UPDATE` work:** still unknown. With
+  `1` the updater still ran and only failed because the network was dead.
+- **SPEC 2.3's agy row, "how the running session's id is read":** the
+  `conversations/<id>.db` the process holds open (above).
+
+### What this run could not capture
+
+- A real terminal other than tmux, kitty flag-7 release events, and a Ctrl+V or
+  right-click clipboard paste.
+- A streaming reply, and the box's height cap during a turn: nothing can answer
+  on the dead endpoint.
+- The `/resume` picker with conversations in it, and `/fork`, `/new` and
+  `/rename`.
+- Vim mode, `SetVirtualCursor`, and the light theme's colours.
+- The paste settle delay and a restore: unsent has no agy reader yet, so the
+  first-frame paste and restore belong to the profile run.
+- Every capture in this run ended with the rig closing the window, except
+  `exit-ctrl-d`, `exit-ctrl-c`, `kill9` and `killsession`; the two exit
+  captures are the ones that show agy's own quit.
+
 ## Verification notes
 
 Checked:

@@ -1,0 +1,8 @@
+line one ctrl j
+line two
+line three alt enter
+line four shift enter
+line five esc enter
+line six backslash enter
+
+line eight after a blank one

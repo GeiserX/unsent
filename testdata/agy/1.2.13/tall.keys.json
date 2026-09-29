@@ -1,0 +1,2273 @@
+{
+ "name": "tall",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "row 01 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 02 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 03 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 04 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 05 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 06 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 07 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 08 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 09 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 10 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 11 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 12 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 13 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 14 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 15 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 16 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 17 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 18 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 19 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 20 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 21 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 22 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 23 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 24 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 25 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 26 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 27 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 28 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 29 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 30 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 31 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 32 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 33 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 34 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 35 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 36 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 37 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 38 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 39 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 40 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 41 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 42 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 43 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 44 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "row 45 of the tall draft",
+   "gap": 0.04
+  },
+  {
+   "wait": 1.2
+  },
+  {
+   "screen": "tall-bottom"
+  },
+  {
+   "keys": [
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up"
+   ],
+   "gap": 0.05
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "tall-top"
+  },
+  {
+   "type": " EDIT-HIGH"
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "tall-edit"
+  },
+  {
+   "keys": [
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down"
+   ],
+   "gap": 0.05
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "tall-back"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up"
+   ],
+   "gap": 0.05
+  },
+  {
+   "keys": [
+    "C-w"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "tall-after-ctrl-w"
+  },
+  {
+   "keys": [
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down",
+    "Down"
+   ],
+   "gap": 0.05
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "wait": 0.4
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.69,
+   "step": "type",
+   "detail": "row 01 of the tall draft"
+  },
+  {
+   "t": 1.74,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 1.8,
+   "step": "type",
+   "detail": "row 02 of the tall draft"
+  },
+  {
+   "t": 1.85,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 1.9,
+   "step": "type",
+   "detail": "row 03 of the tall draft"
+  },
+  {
+   "t": 1.95,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.0,
+   "step": "type",
+   "detail": "row 04 of the tall draft"
+  },
+  {
+   "t": 2.06,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.11,
+   "step": "type",
+   "detail": "row 05 of the tall draft"
+  },
+  {
+   "t": 2.16,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.22,
+   "step": "type",
+   "detail": "row 06 of the tall draft"
+  },
+  {
+   "t": 2.27,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.32,
+   "step": "type",
+   "detail": "row 07 of the tall draft"
+  },
+  {
+   "t": 2.37,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.44,
+   "step": "type",
+   "detail": "row 08 of the tall draft"
+  },
+  {
+   "t": 2.49,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.54,
+   "step": "type",
+   "detail": "row 09 of the tall draft"
+  },
+  {
+   "t": 2.59,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.64,
+   "step": "type",
+   "detail": "row 10 of the tall draft"
+  },
+  {
+   "t": 2.69,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.75,
+   "step": "type",
+   "detail": "row 11 of the tall draft"
+  },
+  {
+   "t": 2.8,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.85,
+   "step": "type",
+   "detail": "row 12 of the tall draft"
+  },
+  {
+   "t": 2.9,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.95,
+   "step": "type",
+   "detail": "row 13 of the tall draft"
+  },
+  {
+   "t": 3.0,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.06,
+   "step": "type",
+   "detail": "row 14 of the tall draft"
+  },
+  {
+   "t": 3.11,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.17,
+   "step": "type",
+   "detail": "row 15 of the tall draft"
+  },
+  {
+   "t": 3.23,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.29,
+   "step": "type",
+   "detail": "row 16 of the tall draft"
+  },
+  {
+   "t": 3.34,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.39,
+   "step": "type",
+   "detail": "row 17 of the tall draft"
+  },
+  {
+   "t": 3.45,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.5,
+   "step": "type",
+   "detail": "row 18 of the tall draft"
+  },
+  {
+   "t": 3.56,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.62,
+   "step": "type",
+   "detail": "row 19 of the tall draft"
+  },
+  {
+   "t": 3.67,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.72,
+   "step": "type",
+   "detail": "row 20 of the tall draft"
+  },
+  {
+   "t": 3.78,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.84,
+   "step": "type",
+   "detail": "row 21 of the tall draft"
+  },
+  {
+   "t": 3.89,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.94,
+   "step": "type",
+   "detail": "row 22 of the tall draft"
+  },
+  {
+   "t": 3.99,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.03,
+   "step": "type",
+   "detail": "row 23 of the tall draft"
+  },
+  {
+   "t": 4.08,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.14,
+   "step": "type",
+   "detail": "row 24 of the tall draft"
+  },
+  {
+   "t": 4.19,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.24,
+   "step": "type",
+   "detail": "row 25 of the tall draft"
+  },
+  {
+   "t": 4.29,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.34,
+   "step": "type",
+   "detail": "row 26 of the tall draft"
+  },
+  {
+   "t": 4.39,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.44,
+   "step": "type",
+   "detail": "row 27 of the tall draft"
+  },
+  {
+   "t": 4.49,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.55,
+   "step": "type",
+   "detail": "row 28 of the tall draft"
+  },
+  {
+   "t": 4.6,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.65,
+   "step": "type",
+   "detail": "row 29 of the tall draft"
+  },
+  {
+   "t": 4.71,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.77,
+   "step": "type",
+   "detail": "row 30 of the tall draft"
+  },
+  {
+   "t": 4.82,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.88,
+   "step": "type",
+   "detail": "row 31 of the tall draft"
+  },
+  {
+   "t": 4.93,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.98,
+   "step": "type",
+   "detail": "row 32 of the tall draft"
+  },
+  {
+   "t": 5.03,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.09,
+   "step": "type",
+   "detail": "row 33 of the tall draft"
+  },
+  {
+   "t": 5.14,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.2,
+   "step": "type",
+   "detail": "row 34 of the tall draft"
+  },
+  {
+   "t": 5.24,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.3,
+   "step": "type",
+   "detail": "row 35 of the tall draft"
+  },
+  {
+   "t": 5.35,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.4,
+   "step": "type",
+   "detail": "row 36 of the tall draft"
+  },
+  {
+   "t": 5.45,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.51,
+   "step": "type",
+   "detail": "row 37 of the tall draft"
+  },
+  {
+   "t": 5.57,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.62,
+   "step": "type",
+   "detail": "row 38 of the tall draft"
+  },
+  {
+   "t": 5.67,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.72,
+   "step": "type",
+   "detail": "row 39 of the tall draft"
+  },
+  {
+   "t": 5.78,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.84,
+   "step": "type",
+   "detail": "row 40 of the tall draft"
+  },
+  {
+   "t": 5.89,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 5.94,
+   "step": "type",
+   "detail": "row 41 of the tall draft"
+  },
+  {
+   "t": 6.0,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 6.05,
+   "step": "type",
+   "detail": "row 42 of the tall draft"
+  },
+  {
+   "t": 6.1,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 6.15,
+   "step": "type",
+   "detail": "row 43 of the tall draft"
+  },
+  {
+   "t": 6.2,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 6.26,
+   "step": "type",
+   "detail": "row 44 of the tall draft"
+  },
+  {
+   "t": 6.31,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 6.36,
+   "step": "type",
+   "detail": "row 45 of the tall draft"
+  },
+  {
+   "t": 7.6,
+   "step": "wait",
+   "detail": "1.2"
+  },
+  {
+   "t": 7.62,
+   "step": "screen",
+   "detail": "tall-bottom"
+  },
+  {
+   "t": 7.63,
+   "step": "keys",
+   "detail": "Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up"
+  },
+  {
+   "t": 8.68,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 8.69,
+   "step": "screen",
+   "detail": "tall-top"
+  },
+  {
+   "t": 8.7,
+   "step": "type",
+   "detail": " EDIT-HIGH"
+  },
+  {
+   "t": 9.45,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 9.46,
+   "step": "screen",
+   "detail": "tall-edit"
+  },
+  {
+   "t": 9.47,
+   "step": "keys",
+   "detail": "Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down"
+  },
+  {
+   "t": 10.53,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 10.54,
+   "step": "screen",
+   "detail": "tall-back"
+  },
+  {
+   "t": 10.56,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 13.72,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 13.73,
+   "step": "keys",
+   "detail": "Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up Up"
+  },
+  {
+   "t": 13.79,
+   "step": "keys",
+   "detail": "C-w"
+  },
+  {
+   "t": 14.55,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 14.56,
+   "step": "screen",
+   "detail": "tall-after-ctrl-w"
+  },
+  {
+   "t": 14.57,
+   "step": "keys",
+   "detail": "Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down Down"
+  },
+  {
+   "t": 14.63,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 17.78,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 17.79,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 17.95,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.05,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.15,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.25,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.34,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.43,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.53,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.63,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.72,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.82,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 18.91,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.0,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.1,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.19,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.29,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.38,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.47,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.56,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.66,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.75,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.84,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 19.94,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.02,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.12,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.22,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.32,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.41,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.51,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.6,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.69,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.78,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.88,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 20.97,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.06,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.15,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.25,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.34,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.43,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.52,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.61,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.7,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.79,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.89,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 21.99,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.08,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.17,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.26,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.36,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.46,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.56,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.66,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.75,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.84,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 22.94,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.03,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.11,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.2,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.29,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.39,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.48,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.57,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.67,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.77,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.86,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 23.95,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.04,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.13,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.23,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.33,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.43,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.52,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.61,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.7,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.79,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.89,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 24.98,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.07,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.16,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.26,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.35,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.45,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.54,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.63,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.72,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.81,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 25.9,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 26.0,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 26.1,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 26.19,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 26.29,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 26.38,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 26.87,
+   "step": "wait",
+   "detail": "0.4"
+  },
+  {
+   "t": 26.88,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 29.04,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

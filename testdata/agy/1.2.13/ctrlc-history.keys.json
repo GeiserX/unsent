@@ -1,0 +1,512 @@
+{
+ "name": "ctrlc-history",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "first sent prompt rig"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 5
+  },
+  {
+   "keys": [
+    "Escape"
+   ]
+  },
+  {
+   "wait": 2.5
+  },
+  {
+   "type": "second sent prompt rig"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 5
+  },
+  {
+   "keys": [
+    "Escape"
+   ]
+  },
+  {
+   "wait": 2.5
+  },
+  {
+   "screen": "after-two-sends"
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "after-two-sends"
+  },
+  {
+   "keys": [
+    "Up"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "history-1"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "Up"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "history-2"
+  },
+  {
+   "keys": [
+    "Up"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "history-3"
+  },
+  {
+   "keys": [
+    "Down"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "history-down"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "type": "a draft, then Up"
+  },
+  {
+   "keys": [
+    "Up"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "up-in-draft"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-r"
+   ]
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "ctrl-r"
+  },
+  {
+   "keys": [
+    "Escape"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "end"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.24,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.74,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.75,
+   "step": "type",
+   "detail": "first sent prompt rig"
+  },
+  {
+   "t": 1.92,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 7.08,
+   "step": "wait",
+   "detail": "5"
+  },
+  {
+   "t": 7.09,
+   "step": "keys",
+   "detail": "Escape"
+  },
+  {
+   "t": 9.75,
+   "step": "wait",
+   "detail": "2.5"
+  },
+  {
+   "t": 9.76,
+   "step": "type",
+   "detail": "second sent prompt rig"
+  },
+  {
+   "t": 9.92,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 15.09,
+   "step": "wait",
+   "detail": "5"
+  },
+  {
+   "t": 15.1,
+   "step": "keys",
+   "detail": "Escape"
+  },
+  {
+   "t": 17.75,
+   "step": "wait",
+   "detail": "2.5"
+  },
+  {
+   "t": 17.77,
+   "step": "screen",
+   "detail": "after-two-sends"
+  },
+  {
+   "t": 18.31,
+   "step": "sh",
+   "detail": "after-two-sends"
+  },
+  {
+   "t": 18.32,
+   "step": "keys",
+   "detail": "Up"
+  },
+  {
+   "t": 19.28,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 19.29,
+   "step": "screen",
+   "detail": "history-1"
+  },
+  {
+   "t": 19.29,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 22.25,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 22.27,
+   "step": "keys",
+   "detail": "Up"
+  },
+  {
+   "t": 23.23,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 23.24,
+   "step": "screen",
+   "detail": "history-2"
+  },
+  {
+   "t": 23.25,
+   "step": "keys",
+   "detail": "Up"
+  },
+  {
+   "t": 24.21,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 24.22,
+   "step": "screen",
+   "detail": "history-3"
+  },
+  {
+   "t": 24.22,
+   "step": "keys",
+   "detail": "Down"
+  },
+  {
+   "t": 25.18,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 25.19,
+   "step": "screen",
+   "detail": "history-down"
+  },
+  {
+   "t": 25.2,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 28.16,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 28.17,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 28.33,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 29.1,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 29.11,
+   "step": "type",
+   "detail": "a draft, then Up"
+  },
+  {
+   "t": 29.27,
+   "step": "keys",
+   "detail": "Up"
+  },
+  {
+   "t": 30.23,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 30.24,
+   "step": "screen",
+   "detail": "up-in-draft"
+  },
+  {
+   "t": 30.25,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 33.2,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 33.22,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 33.38,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 34.13,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 34.14,
+   "step": "keys",
+   "detail": "C-r"
+  },
+  {
+   "t": 35.31,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 35.31,
+   "step": "screen",
+   "detail": "ctrl-r"
+  },
+  {
+   "t": 35.32,
+   "step": "keys",
+   "detail": "Escape"
+  },
+  {
+   "t": 36.28,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 36.76,
+   "step": "sh",
+   "detail": "end"
+  },
+  {
+   "t": 36.76,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 36.92,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 37.67,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 37.68,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 39.84,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

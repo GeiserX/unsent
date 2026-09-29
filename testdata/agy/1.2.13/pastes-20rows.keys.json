@@ -1,0 +1,229 @@
+{
+ "name": "pastes-20rows",
+ "size": [
+  120,
+  20
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "screen": "empty"
+  },
+  {
+   "paste": "short line 1\nshort line 2\nshort line 3\nshort line 4\nshort line 5\nshort line 6\nshort line 7\nshort line 8\nshort line 9\nshort line 10"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "lines-10"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "short line 1\nshort line 2\nshort line 3\nshort line 4\nshort line 5\nshort line 6\nshort line 7\nshort line 8\nshort line 9\nshort line 10\nshort line 11"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "lines-11"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "cleared"
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.17,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.69,
+   "step": "screen",
+   "detail": "empty"
+  },
+  {
+   "t": 1.7,
+   "step": "paste",
+   "detail": "130 chars, 9 breaks, raw=False"
+  },
+  {
+   "t": 2.87,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 2.88,
+   "step": "screen",
+   "detail": "lines-10"
+  },
+  {
+   "t": 2.89,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 3.05,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 3.81,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 3.83,
+   "step": "paste",
+   "detail": "144 chars, 10 breaks, raw=False"
+  },
+  {
+   "t": 4.99,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 5.0,
+   "step": "screen",
+   "detail": "lines-11"
+  },
+  {
+   "t": 5.01,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 5.17,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 5.93,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 5.94,
+   "step": "screen",
+   "detail": "cleared"
+  },
+  {
+   "t": 5.95,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 8.12,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

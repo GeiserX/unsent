@@ -1,0 +1,254 @@
+{
+ "name": "first-run",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "Choose your color scheme",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "screen": "color-scheme"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 2.5
+  },
+  {
+   "screen": "terms"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "terms-unchecked"
+  },
+  {
+   "keys": [
+    "Down"
+   ]
+  },
+  {
+   "keys": [
+    "Down"
+   ]
+  },
+  {
+   "keys": [
+    "Right"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "terms-done-selected"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 4.0
+  },
+  {
+   "screen": "trust-dialog"
+  },
+  {
+   "keys": [
+    "Down"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "trust-no-selected"
+  },
+  {
+   "keys": [
+    "Up"
+   ]
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 6.0
+  },
+  {
+   "screen": "box-after-trust"
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "first-run-end"
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.42,
+   "step": "until",
+   "detail": "Choose your color scheme"
+  },
+  {
+   "t": 1.92,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.93,
+   "step": "screen",
+   "detail": "color-scheme"
+  },
+  {
+   "t": 1.94,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 4.59,
+   "step": "wait",
+   "detail": "2.5"
+  },
+  {
+   "t": 4.6,
+   "step": "screen",
+   "detail": "terms"
+  },
+  {
+   "t": 4.61,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 5.76,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 5.77,
+   "step": "screen",
+   "detail": "terms-unchecked"
+  },
+  {
+   "t": 5.77,
+   "step": "keys",
+   "detail": "Down"
+  },
+  {
+   "t": 5.93,
+   "step": "keys",
+   "detail": "Down"
+  },
+  {
+   "t": 6.09,
+   "step": "keys",
+   "detail": "Right"
+  },
+  {
+   "t": 7.05,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 7.06,
+   "step": "screen",
+   "detail": "terms-done-selected"
+  },
+  {
+   "t": 7.06,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 11.22,
+   "step": "wait",
+   "detail": "4.0"
+  },
+  {
+   "t": 11.23,
+   "step": "screen",
+   "detail": "trust-dialog"
+  },
+  {
+   "t": 11.24,
+   "step": "keys",
+   "detail": "Down"
+  },
+  {
+   "t": 12.19,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 12.2,
+   "step": "screen",
+   "detail": "trust-no-selected"
+  },
+  {
+   "t": 12.21,
+   "step": "keys",
+   "detail": "Up"
+  },
+  {
+   "t": 12.37,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 18.52,
+   "step": "wait",
+   "detail": "6.0"
+  },
+  {
+   "t": 18.53,
+   "step": "screen",
+   "detail": "box-after-trust"
+  },
+  {
+   "t": 19.07,
+   "step": "sh",
+   "detail": "first-run-end"
+  },
+  {
+   "t": 19.07,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 21.23,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

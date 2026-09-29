@@ -1,0 +1,40 @@
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;69mAntigravity CLI[39m   [90mgeneral[39m    [90mcommands[39m    [1;4m[94mshortcuts[0m [90m  (←/→ or tab to cycle)[39m
+[1m[37mKeyboard Shortcuts[0m
+  [94m/keybindings[39m [90mto customize[39m
+
+[94m> /[39m                               [2mOpen slash commands[0m
+  [94m\ + enter[39m                       [90mInsert newline fallback[39m
+  [94malt+enter, ctrl+j, shift+enter[39m  [90mInsert newline[39m
+  [94malt+j[39m                           [90mManage subagent[39m
+  [94malt+v, ctrl+v[39m                   [90mPaste image/video[39m
+  [94mctrl+_, ctrl+shift+-          [39m  [90mUndo[39m
+  [94mctrl+c, esc[39m                     [90mGo back / dismiss[39m
+  [94mctrl+d[39m                          [90mExit[39m
+  [94mctrl+end[39m                        [90mGo to bottom[39m
+  [94mctrl+g[39m                          [90mOpen prompt in $EDITOR[39m
+  [94mctrl+home[39m                       [90mGo to top[39m
+  [94mctrl+k[39m                          [90mApprove subagent fast[39m
+  [94mctrl+l[39m                          [90mClear CLI screen[39m
+  [94mctrl+o[39m                          [90mToggle trajectory view[39m
+  [94mctrl+r[39m                          [90mReview artifact[39m
+  [94mctrl+shift+z[39m                    [90mRedo[39m
+  [94mctrl+y[39m                          [90mYank (paste from kill ring)[39m
+  [94mctrl+z[39m                          [90mSuspend CLI[39m
+  [94mdown[39m                            [90mMove down[39m
+  [94menter[39m                           [90mSend message or confirm[39m
+  [94mf2[39m                              [90mRename[39m
+  [94mf4[39m                              [90mDelete[39m
+  [94mf5[39m                              [90mStart voice dictation[39m
+  [94mleft[39m                            [90mMove left / Prev tab[39m
+  [94mpgdown[39m                          [90mPage down[39m
+  [94mpgup[39m                            [90mPage up[39m
+[90m  [1-26 of 33 items][39m
+
+[1mKeyboard: [0m[94m↑/↓[39m [90mNavigate[39m  [94m←/→[39m [90mSwitch View[39m  [94mesc[39m [90mClose[39m
+
+                                                                                                    [2mGemini 3.1 Pro · low

@@ -1,0 +1,1095 @@
+{
+ "name": "pastes",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "before "
+  },
+  {
+   "paste": "paste line 1\npaste line 2\npaste line 3"
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "paste-3-lines"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 1\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 2\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 3\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 4\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 5\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 6\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 7\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 8\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 9\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 10\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 11\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 12\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 13\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 14\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 15"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "paste-15-lines"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "cleared-1"
+  },
+  {
+   "paste": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 1\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 2\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 3\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 4\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 5\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 6\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 7\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 8\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 9\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 10\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 11\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 12\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 13\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 14\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 15\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 16"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "paste-16-lines"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "placeholder-backspaced"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "paste-1000-chars"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "cleared-2"
+  },
+  {
+   "paste": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "paste-1001-chars"
+  },
+  {
+   "type": " middle "
+  },
+  {
+   "paste": "sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "paste-two-placeholders"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "screen": "after-editor"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "cleared-3"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+  },
+  {
+   "type": " keep "
+  },
+  {
+   "paste": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "before-backspace"
+  },
+  {
+   "keys": [
+    "Home"
+   ]
+  },
+  {
+   "keys": [
+    "Right"
+   ]
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "after-backspace"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "paste": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "after-third-paste"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "one\ntwo\n",
+   "raw": true
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "paste-trailing-newline"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 1\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 2\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 3\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 4\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 5\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 6\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 7\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 8\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 9\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 10\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 11\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 12\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 13\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 14\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 15\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 16"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "expand-before"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "expand-one-ctrl-u"
+  },
+  {
+   "keys": [
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "expand-two-ctrl-u"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.6,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 2.11,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 2.12,
+   "step": "type",
+   "detail": "before "
+  },
+  {
+   "t": 2.3,
+   "step": "paste",
+   "detail": "38 chars, 2 breaks, raw=False"
+  },
+  {
+   "t": 3.26,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 3.27,
+   "step": "screen",
+   "detail": "paste-3-lines"
+  },
+  {
+   "t": 3.28,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 6.44,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 6.45,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 6.62,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 7.37,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 7.39,
+   "step": "paste",
+   "detail": "950 chars, 14 breaks, raw=False"
+  },
+  {
+   "t": 8.55,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 8.56,
+   "step": "screen",
+   "detail": "paste-15-lines"
+  },
+  {
+   "t": 8.57,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 8.74,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 9.5,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 9.51,
+   "step": "screen",
+   "detail": "cleared-1"
+  },
+  {
+   "t": 9.52,
+   "step": "paste",
+   "detail": "1014 chars, 15 breaks, raw=False"
+  },
+  {
+   "t": 10.68,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 10.69,
+   "step": "screen",
+   "detail": "paste-16-lines"
+  },
+  {
+   "t": 10.7,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 13.86,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 13.87,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 14.03,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 14.99,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 15.0,
+   "step": "screen",
+   "detail": "placeholder-backspaced"
+  },
+  {
+   "t": 15.0,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 15.16,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 15.92,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 15.95,
+   "step": "paste",
+   "detail": "1000 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 17.11,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 17.12,
+   "step": "screen",
+   "detail": "paste-1000-chars"
+  },
+  {
+   "t": 17.12,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 20.28,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 20.29,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 20.45,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 21.2,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 21.21,
+   "step": "screen",
+   "detail": "cleared-2"
+  },
+  {
+   "t": 21.23,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 22.38,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 22.39,
+   "step": "screen",
+   "detail": "paste-1001-chars"
+  },
+  {
+   "t": 22.4,
+   "step": "type",
+   "detail": " middle "
+  },
+  {
+   "t": 22.56,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 23.72,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 23.72,
+   "step": "screen",
+   "detail": "paste-two-placeholders"
+  },
+  {
+   "t": 23.73,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 26.88,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 26.89,
+   "step": "screen",
+   "detail": "after-editor"
+  },
+  {
+   "t": 26.9,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 27.08,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 27.85,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 27.86,
+   "step": "keys",
+   "detail": "BSpace BSpace BSpace BSpace BSpace BSpace BSpace BSpace"
+  },
+  {
+   "t": 28.61,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 28.62,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 29.57,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 29.58,
+   "step": "screen",
+   "detail": "cleared-3"
+  },
+  {
+   "t": 29.6,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 29.77,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 30.52,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 30.55,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 30.71,
+   "step": "type",
+   "detail": " keep "
+  },
+  {
+   "t": 30.89,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 32.06,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 32.07,
+   "step": "screen",
+   "detail": "before-backspace"
+  },
+  {
+   "t": 32.08,
+   "step": "keys",
+   "detail": "Home"
+  },
+  {
+   "t": 32.25,
+   "step": "keys",
+   "detail": "Right"
+  },
+  {
+   "t": 32.41,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 33.37,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 33.37,
+   "step": "screen",
+   "detail": "after-backspace"
+  },
+  {
+   "t": 33.38,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 33.55,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 34.7,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 34.71,
+   "step": "screen",
+   "detail": "after-third-paste"
+  },
+  {
+   "t": 34.72,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 37.87,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 37.88,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 38.04,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 38.81,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 38.83,
+   "step": "paste",
+   "detail": "8 chars, 2 breaks, raw=True"
+  },
+  {
+   "t": 39.78,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 39.8,
+   "step": "screen",
+   "detail": "paste-trailing-newline"
+  },
+  {
+   "t": 39.8,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 42.96,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 42.97,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 43.14,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 43.91,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 43.93,
+   "step": "paste",
+   "detail": "1014 chars, 15 breaks, raw=False"
+  },
+  {
+   "t": 45.08,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 45.12,
+   "step": "screen",
+   "detail": "expand-before"
+  },
+  {
+   "t": 45.12,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 45.28,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 46.25,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 46.26,
+   "step": "screen",
+   "detail": "expand-one-ctrl-u"
+  },
+  {
+   "t": 46.27,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 47.22,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 47.23,
+   "step": "screen",
+   "detail": "expand-two-ctrl-u"
+  },
+  {
+   "t": 47.23,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 50.39,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 50.39,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 50.55,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 51.31,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 51.32,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 53.48,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

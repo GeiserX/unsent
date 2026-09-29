@@ -1,0 +1,326 @@
+{
+ "name": "accents",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "\u00f1and\u00fa \u00bfqu\u00e9 pas\u00f3? Ping\u00fcino"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "decompuesto: e\u0301 n\u0303 u\u0308"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "emoji \ud83d\udc4d\ud83c\udffd bandera \ud83c\uddea\ud83c\uddf8 fin"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u6f22\u5b57"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \u00f1and\u00fa"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "accents"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "wait": 0.4
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.68,
+   "step": "type",
+   "detail": "\u00f1and\u00fa \u00bfqu\u00e9 pas\u00f3? Ping\u00fcino"
+  },
+  {
+   "t": 1.85,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.01,
+   "step": "type",
+   "detail": "decompuesto: e\u0301 n\u0303 u\u0308"
+  },
+  {
+   "t": 2.18,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.35,
+   "step": "type",
+   "detail": "emoji \ud83d\udc4d\ud83c\udffd bandera \ud83c\uddea\ud83c\uddf8 fin"
+  },
+  {
+   "t": 2.51,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.67,
+   "step": "type",
+   "detail": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "t": 2.83,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.0,
+   "step": "type",
+   "detail": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "t": 4.16,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 4.17,
+   "step": "screen",
+   "detail": "accents"
+  },
+  {
+   "t": 4.17,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 7.34,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 7.35,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 7.51,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 7.6,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 7.69,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 7.79,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 7.88,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 7.97,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.07,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.18,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.27,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.37,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.46,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.56,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.66,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.15,
+   "step": "wait",
+   "detail": "0.4"
+  },
+  {
+   "t": 9.16,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 11.32,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

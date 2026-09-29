@@ -1,0 +1,157 @@
+{
+ "name": "resume-c",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy",
+  "-c"
+ ],
+ "steps": [
+  {
+   "bg": "$RIG/poll.sh resume-c 40"
+  },
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "screen": "start"
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "0-start"
+  },
+  {
+   "type": "draft in the resumed conversation"
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 2.8
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "1-typed"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.0,
+   "step": "bg",
+   "detail": "$RIG/poll.sh resume-c 40"
+  },
+  {
+   "t": 0.53,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 2.54,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 2.55,
+   "step": "screen",
+   "detail": "start"
+  },
+  {
+   "t": 3.07,
+   "step": "sh",
+   "detail": "0-start"
+  },
+  {
+   "t": 3.08,
+   "step": "type",
+   "detail": "draft in the resumed conversation"
+  },
+  {
+   "t": 4.04,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 4.04,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 7.0,
+   "step": "wait",
+   "detail": "2.8"
+  },
+  {
+   "t": 7.58,
+   "step": "sh",
+   "detail": "1-typed"
+  },
+  {
+   "t": 7.58,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 7.74,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 8.5,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 8.51,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 10.67,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}
