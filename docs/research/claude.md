@@ -371,7 +371,9 @@ Open: zsh turns bracketed paste off when it runs `fg`, and Claude Code turns it 
 
 Why Warp sends Ctrl+C in legacy form under flags 5 is not known [guess: Warp keeps Ctrl+C as the interrupt byte]; unsent's Claude keyset reads either form as a clear.
 
-**What this section could not measure.** Every key in Warp (the gate run below pressed three). iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
+**A burst scrolls out before the first read** [measured, 2026-09-29, Claude Code 2.1.284, two runs at the v0.6 gate]: 599 characters (`word001` to `word075`) written in one tmux write into a capped box left unsent's saves holding only the last 487, from `word015` on, because the first words scrolled out of the box before unsent's first read. It is a synthetic burst, not typing.
+
+**What this section could not measure.** Every key in Warp (the gate run above pressed three). iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
 
 ## Risks
 
