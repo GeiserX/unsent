@@ -156,6 +156,11 @@ func fakeAgent() {
 	// still starting (docs/research/claude.md section 10).
 	escBack := os.Getenv("UNSENT_FAKE_ESC_BACK") == "1"
 	var lastSent []string
+	// UNSENT_FAKE_BACK_LEAVES names a file that, once it exists after an
+	// Esc put a message back, makes the agent leave the alternate screen
+	// and exit on its own, with no key and no hang-up: the last screen
+	// unsent reads has no box, and nothing but the Esc disarmed the send.
+	backLeaves := os.Getenv("UNSENT_FAKE_BACK_LEAVES")
 	// UNSENT_FAKE_HUP_LEAVES makes a hang-up leave the alternate screen
 	// before the agent dies of it, as Claude Code does when its window
 	// closes: the last screen unsent reads has no box.
@@ -277,6 +282,18 @@ func fakeAgent() {
 			case in == "\x1b" && escBack && lastSent != nil && len(draft) == 0:
 				draft, lastSent = lastSent, nil
 				in = ""
+				if backLeaves != "" {
+					go func() {
+						for {
+							if _, err := os.Stat(backLeaves); err == nil {
+								break
+							}
+							time.Sleep(10 * time.Millisecond)
+						}
+						os.Stdout.WriteString("\x1b[?1049l\x1b[H\x1b[2J")
+						os.Exit(0)
+					}()
+				}
 			case in == "\x1b": // a lone Esc: a second one clears the box
 				if wasEsc {
 					draft = nil
@@ -774,7 +791,10 @@ func TestWrapSavesOnHangup(t *testing.T) {
 // leaves Claude Code's exit screen, which has no box (docs/research/claude.md
 // section 10). The message is still in the box when the window closes, so
 // unsent keeps it as a draft, under either on-send setting, whether the Esc
-// came in Enter's own read or in the next one.
+// came in Enter's own read or in the next one. The agent leaving on its
+// own with the message back in its box, with no close, keeps it too: there
+// only the Esc, still held back as a possible paste start, disarms the
+// Enter.
 func TestWrapEscRightAfterEnterKeepsTheDraftPutBack(t *testing.T) {
 	const text = "sent then taken back with esc"
 	for _, c := range []struct {
@@ -784,35 +804,53 @@ func TestWrapEscRightAfterEnterKeepsTheDraftPutBack(t *testing.T) {
 		{"one read", []string{"\r\x1b"}},
 		{"next read", []string{"\r", "\x1b"}},
 	} {
-		for _, onSend := range []string{"log", "delete"} {
-			t.Run(c.name+"/"+onSend, func(t *testing.T) {
-				t.Setenv("UNSENT_FAKE_ESC_BACK", "1")
-				t.Setenv("UNSENT_FAKE_HUP_LEAVES", "1")
-				t.Setenv("UNSENT_ON_SEND", onSend)
-				_, st, _, _ := runWrappedWith(t, t.TempDir(), "claude", []string{"claude"}, func(w *wrapRun) {
-					w.type_(text)
-					// Right after a save, so the next one reads the box
-					// only once the message is back in it.
-					w.waitSave()
-					for i, k := range c.keys {
-						if i > 0 {
-							time.Sleep(30 * time.Millisecond)
-						}
-						w.write(k)
-					}
-					w.waitSave()
-					syscall.Kill(os.Getpid(), syscall.SIGHUP)
-					time.Sleep(time.Second)
+		for _, end := range []string{"close", "agent leaves"} {
+			for _, onSend := range []string{"log", "delete"} {
+				t.Run(c.name+"/"+end+"/"+onSend, func(t *testing.T) {
+					escBackThenEnd(t, text, c.keys, end == "close", onSend)
 				})
-				if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != text {
-					var drafts []string
-					for _, r := range rs {
-						drafts = append(drafts, r.Draft)
-					}
-					t.Fatalf("drafts left %q, want %q", drafts, text)
-				}
-			})
+			}
 		}
+	}
+}
+
+// escBackThenEnd types text, sends it with keys (Enter and an Esc that puts
+// it back), then closes the window or lets the agent leave on its own, and
+// checks the text is kept as a draft.
+func escBackThenEnd(t *testing.T, text string, keys []string, close bool, onSend string) {
+	t.Setenv("UNSENT_FAKE_ESC_BACK", "1")
+	t.Setenv("UNSENT_ON_SEND", onSend)
+	leave := filepath.Join(t.TempDir(), "leave")
+	if close {
+		t.Setenv("UNSENT_FAKE_HUP_LEAVES", "1")
+	} else {
+		t.Setenv("UNSENT_FAKE_BACK_LEAVES", leave)
+	}
+	_, st, _, _ := runWrappedWith(t, t.TempDir(), "claude", []string{"claude"}, func(w *wrapRun) {
+		w.type_(text)
+		// Right after a save, so the next one reads the box only once the
+		// message is back in it.
+		w.waitSave()
+		for i, k := range keys {
+			if i > 0 {
+				time.Sleep(30 * time.Millisecond)
+			}
+			w.write(k)
+		}
+		w.waitSave()
+		if close {
+			syscall.Kill(os.Getpid(), syscall.SIGHUP)
+			time.Sleep(time.Second)
+		} else {
+			os.WriteFile(leave, nil, 0o600)
+		}
+	})
+	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != text {
+		var drafts []string
+		for _, r := range rs {
+			drafts = append(drafts, r.Draft)
+		}
+		t.Fatalf("drafts left %q, want %q", drafts, text)
 	}
 }
 
