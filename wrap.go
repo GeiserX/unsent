@@ -60,8 +60,15 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	resizes, sigs := make(chan os.Signal, 1), make(chan os.Signal, 4)
 	signal.Notify(resizes, syscall.SIGWINCH)
 	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	// Nothing reads conts, but without a handler for SIGCONT a stopped Go
+	// process on macOS never gets a signal that came while it was stopped:
+	// a window closed on a suspended unsent sends it SIGHUP then SIGCONT,
+	// and the hang-up would never reach sigs.
+	conts := make(chan os.Signal, 1)
+	signal.Notify(conts, syscall.SIGCONT)
 	defer signal.Stop(resizes)
 	defer signal.Stop(sigs)
+	defer signal.Stop(conts)
 	// broken hands the session to the agent when unsent cannot run it: a
 	// draft saver that fails must not cost the user the session. The
 	// handlers go first, so the agent gets the dispositions unsent was
@@ -70,6 +77,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		fmt.Fprintf(os.Stderr, "unsent: %s: %v; drafts are not being saved this session\n", what, err)
 		signal.Stop(resizes)
 		signal.Stop(sigs)
+		signal.Stop(conts)
 		return handOver(bin, args)
 	}
 

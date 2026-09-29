@@ -37,6 +37,12 @@ func TestMain(m *testing.M) {
 				return nil, errors.New("forced pty failure")
 			}
 		}
+		// unsent leads its own session here, an orphaned process group,
+		// where the kernel drops the SIGTSTP of a suspend: it stops as a
+		// suspended job does, with SIGSTOP.
+		if os.Getenv("UNSENT_TEST_STOP") == "1" {
+			stopSelf = func() { syscall.Kill(os.Getpid(), syscall.SIGSTOP) }
+		}
 		exitAs(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
 	// The test binary as unsent at its end, after the agent was killed by
@@ -1188,6 +1194,121 @@ func TestWrapDiesOfTheSignalThatKilledTheAgent(t *testing.T) {
 				t.Fatalf("orphans %+v, want the draft", rs)
 			}
 		})
+	}
+}
+
+// A window closed on a suspended unsent (Ctrl+Z, then the tab closed) ends
+// it as a hang-up does: the kernel sends the stopped job SIGHUP, then
+// SIGCONT. The draft is kept as an orphan with its end time and its lock
+// released, the agent goes, and unsent dies of the hang-up. On macOS a Go
+// process resumed by a SIGCONT at its default action never got the hang-up
+// that came while it was stopped, so unsent and its agent ran on with no
+// terminal, the draft locked and never ended.
+func TestWrapClosedWhileSuspendedEndsAsAHangUp(t *testing.T) {
+	bin := t.TempDir()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(self, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("UNSENT_HOME", home)
+	user, tty, err := pty.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { user.Close(); tty.Close() }()
+	pty.Setsize(user, &pty.Winsize{Cols: 100, Rows: 30})
+	cmd := exec.Command(self, "claude")
+	cmd.Env = append(os.Environ(), "UNSENT_TEST_RUN=wrap", "UNSENT_TEST_STOP=1", "UNSENT_HOME="+home,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	agent := 0
+	defer func() {
+		if cmd.ProcessState == nil {
+			cmd.Process.Kill()
+			cmd.Wait()
+		}
+		if agent != 0 {
+			syscall.Kill(agent, syscall.SIGKILL)
+		}
+	}()
+	var mu sync.Mutex
+	var out []byte
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := user.Read(buf)
+			mu.Lock()
+			out = append(out, buf[:n]...)
+			mu.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}()
+	shown := func(want string) func() bool {
+		return func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return strings.Contains(string(out), want)
+		}
+	}
+	waitFor(t, "the box", shown("❯"))
+	user.WriteString("hello")
+	waitFor(t, "the draft on the screen", shown("hello"))
+	time.Sleep(3 * saveInterval) // a wrapper has saved it by now
+	user.WriteString("\x1a")
+	stopped := make(chan syscall.WaitStatus, 1)
+	go func() {
+		var ws syscall.WaitStatus
+		syscall.Wait4(cmd.Process.Pid, &ws, syscall.WUNTRACED, nil)
+		stopped <- ws
+	}()
+	select {
+	case ws := <-stopped:
+		// 0x7f is stopped on both kernels; Stopped is false on macOS for
+		// SIGSTOP.
+		if ws&0xff != 0x7f {
+			t.Fatalf("unsent ended %v on Ctrl+Z; want it stopped", ws)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("unsent did not stop on Ctrl+Z")
+	}
+	pids, _ := exec.Command("pgrep", "-P", strconv.Itoa(cmd.Process.Pid)).Output()
+	if agent, err = strconv.Atoi(strings.TrimSpace(string(pids))); err != nil {
+		t.Fatalf("the agent's pid: %q", pids)
+	}
+	// What the kernel sends a stopped job whose session leader died.
+	syscall.Kill(cmd.Process.Pid, syscall.SIGHUP)
+	syscall.Kill(cmd.Process.Pid, syscall.SIGCONT)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("unsent ran on after the hang-up of its closed window")
+	}
+	if ws := cmd.ProcessState.Sys().(syscall.WaitStatus); !ws.Signaled() || ws.Signal() != syscall.SIGHUP {
+		t.Fatalf("unsent ended %v; want killed by the hang-up", cmd.ProcessState)
+	}
+	if err := syscall.Kill(agent, 0); err != syscall.ESRCH {
+		t.Fatalf("the agent is still there (%v)", err)
+	}
+	agent = 0
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// orphans leaves out a draft whose lock is still held.
+	if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "hello" || rs[0].Ended.IsZero() {
+		t.Fatalf("orphans %+v, want the draft with its end time", rs)
 	}
 }
 
