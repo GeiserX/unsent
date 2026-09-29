@@ -561,12 +561,15 @@ type captureSet struct {
 	shows           func(got, truth string) bool
 	// saved, when set, sees the session after every save.
 	saved func(*session)
+	// tick, when set, saves once every tick of recorded time, as a live
+	// session saves, instead of after every output frame.
+	tick time.Duration
 }
 
 var codexCaptures = captureSet{folder: filepath.Join("testdata", "codex", "0.158.0"), command: "codex", shows: codexShows}
 
 // replayCaptureSession replays name.rec of set through a session with prof,
-// with a save after every output frame, and returns the session and the
+// with a save after every output frame (or every set.tick), and returns the session and the
 // first Ctrl+G whose editor copy the saved draft differs from. At the
 // Ctrl+G numbers in recalled the box holds an entry of the agent's history
 // brought back with Up, which is not a draft: the draft must be the empty
@@ -590,7 +593,24 @@ func replayCaptureSession(t *testing.T, prof *profile, set captureSet, name stri
 	s.deletes.now = func() time.Time { return now }
 	checked := 0
 	var failed error
+	save := func() {
+		if s.save(); s.broken.Load() {
+			t.Fatal("the session stopped saving")
+		}
+		if set.saved != nil {
+			set.saved(s)
+		}
+	}
+	var next time.Time
 	eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+		for set.tick > 0 && !next.IsZero() && !at.Before(next) {
+			now = next
+			save()
+			next = next.Add(set.tick)
+		}
+		if next.IsZero() {
+			next = at.Add(set.tick)
+		}
 		now = at
 		switch dir {
 		case 'i':
@@ -619,13 +639,8 @@ func replayCaptureSession(t *testing.T, prof *profile, set captureSet, name stri
 				}
 				s.write(chunk[:k])
 				chunk = chunk[k:]
-				if !s.inFrame {
-					if s.save(); s.broken.Load() {
-						t.Fatal("the session stopped saving")
-					}
-					if set.saved != nil {
-						set.saved(s)
-					}
+				if set.tick == 0 && !s.inFrame {
+					save()
 				}
 			}
 		}

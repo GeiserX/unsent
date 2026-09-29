@@ -522,14 +522,17 @@ type session struct {
 	// since it was emptied: by a submit or clear key, or by any keys once a
 	// save reads the draft it held gone. recalled is set by a recall key
 	// typed while the box is empty and not edited since, or by any recall
-	// key when the profile's browse history from a draft (keyset.browses):
+	// key when the profile browses history from a draft (keyset.browses):
 	// until another key, a paste or a restore, the box holds an entry of
 	// the agent's own history, which the agent keeps, not a draft. Text
-	// that comes into
-	// the empty box with no recall key (Codex giving back a queued or
-	// refused message) is a draft.
+	// that comes into the empty box with no recall key (Codex giving back
+	// a queued or refused message) is a draft. aside is set while the box
+	// shows such an entry in place of a saved draft, which the agent holds
+	// aside only until the entry is edited or sent: the next text that is
+	// not that draft sends it to history first, however alike the two are.
 	edited   bool
 	recalled bool
+	aside    bool
 	pasted   atomic.Bool
 
 	rec    *record
@@ -720,7 +723,11 @@ func (s *session) save() {
 	for _, e := range events {
 		switch e.kind {
 		case keyOther, keyRecall:
-			if s.armed && e.before != nil {
+			// A recall key that may bring history into a draft comes with
+			// the screen it was typed into: the text typed before it, in
+			// the same save, is on no screen read while the box holds an
+			// entry.
+			if e.before != nil && (s.armed || e.kind == keyRecall && s.prof.keys.browses) {
 				s.look(e.before)
 			}
 			s.armed, s.leftOnSubmit = false, false
@@ -836,6 +843,10 @@ func (s *session) look(scr *screen) bool {
 		// A history entry brought into a box that holds a draft, which the
 		// agent keeps aside and puts back when the user comes back down: the
 		// draft stays as it was, and so does what the stitcher knows of it.
+		// The box shows the entry when it shows anything else (a recall key
+		// that only moved the cursor leaves the draft in view).
+		alt := s.stitch
+		s.aside = alt.update(v, s.prof.unwrap) != s.stitch.text
 		return true
 	}
 	before := s.stitch
@@ -865,7 +876,7 @@ func (s *session) look(scr *screen) bool {
 		// Output that leaves the box as it was (a window title, a spinner
 		// above it) is not the agent's answer to a submit key yet. A send
 		// still to come goes to the session it was typed in.
-		s.armed = armed
+		s.armed, s.aside = armed, false
 		if !armed && s.follow(false) && s.rec.Draft != "" {
 			if err := s.store.write(s.rec); err != nil {
 				s.store.warn(err)
@@ -875,6 +886,12 @@ func (s *session) look(scr *screen) bool {
 	}
 	s.stitched = s.stitched || v.capped
 	history, version := keepOld(s.rec.Draft, draft, s.stitched)
+	if s.aside {
+		// The entry the agent showed in its place was edited or sent, and
+		// the agent dropped the draft it held aside: nothing else has it.
+		// It was not what the box sent.
+		history, version, sent = true, false, false
+	}
 	var err error
 	switch {
 	case history && sent:
@@ -891,6 +908,7 @@ func (s *session) look(scr *screen) bool {
 	}
 	// The old draft went where its session's drafts go; the new one is in
 	// the session the agent is in now.
+	s.aside = false
 	s.follow(true)
 	if draft == "" {
 		s.pastes.reset()

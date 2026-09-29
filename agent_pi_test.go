@@ -94,6 +94,23 @@ func TestReplayPi(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		// Again with a save every 0.4 s of recorded time, as a live session
+		// saves: keys typed in one save, such as ctrlc-history's "typed
+		// draft" and the Up right after it, must still be read. Not
+		// deletes, which presses Ctrl+U and Ctrl+G at once: the draft read
+		// before the Ctrl+U is still the saved one as the editor opens,
+		// which holds more than pi's copy, never less.
+		if r.name == "deletes" {
+			continue
+		}
+		t.Run(r.name+" save every "+saveInterval.String(), func(t *testing.T) {
+			t.Parallel()
+			set := piCaptures
+			set.tick = saveInterval
+			if _, err := replayCaptureSession(t, &pi, set, r.name, r.recalled...); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 	// Every capture with editor copies is replayed: a new one needs a line
 	// in piReplays.
@@ -418,20 +435,24 @@ func TestPiKeyMutations(t *testing.T) {
 func piBrowseCheck(t *testing.T, prof *profile) error {
 	t.Helper()
 	set := piCaptures
-	var sent bool
+	var typed, sent bool
 	var saved error
 	const entry = "second sent prompt, dummy"
 	set.saved = func(s *session) {
 		switch {
-		case s.rec.Draft == "" && sent:
 		case s.rec.Draft == entry && sent && saved == nil:
 			saved = fmt.Errorf("the history entry %q was saved as the draft", entry)
 		case s.rec.Draft == entry:
-			sent = true // typed; the next empty box is its send
+			typed = true // the next empty box is its send
+		case s.rec.Draft == "" && typed:
+			sent = true
 		}
 	}
 	if _, err := replayCaptureSession(t, prof, set, "ctrlc-history"); err != nil {
 		return err
+	}
+	if !sent && saved == nil {
+		return fmt.Errorf("%q was never typed and sent", entry)
 	}
 	return saved
 }
@@ -828,5 +849,152 @@ func TestPiWrap(t *testing.T) {
 		if got := (piWrap{}).unwrap(rows, c.width); got != want {
 			t.Errorf("%q: unwrapped as %q", c.text, got)
 		}
+	}
+}
+
+// drawPiBox is pi's screen with one row of text in its box and the
+// cursor at its end, drawn the way pi 0.87.1 draws it (typed in
+// testdata/pi/0.87.1): full-width rules, a reverse-video cursor, the
+// footer under the bottom rule.
+func drawPiBox(cols int, text string) string {
+	rule := strings.Repeat("─", cols)
+	return "\x1b[H\x1b[2J" + rule + "\r\n" + text + "\x1b[7m \x1b[0m\r\n" + rule + "\r\n/w\r\n0.0%/0 (auto)"
+}
+
+// piAsideCheck drives pi's box by hand through what ctrlc-history does not
+// show: in a saved draft, Up moves the cursor to its start, and Up again
+// shows the newest entry of pi's history while pi holds the draft aside,
+// in memory only, and drops it once the entry is edited or sent. The
+// draft must then be in history, short and alike as the two are; coming
+// back down to it costs nothing. Text typed in the same save as the Up
+// that follows it, into a draft or an empty box, is saved from the screen
+// the Up was typed into, and is still there when the window closes.
+func piAsideCheck(t *testing.T, prof *profile) error {
+	t.Helper()
+	const up, down = "\x1b[A", "\x1b[B"
+	start := func(draft string) sendSession {
+		s := newSendSession(t, prof)
+		s.rec.Agent = "pi"
+		if draft != "" {
+			s.input([]byte(draft))
+			s.write([]byte(drawPiBox(100, draft)))
+			s.save()
+		}
+		return s
+	}
+	browse := func(s sendSession) {
+		s.input([]byte(up))
+		s.write([]byte(drawPiBox(100, "fix the bug"))) // the cursor at the start
+		s.save()
+		s.input([]byte(up))
+		s.write([]byte(drawPiBox(100, "run tests"))) // the entry, the draft aside
+		s.save()
+	}
+	for _, c := range []struct {
+		name          string
+		keys, box     string
+		sent, history []string
+		draft         string
+	}{
+		{"entry edited", "x", "run testsx", nil, []string{"fix the bug"}, "run testsx"},
+		{"entry sent", "\r", "", []string{"run tests"}, []string{"fix the bug"}, ""},
+		{"back down to the draft", "", "", nil, nil, "fix the bug!"},
+	} {
+		s := start("fix the bug")
+		browse(s)
+		if c.keys == "" {
+			s.input([]byte(down))
+			s.write([]byte(drawPiBox(100, "fix the bug")))
+			s.save()
+			c.keys, c.box = "!", "fix the bug!"
+		}
+		s.input([]byte(c.keys))
+		s.write([]byte(drawPiBox(100, c.box)))
+		s.save()
+		if got := s.sent(); !slices.Equal(got, c.sent) {
+			return fmt.Errorf("%s: sent log %q, want %q", c.name, got, c.sent)
+		}
+		if got := s.history(); !slices.Equal(got, c.history) {
+			return fmt.Errorf("%s: history %q, want %q", c.name, got, c.history)
+		}
+		if s.rec.Draft != c.draft {
+			return fmt.Errorf("%s: draft %q, want %q", c.name, s.rec.Draft, c.draft)
+		}
+	}
+	for _, c := range []struct{ name, saved, typed string }{
+		{"typed into a draft, then Up", "line one", "line one and the rest"},
+		{"typed into the empty box, then Up", "", "typed then up"},
+	} {
+		s := start(c.saved)
+		s.input([]byte(strings.TrimPrefix(c.typed, c.saved)))
+		s.write([]byte(drawPiBox(100, c.typed)))
+		s.input([]byte(up)) // in the same save: the cursor goes to the start
+		s.write([]byte(drawPiBox(100, c.typed)))
+		s.closing()
+		s.finish()
+		var kept []string
+		for _, r := range s.store.orphans() {
+			kept = append(kept, r.Draft)
+		}
+		if !slices.Equal(kept, []string{c.typed}) {
+			return fmt.Errorf("%s: orphans %q at the close, want %q", c.name, kept, c.typed)
+		}
+	}
+	return nil
+}
+
+func TestPiHistoryBrowsing(t *testing.T) {
+	if err := piBrowseCheck(t, &pi); err != nil {
+		t.Fatal(err)
+	}
+	if err := piAsideCheck(t, &pi); err != nil {
+		t.Fatal(err)
+	}
+	// A check that can fail: without browsing from a draft, the entry
+	// replaces the draft with no copy.
+	p := pi
+	p.keys.browses = false
+	if piAsideCheck(t, &p) == nil {
+		t.Error("with browses off the held-aside check stayed green")
+	}
+}
+
+// piHeldPasteCheck expands pi's placeholders for pastes pi keeps other
+// than they came (piPasteText): a paste that collapses only once its tab
+// is four spaces and its CRLF one LF fills "[paste #1 1002 chars]" with
+// the text pi holds; after the editor round trip the box shows that text
+// as typed, and a new paste of the same size, #1 again, is the new paste,
+// not the one already in the box.
+func piHeldPasteCheck(prof *profile) error {
+	a := strings.Repeat("x", 990) + "\tend\r\nnext" // 1,000 bytes as pasted
+	held := strings.Repeat("x", 990) + "    end\nnext"
+	b := strings.Repeat("y", 1002)
+	p := &pasteTracker{}
+	p.feed([]byte("\x1b[200~" + a + "\x1b[201~"))
+	prev := p.expand("before [paste #1 1002 chars] after", "", prof)
+	if want := "before " + held + " after"; prev != want {
+		return fmt.Errorf("expanded %.40q, want %.40q", prev, want)
+	}
+	p.feed([]byte("\x1b[200~" + b + "\x1b[201~"))
+	if got, want := p.expand("before "+held+" after [paste #1 1002 chars]", prev, prof), "before "+held+" after "+b; got != want {
+		return fmt.Errorf("the second paste: %.40q, want %.40q", got[len(got)-min(len(got), 40):], want[len(want)-40:])
+	}
+	return nil
+}
+
+func TestPasteExpandPiHeldText(t *testing.T) {
+	if len("\t\r\n")+990+len("endnext") != 1000 || len(piPasteText(strings.Repeat("x", 990)+"\tend\r\nnext")) != 1002 {
+		t.Fatal("the paste must collapse only as pi holds it")
+	}
+	if err := piHeldPasteCheck(&pi); err != nil {
+		t.Fatal(err)
+	}
+	// A check that can fail: with the paste as it came, the tab and the CR
+	// come back, and the paste already in the box fills the new placeholder.
+	p := pi
+	p.pastes = slices.Clone(pi.pastes)
+	p.pastes[0].holds = nil
+	if piHeldPasteCheck(&p) == nil {
+		t.Error("with holds unset the held-text check stayed green")
 	}
 }

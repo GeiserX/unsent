@@ -38,8 +38,10 @@ const (
 type keyEvent struct {
 	kind keyKind
 	// before is the screen a submit key, or the first run of other keys
-	// after one, was typed into, as the agent last drew it before the key
-	// reached it; nil when it was half drawn, and for every other key.
+	// after one, or a run of recall keys when the profile browses history
+	// from a draft (keyset.browses), was typed into, as the agent last
+	// drew it before the key reached it; nil when it was half drawn, and
+	// for every other key.
 	before *screen
 }
 
@@ -137,7 +139,7 @@ func (l *keyLog) push(ks keyset, typed []byte) {
 	kinds, esc := ks.kindsOf(keys)
 	l.esc = esc
 	for _, k := range kinds {
-		l.add(k)
+		l.add(k, ks.browses)
 	}
 }
 
@@ -149,11 +151,14 @@ func (l *keyLog) push(ks keyset, typed []byte) {
 func (l *keyLog) hold() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.add(keyOther)
+	l.add(keyOther, false)
 }
 
 // add appends one key, a run of other keys as one. The caller holds l.mu.
-func (l *keyLog) add(k keyKind) {
+// browses is keyset.browses: the first of a run of recall keys then gets
+// the screen it was typed into, as the text typed before it may be on no
+// later one.
+func (l *keyLog) add(k keyKind, browses bool) {
 	after := l.last
 	l.last = k
 	if n := len(l.events); k.runs() && n > 0 && l.events[n-1].kind == k {
@@ -167,6 +172,10 @@ func (l *keyLog) add(k keyKind) {
 	case k.runs() && after == keySubmit:
 		// Typed into the agent's answer to the submit key, if it has
 		// drawn one: a box that is empty there was sent.
+		l.pending = append(l.pending, e)
+	case k == keyRecall && browses && after != keyRecall:
+		// Typed into the box as the keys before it left it: the next
+		// screens may show an entry of the agent's history instead.
 		l.pending = append(l.pending, e)
 	}
 }
