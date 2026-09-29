@@ -26,6 +26,10 @@ Three files differ from that:
 - `typing.bin` was logged after the box was already drawn, so the test first replays the start-up paint from `editor-probe.bin` (same build, same size, same settings).
 - `empty-hint.bin` and `suspend.bin` are 100x30 start-ups from a configured install, which shows the dim `Try "…"` hint in an empty box. Their header row's model and plan label was replaced with `model and plan label removed`; nothing the reader looks at was changed.
 
+## The 2.1.284 runs
+
+`2.1.284/*.rec` are whole runs, from start-up to exit, written by unsent's own raw log (`UNSENT_DEBUG_DIR`) while `unsent claude` ran Claude Code 2.1.284 in the setup above, plus `ANTHROPIC_BASE_URL` on a closed local port, `CLAUDE_CODE_MAX_RETRIES=0`, `"tui":"fullscreen"` and a stub status line (`rename-main-screen.rec` on the main-screen renderer). They show slash commands and a named session: `/rename`, then typing under the rule that carries the name, a session resumed by name, the `/resume` picker, `/clear`, `/help`, `/model`, the agents view, a name wider than the window (`rename-long-name.rec`), Ctrl+C in the `/resume` picker and the `/model` dialog (`resume-picker-ctrlc.rec`, `model-ctrlc.rec`, without the stub status line), and a control with a half-typed prompt. There are no editor copies: `TestReplayClaudeSlashCommandsAndNames` checks what the store holds once the agent is gone, and its comment lists the keys of each run. Five runs end with the window closed (`rename-main-screen`, `resume-picker-close`, `resume-picker-ctrlc`, `model-ctrlc`, `control`); the rest end on keys. `2.1.284/screens/` are the tmux panes of their key frames. The names in them (`calls`, `alpha-notes`) are dummies.
+
 ## Adding one
 
 `unsent capture claude` records a new `.rec` with its editor copies, named `capture-<time>`, into the folder of the running version; rename them for what they show. Keep each agent under 20 MB, trimmed or compressed. Check every file for real prompt text, names, paths and keys before committing. A new screen needs its expected draft in `claudeScreens`, or `TestReplayClaudeScreens` fails.

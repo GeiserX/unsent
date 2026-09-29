@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"image/color"
 	"strings"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -9,7 +10,7 @@ import (
 )
 
 // screen is a plain snapshot of the shadow terminal: the text of every row,
-// which cells are drawn dim, and where the cursor is.
+// which cells are drawn dim and in which colour, and where the cursor is.
 type screen struct {
 	rows       []screenRow
 	cols       int
@@ -21,6 +22,7 @@ type screen struct {
 type screenRow struct {
 	cells []string
 	faint []bool
+	ink   []uint32 // foreground colour (inkOf), 0 for the default
 }
 
 func (r screenRow) text() string {
@@ -51,11 +53,37 @@ func (r screenRow) faintFrom(x int) bool {
 	return seen
 }
 
+// inkFrom reports whether every visible character from column x on is
+// drawn in ink, and there is one. Claude Code draws a placeholder this way.
+func (r screenRow) inkFrom(x int, ink uint32) bool {
+	seen := false
+	for i := x; i < len(r.cells); i++ {
+		if strings.TrimSpace(r.cells[i]) == "" {
+			continue
+		}
+		if r.ink[i] != ink {
+			return false
+		}
+		seen = true
+	}
+	return seen
+}
+
+// inkOf packs a cell's foreground colour into a number that compares
+// equal for the same colour; the default colour is 0.
+func inkOf(c color.Color) uint32 {
+	if c == nil {
+		return 0
+	}
+	r, g, b, _ := c.RGBA()
+	return 1<<24 | (r>>8)<<16 | (g>>8)<<8 | b>>8
+}
+
 func snapshot(e *vt.Emulator) *screen {
 	w, h := e.Width(), e.Height()
 	s := &screen{rows: make([]screenRow, h), cols: w}
 	for y := 0; y < h; y++ {
-		row := screenRow{cells: make([]string, w), faint: make([]bool, w)}
+		row := screenRow{cells: make([]string, w), faint: make([]bool, w), ink: make([]uint32, w)}
 		for x := 0; x < w; x++ {
 			c := e.CellAt(x, y)
 			switch {
@@ -68,6 +96,7 @@ func snapshot(e *vt.Emulator) *screen {
 			default:
 				row.cells[x] = c.Content
 				row.faint[x] = c.Style.Attrs&uv.AttrFaint != 0
+				row.ink[x] = inkOf(c.Style.Fg)
 			}
 		}
 		s.rows[y] = row
@@ -93,7 +122,7 @@ func screenFromText(text string, cols int) *screen {
 	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
 	s := &screen{cols: cols, curX: -1, curY: -1}
 	for y, l := range lines {
-		row := screenRow{cells: make([]string, cols), faint: make([]bool, cols)}
+		row := screenRow{cells: make([]string, cols), faint: make([]bool, cols), ink: make([]uint32, cols)}
 		for i := range row.cells {
 			row.cells[i] = " "
 		}
