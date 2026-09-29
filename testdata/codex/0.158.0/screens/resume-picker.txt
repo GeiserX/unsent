@@ -1,0 +1,40 @@
+ [1mResume a previous session[0m
+
+ Filter: [1;4m Cwd [0m All    Status: [1m Active [0m Archived    Sort: [1m Updated [0m Created
+
+ Type to search
+
+  [1;7m› [0;7m30s ago     [1mdummy prompt that must fail on the dead base url                                                      [0m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[2m─────────────────────────────────────────────────────────────────────────────────────────────────────────[0m 1 / 1 · 100% [2m─
+[0m [1menter[0m resume   [1mctrl+a[0m archive   [1mesc[0m start new   [1mctrl+c[0m quit   [1mtab[0m focus sort/filter   [1m←/→[0m change option
+ [1mctrl+o[0m comfortable view   [1mctrl+t[0m transcript   [1mctrl+e[0m expand   [1m↑/↓[0m browse
+

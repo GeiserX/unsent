@@ -1,0 +1,11 @@
+[
+{"screen":"resume-picker"},
+{"keys":["Enter"]},
+{"until":"Ask Codex to do anything","timeout":20},
+{"wait":0.3},{"sh":"./ids.sh","out":"id-picker-chosen"},{"screen":"picker-chosen"},
+{"type":"/new"},{"wait":0.6},{"screen":"slash-new-menu"},{"keys":["Enter"]},{"wait":2.5},{"screen":"after-new"},{"sh":"./ids.sh","out":"id-after-new"},
+{"type":"/resume"},{"wait":0.6},{"keys":["Enter"]},{"wait":2.5},{"screen":"slash-resume-open"},{"sh":"./ids.sh","out":"id-slash-resume-open"},
+{"keys":["Enter"]},{"wait":2.5},{"screen":"slash-resume-chosen"},{"sh":"./ids.sh","out":"id-slash-resume-chosen"},
+{"type":"/status"},{"wait":0.6},{"keys":["Enter"]},{"wait":1.5},{"screen":"status"},
+{"keys":["C-c"]},{"wait":2}
+]

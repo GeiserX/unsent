@@ -1,0 +1,20 @@
+[
+{
+"wait": 8
+},
+{
+"screen": "resume-unsent-id"
+},
+{
+"sh": "./ids.sh",
+"out": "id-resume-unsent-id"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

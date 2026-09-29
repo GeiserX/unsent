@@ -19,6 +19,10 @@ var claude = profile{
 	name:  "claude",
 	names: []string{"claude"},
 	read:  claudeBox,
+	// Rows wrap at spaces, and the box scrolls a row at a time holding the
+	// cursor mid-box (CLAUDE.md, measured on 2.1.282).
+	unwrap: wordWrap{},
+	scroll: scrollMidBox,
 	// A paste shows as "[Pasted text #2 +39 lines]", or "[Pasted text #2]"
 	// when it has no line break; the count is of line breaks. Claude Code
 	// first turns each tab into 4 spaces, then collapses a paste over 800
@@ -26,12 +30,20 @@ var claude = profile{
 	// height minus 10 when that is less. Anything shorter goes in as typed
 	// text, and a pasted image path becomes "[Image #N]", so neither fills
 	// a placeholder. "[Image #N]" and "[Audio #N]" hold no text and stay
-	// as they are. N counts up across pastes, images and cut middles.
-	placeholder: regexp.MustCompile(`\[Pasted text #(\d+)(?: \+(\d+) lines?)?\]`),
-	collapses: func(paste string, rows int) bool {
-		paste = strings.ReplaceAll(paste, "\t", "    ")
-		return len(utf16.Encode([]rune(paste))) > 800 || strings.Count(paste, "\n") > max(0, min(rows-10, 2))
-	},
+	// as they are. N counts up across pastes, images and cut middles, so
+	// it names the paste; the line breaks pair it with one.
+	pastes: []pasteRule{{
+		placeholder: regexp.MustCompile(`\[Pasted text #(\d+)(?: \+(\d+) lines?)?\]`),
+		collapses: func(paste string, rows int) bool {
+			paste = strings.ReplaceAll(paste, "\t", "    ")
+			return len(utf16.Encode([]rune(paste))) > 800 || strings.Count(paste, "\n") > max(0, min(rows-10, 2))
+		},
+		id: func(m []string) string { return m[1] },
+		fits: func(m []string, paste string) bool {
+			want, _ := strconv.Atoi(m[2]) // no count: no line break
+			return strings.Count(strings.TrimRight(paste, "\n"), "\n") == want || strings.Count(paste, "\n") == want
+		},
+	}},
 	// A box over 10,000 characters keeps its first and last 500 and shows
 	// the middle as "[...Truncated text #N +M lines...]".
 	truncated: regexp.MustCompile(`\[\.\.\.Truncated text #(\d+) \+(\d+) lines\.\.\.\]`),
@@ -281,7 +293,7 @@ func claudeTitledRule(t string, cols int) bool {
 // section 13). Text the user types is drawn in the default colour, and so
 // is the marker of the main box, so neither matches.
 func claudePlaceholder(r screenRow) bool {
-	return len(r.ink) > 3 && r.ink[0] != 0 && r.inkFrom(3, r.ink[0])
+	return len(r.look) > 3 && r.look[0].fg != 0 && r.fgFrom(3, r.look[0].fg)
 }
 
 // rows2cap is the height at which Claude Code's box stops growing. It is one

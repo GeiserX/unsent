@@ -169,6 +169,12 @@ func decodeCSI(b []byte) (key, int, token) {
 		return key{}, n, tokReport
 	case final == 't': // window and cell size reports (ESC[6;17;8t)
 		return key{}, n, tokReport
+	case final == 'R' && bytes.Count(params, []byte{';'}) == 1:
+		// A cursor position report (ESC[40;1R), the answer to the ESC[6n
+		// Codex sends at start and after every resume. xterm sends F3 with
+		// modifiers in the same shape (ESC[1;2R), a key no agent's box
+		// edits with; kitty sends F3 as ESC[13~ for this reason.
+		return key{}, n, tokReport
 	case final == 'y' && len(params) > 0 && params[len(params)-1] == '$': // mode reports
 		return key{}, n, tokReport
 	}

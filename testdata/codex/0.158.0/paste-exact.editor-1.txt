@@ -1,0 +1,6 @@
+tab	here	and two  
+trailing spaces   
+
+after a blank line, ñandú, qué, é, 👍🏽 🇪🇸
+    four leading spaces
+last line ends in a space 

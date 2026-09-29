@@ -1,0 +1,40 @@
+
+  [38;5;75m>_ [1m[39mOpenAI Codex[0;2m (v0.158.0)[0m
+     [2m/Volumes/Data/unsent-07.GZ7M/work[0m
+
+  [38;5;75mHow’s life between the brackets?[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  [1mKeyboard shortcuts[0m
+
+  [1mCompose[0m                       [1mSession[0m                        [1mTranscript (open first)[0m
+  [38;5;75m/[39m        Commands             [38;5;75mtab[39m        Send message        [38;5;75mctrl+t[39m                 Open transcript
+  [38;5;75m@[39m        Mention files        [38;5;75mshift+tab[39m  Change mode         [38;5;75mf3[39m                     Find text
+  [38;5;75m![39m        Shell command        [38;5;75m⌥+,[39m        Less reasoning      [38;5;75mpgup / pgdn[39m            Scroll
+  [38;5;75mctrl+j[39m   New line             [38;5;75m⌥+.[39m        More reasoning      [38;5;75mctrl+space[39m             Start selection
+  [38;5;75mctrl+v[39m   Paste image          [38;5;75mf8[39m         Voice               [38;5;75mctrl+home / ctrl+end[39m   Top / latest
+  [38;5;75mctrl+g[39m   External editor      [38;5;75mf4[39m         Inspect activity    [38;5;75mshift+⌥+, / shift+⌥+.[39m  Top / latest
+  [38;5;75mctrl+r[39m   Search history       [38;5;75mctrl+c[39m     Quit
+  [38;5;75mesc esc[39m  Edit last message
+
+  [38;5;75m/keymap[39m customize
+
+[1m›[0m [2mAsk Codex to do anything[0m
+
+  [38;5;223mGPT-6-Astra default[39m · [38;5;151m/Volumes/Data/unsent-07.GZ7M/work[39m
+  [1m?[0m / [1mesc[0m close

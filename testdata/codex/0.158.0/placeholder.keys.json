@@ -1,0 +1,95 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "keep "
+},
+{
+"paste": "overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit o"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "placeholder-backspace-before"
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "placeholder-backspace-after"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"paste": "second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste second big paste seco"
+},
+{
+"type": " tail"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "placeholder-before-ctrl-c"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "placeholder-recalled"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

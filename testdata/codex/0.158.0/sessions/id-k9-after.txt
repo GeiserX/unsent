@@ -1,0 +1,12 @@
+zebra: in no file under CODEX_HOME
+threads:
+01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b|codexhome/sessions/2026/09/29/rollout-2026-09-29T04-47-04-01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b.jsonl|cli|0|dummy prompt that must fail on the dead base url|1790650024572
+sessions/:
+  sessions/2026/09/29/rollout-2026-09-29T04-47-04-01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b.jsonl
+history.jsonl:
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650027,"text":"typed but not submitted, dummy"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650030,"text":"dummy prompt that must fail on the dead base url"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650066,"text":"a draft typed after the failed submit"}
+thread-writer-locks:
+-rw-r--r--   1 rig  staff     0 Sep 29 04:47 .coordination.lock
+-rw-r--r--   1 rig  staff     0 Sep 29 04:48 01a0eb10-72b6-7050-81cd-fcb31b728563.lock

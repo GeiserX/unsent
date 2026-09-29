@@ -48,13 +48,13 @@ type profile struct {
 	// names are the command base names that start the agent.
 	names []string
 	read  extractor
-	// placeholder matches what the agent shows in place of a long paste;
-	// its first group is the placeholder's number, and its second, when it
-	// matches, the paste's line count. collapses reports whether the agent
-	// shows a paste that way at all, in a window rows high: one it took in
-	// as typed text never fills a placeholder.
-	placeholder *regexp.Regexp
-	collapses   func(paste string, rows int) bool
+	// unwrap is how the agent wraps the draft into rows, and scroll how
+	// its box scrolls once it stops growing (stitch.go).
+	unwrap unwrapRule
+	scroll scrollModel
+	// pastes are what the agent shows in place of a long paste, and how
+	// each placeholder is paired with the paste behind it (paste.go).
+	pastes []pasteRule
 	// truncated matches what the agent shows in place of the middle of a
 	// draft too long to show whole; its groups are the placeholder's number
 	// and the middle's line count. Nil when the agent never does that.
@@ -81,7 +81,7 @@ type profile struct {
 }
 
 // profiles are the agents unsent can read.
-var profiles = []*profile{&claude}
+var profiles = []*profile{&claude, &codex}
 
 // profileFor returns the profile of the agent a command starts, or nil.
 func profileFor(command string) *profile {

@@ -1,0 +1,11 @@
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650027,"text":"typed but not submitted, dummy"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650030,"text":"dummy prompt that must fail on the dead base url"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650066,"text":"a draft typed after the failed submit"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650169,"text":"a draft in the resumed session"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650206,"text":"a draft in the resumed session"}
+{"session_id":"01a0eb11-e3e3-7c53-9e65-3442a9d52f57","ts":1790650218,"text":"a draft in the resumed session"}
+{"session_id":"01a0eb16-e91b-7ec3-88f3-2dbdb1b7da5c","ts":1790650554,"text":"suspend draft, dummy after fg"}
+{"session_id":"01a0eb17-5f3b-7b63-8278-7e6e2c8263e2","ts":1790650578,"text":"suspend draft, dummyfg"}
+{"session_id":"01a0eb17-5f3b-7b63-8278-7e6e2c8263e2","ts":1790650585,"text":" after fg"}
+{"session_id":"01a0eb17-5f3b-7b63-8278-7e6e2c8263e2","ts":1790650589,"text":"exit"}
+{"session_id":"01a0eb18-180f-71c1-bd1b-0047e0973f70","ts":1790650641,"text":" delt"}

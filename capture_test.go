@@ -191,7 +191,7 @@ func TestCapture(t *testing.T) {
 		pastes: &pasteTracker{},
 		prof:   &claude,
 	}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	checked := 0
 	eachChunk(t, data, func(_ time.Time, dir byte, chunk []byte) {
 		switch dir {

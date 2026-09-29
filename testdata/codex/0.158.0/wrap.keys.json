@@ -1,0 +1,129 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"type": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "wrap-exact-end"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"wait": 0.3
+},
+{
+"screen": "wrap-exact-enter"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "after a blank line"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "after one break"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd ef"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "after a full row of words"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "after a word two rows long"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+},
+{
+"wait": 0.8
+},
+{
+"screen": "wrap"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "wrap-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "wrap-cleared"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

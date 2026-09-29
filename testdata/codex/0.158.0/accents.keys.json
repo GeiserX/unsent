@@ -1,0 +1,67 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"screen": "accents-empty"
+},
+{
+"type": "Canción del ñandú: ¿qué pasó? ¡Olé! Pingüino, café, acción. café decomposed, ñ too. Emoji 🎉 👍🏽 🇪🇸 done."
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa漢字 wide at the edge"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ñandú wraps here"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "accents"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "accents-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "accents-cleared"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

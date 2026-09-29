@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -32,7 +31,7 @@ func newSendSession(t *testing.T, prof *profile) sendSession {
 		prof:   prof,
 	}
 	s.rec.Agent = "claude"
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	return sendSession{s, t}
 }
 

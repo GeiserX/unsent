@@ -1,0 +1,26 @@
+[
+{
+"until": "Ask Codex to do anything|Ask a follow-up",
+"timeout": 60
+},
+{
+"wait": 1
+},
+{
+"type": "a draft under the shared server"
+},
+{
+"wait": 1.0
+},
+{
+"sh": "for f in xdg/state/unsent/drafts/*.json; do grep -E 'agent_session|draft\"' $f; done",
+"out": "r8-store-early"
+},
+{
+"wait": 9
+},
+{
+"sh": "for f in xdg/state/unsent/drafts/*.json; do grep -E 'agent_session|draft\"' $f; done",
+"out": "r8-store-late"
+}
+]

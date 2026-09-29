@@ -223,6 +223,7 @@ func (s *session) tryRestore() {
 	// The paste tracker sees it as a paste, so the placeholder the agent
 	// shows for a long one reads back as the text.
 	s.pastes.feed(paste)
+	s.edited, s.recalled = true, false
 	s.rs.inj = &injection{orphan: r, claim: claim, text: text, at: now}
 	// The lock goes with the write: a key typed meanwhile follows the paste
 	// and never lands inside it. Written apart from the loop, since a write
@@ -265,7 +266,7 @@ func (s *session) clipboardInstead(r *record, why, claim string) {
 // back.
 func (s *session) verifyRestore(draft string, width int) {
 	inj := s.rs.inj
-	if inj == nil || draft != inj.text && !byteExact(draft, inj.text, width) {
+	if inj == nil || draft != inj.text && !byteExact(draft, inj.text, width, s.prof.unwrap) {
 		return
 	}
 	s.rs.inj = nil

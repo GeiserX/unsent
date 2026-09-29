@@ -142,6 +142,11 @@ func makeStore() (*store, error) {
 	if err != nil {
 		return nil, err
 	}
+	return makeStoreAt(dir)
+}
+
+// makeStoreAt is makeStore in dir.
+func makeStoreAt(dir string) (*store, error) {
 	for _, sub := range []string{"drafts", "history", "sent"} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), 0o700); err != nil {
 			return nil, err

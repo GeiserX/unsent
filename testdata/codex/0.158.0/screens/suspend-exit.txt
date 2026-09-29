@@ -1,0 +1,40 @@
+rig% ./start.sh
+unsent: no reader for "codex" yet, running it without saving drafts
+Session ID: 01a0eb16-e91b-7ec3-88f3-2dbdb1b7da5c
+unsent: no reader for "codex" yet, running it without saving drafts
+unsent: captured codex 0.158.0 in /Volumes/Data/unsent-07.GZ7M/work/testdata/codex/0.158.0/capture-20260929-045541.rec (
+keys and output), /Volumes/Data/unsent-07.GZ7M/work/testdata/codex/0.158.0/capture-20260929-045541.json (window sizes) a
+nd 2 editor copies. Check every file for real prompt text, names, paths and keys before committing.
+rig%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

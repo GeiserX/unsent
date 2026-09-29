@@ -1,0 +1,50 @@
+[
+{
+"until": "Ask Codex to do anything|Ask a follow-up",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"screen": "resume-id"
+},
+{
+"sh": "./ids.sh",
+"out": "id-resume-id"
+},
+{
+"sh": "for f in codexhome/thread-writer-locks/*.lock; do python3 -c \"import fcntl,sys;f=open(sys.argv[1]);\ntry:\n fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);print(sys.argv[1],'free')\nexcept OSError as e:\n print(sys.argv[1],'LOCKED',e)\" $f; done",
+"out": "flock-resume-id"
+},
+{
+"type": "a draft in the resumed session"
+},
+{
+"wait": 0.5
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]

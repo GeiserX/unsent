@@ -1,0 +1,56 @@
+[
+{
+"until": "Ask Codex to do anything|Ask a follow-up|put back",
+"timeout": 40
+},
+{
+"screen": "r2-first"
+},
+{
+"wait": 4
+},
+{
+"screen": "r2-restored"
+},
+{
+"sh": "./ids.sh",
+"out": "r2-ids"
+},
+{
+"sh": "find xdg/state -type f | sort; for f in xdg/state/unsent/drafts/*.json; do echo; cat $f; done; echo",
+"out": "r2-store"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"screen": "r2-cleared"
+},
+{
+"type": "second orphan, for resume --last"
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+}
+]

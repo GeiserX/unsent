@@ -1,0 +1,41 @@
+unsent: no reader for "codex" yet, running it without saving drafts
+To continue this session, run:
+  codex resume 01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b
+unsent: no reader for "codex" yet, running it without saving drafts
+unsent: captured codex 0.158.0 in /Volumes/Data/unsent-07.GZ7M/work/testdata/codex/0.158.0/capture-20260929-045000.rec (
+keys and output), /Volumes/Data/unsent-07.GZ7M/work/testdata/codex/0.158.0/capture-20260929-045000.json (window sizes) a
+nd 1 editor copies. Check every file for real prompt text, names, paths and keys before committing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 0, Tue Sep 29 04:50:07 2026)

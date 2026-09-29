@@ -1,0 +1,7 @@
+child: 85789 85783 /Volumes/Data/unsent-07.GZ7M/bin/codex
+  open files under CODEX_HOME:
+  codexhome/tmp/arg0/codex-arg0T0J0TS/.lock
+codex processes anywhere under the scratch:
+daemon 84030
+n/Volumes/Data/unsent-07.GZ7M/codexhome/thread-writer-locks/01a0eb13-da0c-7d22-8d9f-1e7d97778ae6.lock
+n/Volumes/Data/unsent-07.GZ7M/codexhome/thread-writer-locks/01a0eb15-57c8-7f02-9696-059bb7ce816f.lock

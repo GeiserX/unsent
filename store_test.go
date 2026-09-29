@@ -20,6 +20,18 @@ func testStore(t *testing.T) *store {
 	return st
 }
 
+// replayStore is a store of its own for a replay, which may run in
+// parallel with others: t.Setenv is not allowed there, and a replay reads
+// no shell lines.
+func replayStore(t *testing.T) *store {
+	t.Helper()
+	st, err := makeStoreAt(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return st
+}
+
 func TestStoreLiveSessionIsNotAnOrphan(t *testing.T) {
 	st := testStore(t)
 	r := newRecord([]string{"claude"}, "/work")

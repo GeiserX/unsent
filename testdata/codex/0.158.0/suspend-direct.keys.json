@@ -1,0 +1,118 @@
+[
+{
+"until": "%\\s*$",
+"timeout": 10
+},
+{
+"type": "REC=suspend-direct.rec EXTRA_ENV=\"EDITOR=/Volumes/Data/unsent-07.GZ7M/editcopy VISUAL=/Volumes/Data/unsent-07.GZ7M/editcopy UNSENT_CAPTURE_TO=/Volumes/Data/unsent-07.GZ7M/out/suspend-direct\" ./start-direct.sh"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"type": "suspend draft, dummy"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "suspend-direct-before"
+},
+{
+"sh": "tmux -L unsent-07 display -p -t rig 'alternate_on=#{alternate_on}'",
+"out": "suspend-direct-alt"
+},
+{
+"keys": [
+"C-z"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "suspend-direct-stopped"
+},
+{
+"sh": "ps -axo pid,ppid,stat,command | grep -E 'bin/codex|bin/unsent|zsh -f' | grep -v grep | cut -c1-120",
+"out": "suspend-direct-ps"
+},
+{
+"type": "fg"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-direct-fg"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"type": " after fg"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "suspend-direct-typed-after"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-direct-exit"
+},
+{
+"type": "exit"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 0.5
+}
+]

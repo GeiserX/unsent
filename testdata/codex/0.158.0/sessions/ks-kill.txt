@@ -1,0 +1,5 @@
+no codex left
+no unsent left
+yak: in no file under CODEX_HOME
+capture-20260929-044854.json
+capture-20260929-044854.rec

@@ -6,23 +6,55 @@ import (
 	"strings"
 
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 )
 
 // screen is a plain snapshot of the shadow terminal: the text of every row,
-// which cells are drawn dim and in which colour, and where the cursor is.
+// how each cell is drawn, where the cursor is, and whether the agent is on
+// the alternate screen.
 type screen struct {
 	rows       []screenRow
 	cols       int
 	curX, curY int
+	alt        bool
 }
 
 // screenRow holds one string per terminal column. The right half of a wide
-// character is an empty string, so column indexes stay true.
+// character is an empty string, so column indexes stay true. faint marks
+// the dim cells; look holds the rest of each cell's style, for readers that
+// need more than dim to tell the box from what is drawn around it.
 type screenRow struct {
 	cells []string
 	faint []bool
-	ink   []uint32 // foreground colour (inkOf), 0 for the default
+	look  []cellLook
+}
+
+// cellLook is how one cell is drawn, besides dim. Codex marks the chosen
+// row of a menu with reverse video, starts its box with a bold glyph and,
+// when the terminal tells it its colours, tints the box's background
+// (docs/research/codex.md).
+type cellLook struct {
+	fg, bg        cellColor
+	bold, reverse bool
+}
+
+// cellColor is a cell's colour: 0 for the terminal's default, 1<<24 plus
+// the index for a palette colour (the 16 basic ones included), 2<<24 plus
+// 0xRRGGBB for any other.
+type cellColor uint32
+
+func colorOf(c color.Color) cellColor {
+	switch c := c.(type) {
+	case nil:
+		return 0
+	case ansi.BasicColor:
+		return 1<<24 | cellColor(c)
+	case ansi.IndexedColor:
+		return 1<<24 | cellColor(c)
+	}
+	r, g, b, _ := c.RGBA()
+	return 2<<24 | cellColor(r>>8)<<16 | cellColor(g>>8)<<8 | cellColor(b>>8)
 }
 
 func (r screenRow) text() string {
@@ -53,15 +85,16 @@ func (r screenRow) faintFrom(x int) bool {
 	return seen
 }
 
-// inkFrom reports whether every visible character from column x on is
-// drawn in ink, and there is one. Claude Code draws a placeholder this way.
-func (r screenRow) inkFrom(x int, ink uint32) bool {
+// fgFrom reports whether every visible character from column x on is
+// drawn in the foreground colour fg, and there is one. Claude Code draws a
+// placeholder this way.
+func (r screenRow) fgFrom(x int, fg cellColor) bool {
 	seen := false
 	for i := x; i < len(r.cells); i++ {
 		if strings.TrimSpace(r.cells[i]) == "" {
 			continue
 		}
-		if r.ink[i] != ink {
+		if r.look[i].fg != fg {
 			return false
 		}
 		seen = true
@@ -69,21 +102,15 @@ func (r screenRow) inkFrom(x int, ink uint32) bool {
 	return seen
 }
 
-// inkOf packs a cell's foreground colour into a number that compares
-// equal for the same colour; the default colour is 0.
-func inkOf(c color.Color) uint32 {
-	if c == nil {
-		return 0
-	}
-	r, g, b, _ := c.RGBA()
-	return 1<<24 | (r>>8)<<16 | (g>>8)<<8 | b>>8
-}
-
 func snapshot(e *vt.Emulator) *screen {
 	w, h := e.Width(), e.Height()
-	s := &screen{rows: make([]screenRow, h), cols: w}
+	s := &screen{rows: make([]screenRow, h), cols: w, alt: e.IsAltScreen()}
+	// A save snapshots the screen after every frame: one array of each for
+	// the whole screen, not three per row, keeps that cheap.
+	cells, faint, look := make([]string, w*h), make([]bool, w*h), make([]cellLook, w*h)
 	for y := 0; y < h; y++ {
-		row := screenRow{cells: make([]string, w), faint: make([]bool, w), ink: make([]uint32, w)}
+		i, j := y*w, (y+1)*w
+		row := screenRow{cells: cells[i:j:j], faint: faint[i:j:j], look: look[i:j:j]}
 		for x := 0; x < w; x++ {
 			c := e.CellAt(x, y)
 			switch {
@@ -96,7 +123,20 @@ func snapshot(e *vt.Emulator) *screen {
 			default:
 				row.cells[x] = c.Content
 				row.faint[x] = c.Style.Attrs&uv.AttrFaint != 0
-				row.ink[x] = inkOf(c.Style.Fg)
+			}
+			// A blank cell has a look too: a tinted row is mostly blanks. Most
+			// cells have none, so test the four fields the look keeps rather
+			// than compare the whole style.
+			if c == nil {
+				continue
+			}
+			if st := &c.Style; st.Fg != nil || st.Bg != nil || st.Attrs&(uv.AttrBold|uv.AttrReverse) != 0 {
+				row.look[x] = cellLook{
+					fg:      colorOf(st.Fg),
+					bg:      colorOf(st.Bg),
+					bold:    st.Attrs&uv.AttrBold != 0,
+					reverse: st.Attrs&uv.AttrReverse != 0,
+				}
 			}
 		}
 		s.rows[y] = row
@@ -122,7 +162,7 @@ func screenFromText(text string, cols int) *screen {
 	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
 	s := &screen{cols: cols, curX: -1, curY: -1}
 	for y, l := range lines {
-		row := screenRow{cells: make([]string, cols), faint: make([]bool, cols), ink: make([]uint32, cols)}
+		row := screenRow{cells: make([]string, cols), faint: make([]bool, cols), look: make([]cellLook, cols)}
 		for i := range row.cells {
 			row.cells[i] = " "
 		}

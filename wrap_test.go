@@ -1232,7 +1232,7 @@ func TestSessionWaitsForTheFrameToEnd(t *testing.T) {
 			return view{}, false
 		}},
 	}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	s.write([]byte("\x1b[?2026hhalf a fra"))
 	go func() {
 		time.Sleep(20 * time.Millisecond)
@@ -1274,7 +1274,7 @@ func TestSessionSurvivesAnEmulatorPanic(t *testing.T) {
 // collapses a 3-line paste, so it fills a placeholder there.
 func TestSessionResizeReachesThePasteRule(t *testing.T) {
 	s := &session{screen: vt.NewEmulator(80, 40), pastes: &pasteTracker{rows: 40}, prof: &claude}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	s.resize(80, 11)
 	s.input([]byte("\x1b[200~one\ntwo\nthree\x1b[201~"))
 	if got := s.pastes.expand("[Pasted text #1 +2 lines]", "", &claude); got != "one\ntwo\nthree" {
@@ -1294,7 +1294,7 @@ func TestSessionSurvivesAReaderPanic(t *testing.T) {
 		return claudeBox(scr)
 	}
 	s := &session{screen: vt.NewEmulator(100, 30), rec: newRecord([]string{"claude"}, "/w"), store: st, pastes: &pasteTracker{}, prof: &prof}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	s.write([]byte(drawBox(100, "hello")))
 	s.save()
 	s.write([]byte(drawBox(100, "hello boom")))
@@ -1839,7 +1839,7 @@ func TestStringSeqsStripped(t *testing.T) {
 		}
 	}
 	s := &session{screen: vt.NewEmulator(40, 3)}
-	go io.Copy(io.Discard, s.screen)
+	drainScreen(t, s.screen)
 	s.write([]byte("\x1b]0;✳ Claude Code\x07"))
 	if got := strings.TrimSpace(snapshot(s.screen).String()); got != "" {
 		t.Fatalf("the title reached the screen: %q", got)

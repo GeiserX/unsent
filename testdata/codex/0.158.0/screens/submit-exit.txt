@@ -1,0 +1,40 @@
+
+  >_ OpenAI Codex (v0.158.0)
+     /Volumes/Data/unsent-07.GZ7M/work
+
+  May the source be with you.
+
+
+› dummy prompt that must fail on the dead base url
+
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit `/feedback` to report the
+issue.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+› Ask Codex to do anything
+
+  GPT-6-Astra default · /Volumes/Data/unsent-07.GZ7M/work
+  ? for shortcuts                                                                             ⚠ 2 warnings · f2 to view

@@ -1,0 +1,40 @@
+
+  [38;5;75m>_ [1m[39mOpenAI Codex[0;2m (v0.158.0)[0m
+     [2m/Volumes/Data/unsent-07.GZ7M/work[0m
+
+  [38;5;75mWelcome back. Familiar territory or a fresh adventure?[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1m›[0m suspend draft, dummy
+zsh: suspended  ./start.sh
+rig%
+

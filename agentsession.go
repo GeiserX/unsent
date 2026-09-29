@@ -22,6 +22,11 @@ type sessionSource struct {
 	pids func() []int
 }
 
+// sessionUnsure is what a sessionSource reads when the agent keeps more
+// than one session for the process and nothing says which is current: the
+// process is in no known session, rather than in the last one read.
+const sessionUnsure = "?"
+
 // sessionIDRE is what an agent session id may look like. The id comes from
 // the agent's files and names a sent log file, so nothing that could reach
 // outside the folder gets through.
@@ -79,7 +84,12 @@ func (t *sessionTracker) current() string {
 			id, found = t.src.read(pid, t.since)
 		}
 	}
-	if found && sessionIDRE.MatchString(id) {
+	switch {
+	case found && id == sessionUnsure:
+		// The agent names several sessions for the process and none as
+		// current: text typed from now on belongs to none of them.
+		t.id = ""
+	case found && sessionIDRE.MatchString(id):
 		t.id = id
 	}
 	return t.id
