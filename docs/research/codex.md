@@ -397,6 +397,11 @@ Codex asks for the cursor position (`ESC[6n`) at start and after a resume, and t
 - The first start on a fresh `CODEX_HOME` draws the logo screen with one footer row, `? for shortcuts`, and no `<model> · <folder>` row. The reader wants two footer rows, so the box was first read 6.5 s after start, at the third Backspace, and the draft typed and cleared before that was never saved [measured once, a run of `recall-deleted` on a fresh home; not fixed]. Every later start drew both rows. Warm the home with one start before recording.
 - The shared server needs the whole Codex package beside the binary, and takes more than one SIGTERM to stop (it drains first). A TUI started while the old server drains fails with `Server is draining; retry after reconnecting (code -32600)`. The rig's teardown signals until no process is left, then sends SIGKILL.
 
+### The send scenario, measured on the gate run
+
+- **Keys typed right before the submit** [measured, gate run 2026-09-29, `send.py` and `send3.py`]: with the last key 30 ms or more before Enter or Tab, 0 of 6 logged messages missed anything; each equalled the typed text and Codex's `history.jsonl` entry. With the last key 10 to 20 ms before the submit, 3 of 4 logged messages missed that tail (`history.jsonl` had it). That is the real rate for the limit in spec 2.13 on this version.
+- **A submit key in the same burst as text** [measured, gate run 2026-09-29]: when the tail and Enter arrived in one write (0 ms apart, one `tmux send-keys`), Codex inserted a newline instead of sending, for Enter and for Tab. Nothing was sent and nothing was logged; a Ctrl+C then put the draft in history. Safe for the promise, and a trap for any rig that types and submits in one write.
+
 ## Verification notes
 
 What I checked:
