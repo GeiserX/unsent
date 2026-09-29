@@ -1,6 +1,6 @@
 # Codex captures
 
-Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. No test replays them yet: `replay_test.go` reads only `testdata/claude`.
+Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks; no reader test replays them yet, since `replay_test.go` reads only `testdata/claude`.
 
 ## What each file is
 
@@ -22,6 +22,7 @@ Differences from that setup:
 - `deletes-xterm` ran with `extended-keys-format xterm`, where Codex asks for fewer key reports and tmux sends legacy bytes. tmux has no legacy form for Ctrl+Backspace, so that key arrived as the literal text `C-BSpace`, which is in the draft.
 - `daemon-quit` and `daemon-killsession` ran without `-c` (the sandbox setting went into the scratch `config.toml` instead), which is how Codex starts its shared background server.
 - `suspend` ran `unsent` from a `zsh -f` in the pane, so Ctrl+Z had a shell to return to. `suspend-direct` ran Codex under `script -q -r -t 0` from that shell, without unsent, to see Codex's own Ctrl+Z. Codex did not stop, so the `fg` and Enter typed next went into its box and were sent; that send failed on the dead port.
+- `tinted` ran with `window-style "fg=#cdd6f4,bg=#1e1e2e"` set in the tmux server, so tmux answered `OSC 10;?` and `OSC 11;?` and Codex tinted its box (`ESC[48;5;237m`). An earlier try with only `bg` set got an answer to `OSC 11` alone, and Codex drew no tint.
 - `picker` was started with `codex resume` and its keys begin with the picker open. `resume-id`, `resume-unsent-id`, `resume-last` and `fork-last` were started with `codex resume <id>`, `codex resume <id of a thread that never sent>`, `codex resume --last` and `codex fork --last`.
 
 ## Scenarios
@@ -30,6 +31,7 @@ Differences from that setup:
 | --- | --- |
 | `dialogs` | sign-in screen, API key screen, trust dialog, first empty box with its logo, warnings view (F2), `/` menu, `?` shortcuts, `@` mentions, Ctrl+C on the empty box quitting |
 | `typed` | one typed line, Ctrl+G, Ctrl+C clear |
+| `tinted` | the empty box and a two-line draft with the box tinted, Ctrl+G, Ctrl+C clear |
 | `multiline` | new lines with Ctrl+J, Alt+Enter and Shift+Enter, one of them blank |
 | `accents` | Spanish accents precomposed and decomposed, emoji with a skin tone and a flag, a double-width character at the wrap edge, a word wrap at a space |
 | `tall` | 45 lines, taller than the box; an edit 40 rows up that scrolls the box, then back down so it is out of sight; a word deleted with Ctrl+W 30 rows up |

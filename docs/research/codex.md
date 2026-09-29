@@ -321,7 +321,7 @@ So the running thread's id can be read from outside when Codex runs embedded (wi
 
 - **Box and height cap while a turn runs:** the look is measured (status rows above the box, spinner in the footer); the cap is not.
 - **CSI-u delete keys end to end through unsent:** measured through unsent in tmux with modifyOtherKeys 2, table above. Real Ghostty, kitty, WezTerm and iTerm2 were not run, and release events under flag 7 were not seen.
-- **Does the real terminal's OSC 11 reply reach Codex under unsent?** Not answered: tmux sent no reply, so there was no tint.
+- **Does the real terminal's OSC 11 reply reach Codex under unsent?** Yes, and it is not enough. With tmux's `window-style` background set, tmux answered `OSC 11` through unsent and Codex drew no tint. With foreground and background set, tmux answered `OSC 10` and `OSC 11`, and Codex tinted the top padding, the text rows and the bottom padding from edge to edge with `ESC[48;5;237m` (a palette colour under `TERM=tmux-256color`), the footer untinted. The glyph stays bold on the tint and the hint dim [measured, `tinted.rec`, `screens/tinted*.txt`].
 - **Does text printed before launch survive the first frame?** Yes on 0.158.0, because of the alternate screen.
 - **Remote image rows and the pet reserve:** not measured.
 - **0.157.1 mouse selection and warning row:** warnings now sit on the second footer row (`⚠ 1 warning · f2 to view`), and F2 opens a `Warnings · 1 of 1` view; mouse selection was not tried.
