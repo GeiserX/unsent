@@ -13,7 +13,7 @@
 
 **AutoRecover for your AI agent prompts.**
 
-`unsent` saves text you have typed and not sent yet, in two places: the input box of a coding agent that runs in your terminal, and the command line at your shell prompt. Today that means Claude Code, Codex, pi and zsh. Claude Code, Codex and pi save your *conversations*, not the message you haven't sent yet, so a closed window, a reboot, a crash or one Ctrl+C too many loses the prompt.
+`unsent` saves text you have typed and not sent yet, in two places: the input box of a coding agent that runs in your terminal, and the command line at your shell prompt. Today that means Claude Code, Codex, pi, agy and zsh. Those agents save your *conversations*, not the message you haven't sent yet, so a closed window, a reboot, a crash or one Ctrl+C too many loses the prompt.
 
 The next time you start the agent in that folder, `unsent` tells you what it kept:
 
@@ -24,7 +24,7 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 ## Features
 
 - Saves the agent's input box as you type, every 0.4 seconds, with atomic writes that survive a power cut.
-- Puts a draft back into the box when you reopen its Claude Code or Codex conversation. Nothing is sent for you.
+- Puts a draft back into the box when you reopen its Claude Code, Codex or agy conversation. Nothing is sent for you.
 - Recovers long drafts that scroll inside the box, and big pastes shown as placeholders.
 - Keeps a log of the messages you sent, and a history of drafts you cleared or replaced.
 - Saves your half-typed zsh command line too.

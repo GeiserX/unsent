@@ -21,4 +21,8 @@
 - pi's `editorPaddingX` setting, when it isn't 0, puts spaces at the start of every row of the box, and they end up in the saved draft.
 - A pi draft cleared with Ctrl+C and brought back with Ctrl+- is saved again, but a paste placeholder in it stays the placeholder in the live draft; the draft history kept at the Ctrl+C has the pasted text.
 - pi's fullscreen mode (`--tui-mode fullscreen`) was not measured, and neither was a paste pi reads from the clipboard itself (Ctrl+V, or a right-click in fullscreen), which never crosses the terminal: such a paste over pi's placeholder threshold stays the placeholder in the saved draft.
+- agy draws no combining mark, so a decomposed accent (`e` and U+0301) is saved as the bare letter, although agy itself holds the whole character. A precomposed `é` is saved as it is.
+- agy shows a line break typed at the end of a row the text filled exactly, before a word too long to have fitted there, as nothing at all: those two rows are what one long word broken at the edge draws. That break is lost from the saved draft.
+- An agy draft with a tab, or one ending in a line break, is not pasted back: agy turns a tab into four spaces and drops that break. It goes to the clipboard instead, and the line after agy exits says so.
+- An agy conversation has no id until its first message is sent, so that message is in the sent log of the run that sent it, and the conversation's own log starts with the second.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.

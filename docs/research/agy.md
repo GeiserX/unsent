@@ -93,11 +93,12 @@ Every screen fact below is **measured on 1.2.11** unless its line says otherwise
   - Raw bytes: `ESC[38;2;138;180;248m>ESC[39m ESC[38;2;154;160;166mAccept-edits mode: file edits auto-approved (shift+tab to cycle)ESC[39m`.
   - The other hint is `Plan mode: research & plan only (shift+tab to cycle)`.
   - The hint is not SGR 2 (dim), and the cursor stays at column 2. The hint colour in the light theme (#5F6368) is from the lane and was not re-checked.
-- **Draft colours:** typed text uses the default foreground. A leading `/command` is shown in #8AB4F8 and is still draft text. The lane did not keep a byte capture of the `/command` colour.
+- **Draft colours:** typed text uses the default foreground. A leading `/command` is shown in #8AB4F8 and is still draft text. The lane did not keep a byte capture of the `/command` colour. (On 1.2.13 a `/command` in the box is **not** coloured: see "Profile run on agy 1.2.13".)
 - **Wrapping:**
   - Text width is cols − 3.
   - Text wraps at word boundaries, and a single long token hard-breaks at cols − 3 (150 `x` split into 97 + 53).
   - Wide characters are never split (48 `漢` per row at 100 columns).
+  - A word that would end exactly at the width moves to the next row, since the space after it has to fit there too, and a line that ends exactly at the width gets no row of its own [measured on 1.2.13; see "Profile run on agy 1.2.13"].
 - **Height cap:** the box shows at most floor(rows/2) text rows. Checked pairs: 20→10, 30→15, 50→25, 80→40.
 - **Scroll indicators:**
   - Once past the cap, the first row reads `> ↑ N more lines` and the last reads `  ↓ N more lines`. Both are #9AA0A6. Raw bytes: `ESC[38;2;138;180;248m>ESC[39m ESC[38;2;154;160;166m↑ 16 more linesESC[39m`.
@@ -209,7 +210,7 @@ Everything in this section is **measured**, except where a line is marked as an 
    - First row in hintFg matching `↑ (\d+) more lines?`: rows hidden above, and the row holds no text.
    - Last row matching `↓ (\d+) more lines?`: rows hidden below.
    - Both counts are wrapped screen rows.
-4. **Empty box.** The box is empty if its single row is blank, or holds nothing but hintFg text (the mode hint). There is no SGR 2 anywhere. Keep default-fg text and a blue leading `/command` as draft.
+4. **Empty box.** The box is empty if its single row is blank, or holds nothing but text in a colour of agy's own (the mode hint); a draft, paste placeholders included, is the terminal's own foreground. (1.2.13 does use SGR 2, for the model name in the footer, and draws no `/command` colour in the box.)
 5. **Join rows.** Rejoin rows at wrap width cols−3: word wrap, long tokens hard-broken, wide characters never split.
 6. **Bash mode.** A bold `!` glyph means the draft is `!` + text.
 7. **Placeholders.** Match `\[Pasted text #(\d+) \+(\d+) lines\]` and `\[Pasted text #(\d+) (\d+) chars\]`, then expand each from the captured bracketed paste.
@@ -614,3 +615,101 @@ Not re-checked:
 - The SSH-run sync result, and the keychain mtime note.
 
 Nothing was launched. No agy or other agent CLI was run for this verification.
+
+## Profile run on agy 1.2.13 (measured 2026-09-30)
+
+The same rig as the capture run above, on the same Mac mini and the same
+binary, this time with agy's profile ([`agent_agy.go`](../../agent_agy.go))
+built into unsent. Nine more captures went into
+[`testdata/agy/1.2.13/`](../../testdata/agy/1.2.13/), on a fresh scratch
+home and a fresh unsent state folder. **The binary still did not replace
+itself.** Its SHA-256 is
+`ef3728208834483754b06fd99963b4b6320740bf237212768dfed5256ae24ddb`
+before the first run and after the last, and the updater's status still
+reads `{"success":false,"message":"Update failed, please install from website"}`.
+
+### Wrapping, corrected
+
+- **A word that would end exactly at the wrap width moves to the next row**,
+  because the space after it has to fit on that row too. At 117 columns,
+  `"a"×114` then `" bb cc"` draws `aaaa…(114)` on one row and `bb cc` on
+  the next, where Claude Code and Codex keep `bb` on the first [measured,
+  `wrap`]. So agy's wrap is pi's ([`fitWrap`](../../stitch.go)), not
+  Claude Code's. Every other capture reads the same under both models, which is
+  why the first profile had the wrong one until this capture.
+- **A line that ends exactly at the width gets no row of its own.**
+  `"w"×117`, a new line and `after a full row` draw two rows with no empty
+  one between them, so agy has nothing like Codex's end row [measured,
+  `wrap`].
+- That leaves one line break the screen cannot show at all: one typed at
+  the end of a row the text filled exactly, before a word that would not
+  have fitted on that row either. Those two rows are exactly what one word
+  too long for a row, broken at the edge, draws, so the break comes back
+  joined with nothing. Every other break comes back as itself, or as a
+  space at a full row [measured, `wrap`; the limit is the stitcher's, not
+  agy's].
+
+### What the screen cannot carry
+
+- **agy does not draw a combining mark.** `e` + U+0301, `n` + U+0303 and
+  `u` + U+0308 typed into the box come back from Ctrl+G whole, and are
+  written to the screen as `e n u`: the marks are in no cell [measured,
+  `accents`, the bytes of the record]. A reader of agy's screen cannot
+  save a decomposed accent, and unsent saves the bare letters.
+- **SGR 2 exists in 1.2.13**, against the 1.2.11 note: the model name on
+  the right of the footer is dim. It is drawn nowhere in the box.
+- In a 256-colour terminal agy draws its rules, its hints, its scroll
+  labels and the footer's left text in colour 90, and its `>` glyph in 94;
+  a draft, paste placeholders included, is the terminal's own foreground.
+  A `/command` typed into the box is **not** coloured there (the blue
+  `/command` of the 1.2.11 notes is the menu's selected row, drawn under
+  the bottom rule) [measured, `typed`, `dialogs`, `pastes`].
+
+### Reading a frame
+
+- Every paint is bracketed by `ESC[?25l` … `ESC[?25h`, and agy keeps the
+  cursor hidden for as long as a dialog is on screen: the whole first run
+  is one open paint. So an open paint alone cannot mean a half-drawn
+  screen. unsent reads once the paint closes, or once the output has been
+  quiet for 50 ms [measured, `first-run` and every record].
+- Outside a paint, every chunk in the capture run followed the one before
+  it by at least 1.78 s (the input modes agy re-asserts while idle), and
+  the chunks of one unbracketed burst (the banner at start, the teardown
+  at exit) arrive in the same millisecond.
+
+### Restore-in-box (measured end to end)
+
+| What was run | What happened |
+| --- | --- |
+| A draft left at a closed window in a conversation, then `agy -c` | unsent pasted it back into the empty box; Ctrl+G showed exactly the draft, `ñandú` included, and the orphan moved to history [`orphan`, `restore-c`] |
+| A 20-line draft, then `agy -c` | the box showed `[Pasted text #1 +20 lines]` and Ctrl+G gave all 20 lines [`orphan-long`, `restore-long`] |
+| A new chat in the same folder, with that draft waiting | no paste: a new agy conversation has no id until its first submit, so nothing matches the draft's. unsent's notice before the start named it [`new-chat`] |
+| A 20-line paste on the first frame that showed the box | it landed whole, so the settle delay is a safety margin, not a need [`early-paste`] |
+| The line under the box | agy draws inline on the main screen, where that row belongs to the terminal, so unsent draws nothing there and says it after exit instead: `unsent: put back your draft from 00:18 today, not sent` [`restore-long`, its exit screen] |
+
+The restore caps ([SPEC 2.3](../SPEC.md#23-restore-in-box), item 4 of the
+profile done definition): the conversation id comes from the
+`conversations/<id>.db` the process holds open, the settle delay is 1 s
+and three empty reads in a row, line breaks go in as `\n` inside a
+bracketed paste, and a draft with a tab or a line break at its end goes to
+the clipboard instead, since agy turns a tab into four spaces and drops
+that break.
+
+### The sent log
+
+Two prompts sent in one conversation, both of which failed on the dead
+endpoint: the first went to the run's log, because the conversation is
+created by that first submit and nothing names it yet, and the second to
+`sent/agy-<conversation id>.jsonl`. agy's own `history.jsonl` holds the
+same two texts, with `conversationId` on the second only [measured,
+`send`]. So a conversation's log is complete from its second message on,
+and its first message is in the log of the run that sent it.
+
+### Chat starts, corrected
+
+`agy --help` on 1.2.13 lists `-i`/`--prompt-interactive` as "Run an
+initial prompt interactively and continue the session": it sends on start,
+so it is not a chat start for restore, and neither is `-p`/`--print`/
+`--prompt`, a bare prompt argument, or any subcommand. The chat starts are
+the bare command, `-c`/`--continue` and `--conversation <id>` [source,
+`agy --help`; measured for `-c` and `--conversation`].

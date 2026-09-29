@@ -93,6 +93,23 @@ the three resume captures share a second home, in that order.
 | `exit-ctrl-c` | one Ctrl+C keeping the draft and warning, the second quitting, and the draft in no file afterwards |
 | `first-run` | the colour-scheme picker, the terms screen with its checkbox turned off, and the trust dialog, all on the alternate screen, then the inline box |
 
+## The profile run (2026-09-30)
+
+Nine more captures, made the same way with the agy profile built into
+unsent, on a fresh scratch home and a fresh unsent state folder. The `.rec`
+files of `restore-c` and `restore-long` hold the paste unsent itself made
+to put a draft back; the tests drop it from the record and make it again.
+
+| Record | What it holds |
+| --- | --- |
+| `wrap` | a line that ends exactly at the wrap width, and a word that would end exactly at it with a space after, which agy moves to the next row |
+| `edge-deletes` | Ctrl+W, Backspace, Alt+Backspace, Ctrl+U and Delete on the last row of a box at its cap, where only the keys tell a deletion from rows scrolled out of sight below |
+| `early-paste` | a 20-line paste on the first frame that shows the box |
+| `orphan`, `orphan-long` | a prompt sent so the conversation exists, then a draft (2 lines, and 20) left in the box at a `kill-session` |
+| `new-chat` | a bare `agy` in the same folder with that draft waiting: a new conversation, so no paste |
+| `restore-c`, `restore-long` | `agy -c` reopening that conversation: unsent puts the draft back, the long one as `[Pasted text #1 +20 lines]`, and Ctrl+G says what agy holds |
+| `send` | two prompts sent in one conversation, for the sent log and agy's own `history.jsonl` |
+
 ## Adding one
 
 `unsent capture agy` records a new `.rec` with its editor copies, named
