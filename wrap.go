@@ -28,6 +28,11 @@ import (
 // saveInterval is how often the shadow screen is read for a new draft.
 const saveInterval = 400 * time.Millisecond
 
+// heldWait is how long a key cut short at the end of a read waits for its
+// rest before it goes to the agent as it is (see openSeq). The halves of a
+// split key come back to back; tests raise it.
+var heldWait = 100 * time.Millisecond
+
 // wrap runs args[0] inside a pseudo-terminal, passes every byte between it
 // and the terminal (in, out) untouched and keeps the text in the agent's
 // input box saved on disk. agent names the agent (see agentFor); its
@@ -178,14 +183,35 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 	suspend := make(chan chan struct{}, 1)
 	prof := profileFor(agent)
 	stops := suspendKeys(prof)
+	// A key the terminal split across two reads (ESC[12, then 2;5u) waits
+	// in held for the rest (openSeq), and is decoded and passed on with the
+	// next read. A key that really ends open, such as Alt+[ as ESC [, goes
+	// to the agent heldWait later with no read after it.
 	go func() {
 		buf := make([]byte, 32*1024)
+		var heldMu sync.Mutex
+		var held []byte
+		release := func() {
+			heldMu.Lock()
+			defer heldMu.Unlock()
+			if len(held) > 0 {
+				s.forward(held, ptmx)
+				held = nil
+			}
+		}
+		wait := time.AfterFunc(time.Hour, release)
+		wait.Stop()
 		for {
 			n, err := in.Read(buf)
 			// Logged before the agent gets them, so the record has each key
 			// ahead of the agent's answer. Ctrl+Z too, which the agent never gets.
 			raw.record('i', buf[:n])
-			for rest := buf[:n]; len(rest) > 0; {
+			heldMu.Lock()
+			wait.Stop()
+			data := append(held, buf[:n]...)
+			held = nil
+			cut, suspended := openSeq(data), false
+			for rest := data[:cut]; len(rest) > 0; {
 				at, end := s.suspendAt(rest, stops)
 				if at < 0 {
 					s.forward(rest, ptmx)
@@ -200,12 +226,20 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 					resumed := make(chan struct{})
 					suspend <- resumed
 					<-resumed
+					suspended = true
 					break
 				}
 				s.forward(rest[at:end], ptmx)
 				rest = rest[end:]
 			}
+			// A held tail after a suspend was typed for the shell too.
+			if !suspended && cut < len(data) {
+				held = data[cut:]
+				wait.Reset(heldWait)
+			}
+			heldMu.Unlock()
 			if err != nil {
+				release()
 				return
 			}
 		}

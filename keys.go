@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"slices"
 	"unicode/utf8"
 )
@@ -297,4 +298,28 @@ func findKey(b []byte, keys []key) (at, end int) {
 		i += n
 	}
 	return -1, -1
+}
+
+// maxOpenSeq caps an escape sequence held back for the rest of it: the
+// longest kitty key is shorter, and anything longer goes on as it is.
+const maxOpenSeq = 64
+
+// openSeq returns where a CSI cut short at the end of b starts (ESC [ and
+// parameter bytes, its final byte still to come), or len(b). The terminal
+// can split one key across two reads; the wrapper holds such a tail back
+// and decodes it with the next read, so a suspend, submit or delete key
+// split in two is still that key. A lone ESC is not held: it is the Esc
+// key far more often than half a sequence, and must reach the agent at
+// once (the paste tracker holds it for the key log only).
+func openSeq(b []byte) int {
+	at := bytes.LastIndexByte(b, 0x1b)
+	if at < 0 || len(b)-at < 2 || len(b)-at > maxOpenSeq || b[at+1] != '[' {
+		return len(b)
+	}
+	for _, c := range b[at+2:] {
+		if c < 0x20 || c > 0x3f {
+			return len(b)
+		}
+	}
+	return at
 }

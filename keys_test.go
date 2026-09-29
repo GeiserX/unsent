@@ -458,6 +458,77 @@ func TestWrapCtrlZDropsTheShellsKeys(t *testing.T) {
 	}
 }
 
+// A key cut in two by the terminal's writes is still one key: Ctrl+Z split
+// inside its CSI suspends, and the agent gets neither half, and a Ctrl+W
+// split the same way still counts as a delete. The agent gets every other
+// byte as typed. The wait for the rest is raised here, so a slow runner
+// cannot flush the first half before the second arrives.
+func TestWrapKeySplitAcrossReads(t *testing.T) {
+	oldWait := heldWait
+	heldWait = 5 * time.Second
+	defer func() { heldWait = oldWait }()
+	split := func(w *wrapRun, head, tail string) {
+		w.write(head)
+		time.Sleep(50 * time.Millisecond) // a read of its own
+		w.type_(tail)
+	}
+	t.Run("Ctrl+Z", func(t *testing.T) {
+		stops := 0
+		old := stopSelf
+		stopSelf = func() { stops++ }
+		defer func() { stopSelf = old }()
+		got := agentInput(t)
+		_, st, _, _ := runWrappedWith(t, t.TempDir(), "claude", []string{"claude"}, func(w *wrapRun) {
+			w.type_("before x")
+			split(w, "\x1b[12", "2;5u")
+			w.type_("after")
+			w.type_("\x04")
+		})
+		if stops != 1 {
+			t.Fatalf("stopped %d times", stops)
+		}
+		if in := got(); in != "before xafter\x04" {
+			t.Fatalf("the agent got %q", in)
+		}
+		if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != "before xafter" {
+			t.Fatalf("orphans %+v", rs)
+		}
+	})
+	t.Run("Ctrl+W", func(t *testing.T) {
+		debug := t.TempDir()
+		t.Setenv("UNSENT_DEBUG_DIR", debug)
+		got := agentInput(t)
+		runWrappedWith(t, t.TempDir(), "claude", []string{"claude"}, func(w *wrapRun) {
+			w.type_("hello world")
+			split(w, "\x1b[11", "9;5u")
+			w.type_("\x04")
+		})
+		if in := got(); in != "hello world\x1b[119;5u\x04" {
+			t.Fatalf("the agent got %q", in)
+		}
+		// A save after the key reads the box knowing a word delete came.
+		b, _ := os.ReadFile(filepath.Join(debug, "views.jsonl"))
+		if !strings.Contains(string(b), fmt.Sprintf(`"deleted":%d`, unlimited)) {
+			t.Fatalf("no save counted the Ctrl+W: %s", b)
+		}
+	})
+}
+
+// A sequence that really ends open, such as Alt+[ sent as ESC [, reaches
+// the agent on its own, with no key after it.
+func TestWrapOpenSequenceReachesTheAgent(t *testing.T) {
+	got := agentInput(t)
+	runWrappedWith(t, t.TempDir(), "claude", []string{"claude"}, func(w *wrapRun) {
+		w.type_("x")
+		w.write("\x1b[")
+		waitFor(t, "the held ESC [", func() bool { return got() == "x\x1b[" })
+		w.type_("\x04")
+	})
+	if in := got(); in != "x\x1b[\x04" {
+		t.Fatalf("the agent got %q", in)
+	}
+}
+
 // Inside a paste Ctrl+Z is text, in any form: no suspend, and the agent
 // gets the paste byte for byte.
 func TestWrapCSIuCtrlZInsideAPaste(t *testing.T) {
