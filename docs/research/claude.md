@@ -302,7 +302,7 @@ The line under the box replaces Claude Code's footer row. Typing after it made C
 
 ## 12. Keyboard protocols in real terminals (measured 2026-09-28)
 
-**Environment.** Claude Code 2.1.283 (the binary copied from the MacBook) on a Mac mini with macOS 26.6.1, under `unsent capture claude`, at 120x40. The environment was the one of section 11: `env -i`, scratch `HOME` and `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `HTTPS_PROXY` and `HTTP_PROXY` on a closed local port, `CLAUDE_CODE_MAX_RETRIES=0`, `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`. The terminal's `TERM`, `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `COLORTERM`, `TERMINFO` and `TMUX` were passed through, since Claude Code picks its keyboard mode from them. The config was a copy of a configured install's `settings.json`, its one enabled plugin (Warp's notification plugin) with the install path rewritten, and an empty `CLAUDE.md`, with no credentials. The status line was a stub, and the `SessionStart` hook scripts did not exist on the mini. Terminals: tmux 3.6b with `set -s extended-keys on` and `set -as terminal-features 'xterm*:extkeys'`, driven by `send-keys` with no client attached; Ghostty 1.3.1 with every setting at its default (`--config-default-files=false`), typed at through System Events. Warp was not measured (below). The logs, trimmed to input and to mode and protocol sequences, are in [`testdata/keys/`](../../testdata/keys/README.md), whose README gives the key order.
+**Environment.** Claude Code 2.1.283 (the binary copied from the MacBook) on a Mac mini with macOS 26.6.1, under `unsent capture claude`, at 120x40. The environment was the one of section 11: `env -i`, scratch `HOME` and `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `HTTPS_PROXY` and `HTTP_PROXY` on a closed local port, `CLAUDE_CODE_MAX_RETRIES=0`, `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`. The terminal's `TERM`, `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `COLORTERM`, `TERMINFO` and `TMUX` were passed through, since Claude Code picks its keyboard mode from them. The config was a copy of a configured install's `settings.json`, its one enabled plugin (Warp's notification plugin) with the install path rewritten, and an empty `CLAUDE.md`, with no credentials. The status line was a stub, and the `SessionStart` hook scripts did not exist on the mini. Terminals: tmux 3.6b with `set -s extended-keys on` and `set -as terminal-features 'xterm*:extkeys'`, driven by `send-keys` with no client attached; Ghostty 1.3.1 with every setting at its default (`--config-default-files=false`), typed at through System Events. Warp was measured only later, at the v0.6 gate (below). The logs, trimmed to input and to mode and protocol sequences, are in [`testdata/keys/`](../../testdata/keys/README.md), whose README gives the key order.
 
 **What Claude Code pushes, and when.**
 
@@ -357,9 +357,21 @@ Open: zsh turns bracketed paste off when it runs `fg`, and Claude Code turns it 
 
 **Synchronized output depends on the terminal.** Claude Code asks `ESC[?2026$p` at start. Ghostty answered it and got every frame wrapped in `ESC[?2026h` … `ESC[?2026l`. tmux 3.6b did not answer, and the whole tmux run has no such mark [measured, both captures, counted in the raw logs]. The CLAUDE.md fact that every redraw after a key is wrapped was measured on tmux 3.7c.
 
-**Warp: not measured.** Warp 0.2026.07.29.09.05.02 had never run on the mini. Its first-run screens (Get started, Customize, Choose a theme) took Enter, but the last one, "Create an account", has Enter on Continue and only a mouse click reaches Skip. A System Events `click at` returned Warp's text area and did not press Skip. A permission prompt from another process then took the keyboard focus, and the run was stopped rather than type with that prompt in front. No Warp shell was reached, so there are no Warp bytes. Warp is on the push list, so the likely outcome is a push as in Ghostty; that is a guess until the run is done.
+**Warp, first attempt (2026-09-28): not measured.** Warp 0.2026.07.29.09.05.02 had never run on the mini. Its first-run screens (Get started, Customize, Choose a theme) took Enter, but the last one, "Create an account", has Enter on Continue and only a mouse click reaches Skip. A System Events `click at` returned Warp's text area and did not press Skip. A permission prompt from another process then took the keyboard focus, and the run was stopped rather than type with that prompt in front. No Warp shell was reached, so there are no Warp bytes. Warp is on the push list, so the likely outcome is a push as in Ghostty; that is a guess until the run is done.
 
-**What this section could not measure.** Warp. iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
+**Warp, measured at the v0.6 gate (2026-09-29).** Warp 0.2026.07.29.09.05.02 with `TERM_PROGRAM=WarpTerminal`, Claude Code 2.1.284 under `unsent claude`, a `settings.json` with no plugin and no hooks, the environment above. Keys typed through System Events: text, Ctrl+W, Ctrl+Z, `fg` at the shell, text, Ctrl+C twice. The trimmed log is [`testdata/keys/warp/`](../../testdata/keys/README.md#the-warp-run).
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| Claude Code pushes `ESC[<u ESC[>5u ESC[>4;2m` 0.61 s after start, again after `ESC[?1049h` and with the first key, as in Ghostty | measured | `warp/keys.txt` |
+| Warp answers XTVERSION with `ESC P>\|Warp(v0.2026.07.29.09.05.stable_02) ESC \`, the kitty query with `ESC[?5u`, DA1 with `ESC[?62c`, DECRPM 2026 and the kitty graphics query; not the 1016 query or `ESC[16t`, and no focus report at start | measured | same |
+| Ctrl+W arrives as `ESC[119;5u` and Ctrl+Z as `ESC[122;5u` | measured | same |
+| Ctrl+C arrives as `0x03`, under flags 5, twice | measured | same |
+| unsent suspends on that Ctrl+Z; `fg` brings Claude Code back with the draft in the box | measured | `zsh: suspended`, `ps` (`T`, `Ts+`), screenshots |
+
+Why Warp sends Ctrl+C in legacy form under flags 5 is not known [guess: Warp keeps Ctrl+C as the interrupt byte]; unsent's Claude keyset reads either form as a clear.
+
+**What this section could not measure.** Every key in Warp (the gate run below pressed three). iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
 
 ## Risks
 
@@ -372,7 +384,7 @@ Open: zsh turns bracketed paste off when it runs `fg`, and Claude Code turns it 
 
 ## Open questions
 
-1. Does the main REPL push kitty keyboard / modifyOtherKeys in Ghostty, kitty, WezTerm, iTerm2? Measure raw output outside tmux. Highest priority for `deleteKeys`. Answered for Ghostty and tmux (yes, from start; section 12); Warp, kitty, WezTerm and iTerm2 are still open.
+1. Does the main REPL push kitty keyboard / modifyOtherKeys in Ghostty, kitty, WezTerm, iTerm2? Measure raw output outside tmux. Highest priority for `deleteKeys`. Answered for Ghostty, tmux and Warp (yes, from start; section 12); kitty, WezTerm and iTerm2 are still open.
 2. When does the dim `Try "…"` hint show? Needs the real config (or decoding `be`).
 3. Does the `History n/m` label stay after editing a recalled entry?
 4. Does the box ever jump on large moves (start/end of buffer, mouse click) as CLAUDE.md says? Needs a per-step capture.

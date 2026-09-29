@@ -278,8 +278,8 @@ func labels(ks keyset, chunks [][]byte) []string {
 // The keys Claude Code got under unsent in real terminals
 // (testdata/keys/README.md): every delete key, every submit key and Ctrl+Z
 // is recognised, in the form each terminal sent it, and the terminal's
-// answers and focus reports are not typing. Warp has no log yet (see
-// TestSynthesizedKittyKeys).
+// answers and focus reports are not typing. The Warp log is a short one
+// (see TestSynthesizedKittyKeys for the kitty forms it lacks).
 func TestReplayKeyCaptures(t *testing.T) {
 	cases := []struct {
 		file string
@@ -294,6 +294,10 @@ func TestReplayKeyCaptures(t *testing.T) {
 		// Option+Backspace is a plain Backspace under Ghostty's defaults.
 		{"ghostty/keys", []string{"report", "text", "many", "many", "text", "many ahead", "one", "one ahead",
 			"many", "text", "suspend", "text", "submit", "clear"}},
+		// Kitty CSI-u under flags 5: typing, Ctrl+W, Ctrl+Z (unsent
+		// suspended, fg went to the shell), typing, and Ctrl+C twice, which
+		// Warp sent as 0x03.
+		{"warp/keys", []string{"report", "text", "many", "suspend", "text", "clear", "clear"}},
 		// Nothing pushed: legacy bytes, and Shift+Enter a plain Enter.
 		{"tmux-extkeys/no-tmux-env", []string{"report", "text", "many", "many", "text", "many ahead", "many",
 			"one ahead", "submit", "suspend"}},
@@ -317,12 +321,12 @@ func TestReplayKeyCaptures(t *testing.T) {
 	}
 }
 
-// Synthesized, not captured: there is no Warp log (testdata/keys/README.md),
-// and Warp is on Claude Code's push list, so these are the key forms of the
-// kitty keyboard protocol spec (sketch.kitty.dev keyboard-protocol) under
-// its fullest flags, 15: every key as an escape code, release and repeat
-// events, alternate keys, and the lock bits a terminal adds while Caps Lock
-// or Num Lock is on.
+// Synthesized, not captured: the Warp log holds only Ctrl+W, Ctrl+Z and
+// Ctrl+C, under flags 5 (testdata/keys/README.md), so these are the key
+// forms of the kitty keyboard protocol spec (sketch.kitty.dev
+// keyboard-protocol) under its fullest flags, 15: every key as an escape
+// code, release and repeat events, alternate keys, and the lock bits a
+// terminal adds while Caps Lock or Num Lock is on.
 var synthesizedKitty = []struct{ in, want string }{
 	{"\x1b[97u\x1b[97;1:3u", "text"}, // a, pressed and released
 	{"\x1b[98;65u", "text"},          // b with Caps Lock
