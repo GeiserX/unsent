@@ -1,0 +1,12 @@
+# Supported agents
+
+| Agent | Status | Last rig run | Evidence |
+| --- | --- | --- | --- |
+| Claude Code | Supported | 2.1.284, 2026-09-29 | Rig runs: keys and Ctrl+Z in Warp on 2.1.284 (2026-09-29); drafts put back through `--resume <id>`, `-c`, the picker and `/resume`, the notice in a new chat, and keys in tmux and Ghostty on 2.1.283 (2026-09-28). CI checks the box, pastes and the sent log against captures of 2.1.282, and slash commands and a named session against runs of 2.1.284, on every push, and `unsent` names 2.1.282 as the version it last verified. Measurements: [docs/research/claude.md](research/claude.md). |
+| Codex CLI | Supported | 0.158.0, 2026-09-29 | Rig run: the box, pastes, every delete key in both key forms Codex asks tmux for, Ctrl+Z, the sent log, and drafts put back through `codex resume <id>`, `codex resume --last` and the picker, with the notice in a new chat. Its captures replay in CI. Measurements: [docs/research/codex.md](research/codex.md), sections 10 and 11. |
+| pi | Supported, without put-back | 0.87.1, 2026-09-29 | Rig run: the box, its new-line and submit keys, every delete key, pastes and their renumbering, Ctrl+Z, pickers and dialogs, a closed window, `kill -9`, a paste on the first frame of a new chat and of `pi -c`, and the sent log, which matched pi's own session file byte for byte. Its captures replay in CI. pi names its open conversation nowhere `unsent` can read, so drafts are not put back into a reopened one. Measurements: [docs/research/pi.md](research/pi.md). |
+| Every other agent, such as Gemini CLI, GitHub Copilot CLI, opencode, agy, cursor-agent, Amp, droid, Qwen Code, Crush, Kiro, goose and aider | Not yet supported | none | It runs through `unsent` unchanged and nothing is saved. `unsent` says so before the agent starts and again after it exits. |
+
+A rig run is the real agent at that version, started through `unsent` in a private tmux server with a throwaway home folder and config, a dummy API key, and every request pointed at a closed local port, so nothing reaches a model or leaves the machine. Each saved draft is compared byte for byte with the copy the agent itself hands to your editor on Ctrl+G. "Replay in CI" means the bytes recorded in that run are in [`testdata/`](../testdata/) and go through `unsent`'s reader on every push. An agent with no rig run is not called supported.
+
+When your agent is newer than the version `unsent` last verified and `unsent` can't read its box, it says so after the agent exits and names both versions.
