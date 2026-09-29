@@ -525,9 +525,19 @@ func TestReplayCodex(t *testing.T) {
 	})
 	// Every capture with editor copies is replayed: a new one needs a line
 	// in codexReplays.
+	replayed := map[string]bool{"inline": true}
+	for _, r := range codexReplays {
+		replayed[r.name] = true
+	}
 	copies, _ := filepath.Glob(filepath.Join("testdata", "codex", "0.158.0", "*.editor-1.txt"))
-	if len(copies) != len(codexReplays)+1 {
-		t.Fatalf("%d captures with editor copies, %d replayed", len(copies), len(codexReplays)+1)
+	var missing []string
+	for _, c := range copies {
+		if name := strings.TrimSuffix(filepath.Base(c), ".editor-1.txt"); !replayed[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(copies) == 0 || len(missing) > 0 {
+		t.Fatalf("%d captures with editor copies, not replayed: %s", len(copies), strings.Join(missing, ", "))
 	}
 }
 
