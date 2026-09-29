@@ -18,7 +18,7 @@ Or grab a binary for macOS or Linux from the [releases page](https://github.com/
 
 ## First run
 
-Start your agent through `unsent`, or run setup once so `claude`, `codex` and `pi` go through it from the next shell:
+Start your agent through `unsent`, or, in zsh or bash, run setup once so `claude`, `codex` and `pi` go through it from the next shell:
 
 ```sh
 unsent claude         # one run, drafts saved as you type
