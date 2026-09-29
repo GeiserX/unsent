@@ -24,11 +24,13 @@ var codex = profile{
 	// A paste over 1,000 characters shows as "[Pasted Content 1001 chars]",
 	// whatever its line breaks, which count as characters (CR and CRLF
 	// become LF first). A second paste of the same size still in the box
-	// shows as "[Pasted Content 1001 chars] #2", then #3; once none of that
-	// size is left, the plain label comes back. So the label names the
-	// paste while the box shows it, the count pairs it with one, the
-	// pastes of a size go to the plain label, #2, #3 in the order they
-	// came, and a paste whose label left the box never comes back.
+	// shows as "[Pasted Content 1001 chars] #2", then #3: one above the
+	// highest of that size still there, and the plain label once none is
+	// left (next_large_paste_placeholder in chat_composer.rs, 0.158.0). So
+	// the label names the paste while the box shows it, the count pairs it
+	// with one, the labels of a size show their pastes in the order they
+	// came, and a label deleted and given again stands for the newer paste,
+	// never again for the older one.
 	pastes: []pasteRule{{
 		placeholder: regexp.MustCompile(`\[Pasted Content (\d+) chars\](?: #(\d+))?`),
 		collapses:   func(paste string, _ int) bool { return utf8.RuneCountInString(paste) > 1000 },

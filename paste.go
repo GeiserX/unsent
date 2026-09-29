@@ -32,9 +32,12 @@ type pasteRule struct {
 	// agent numbers them in the order it took the pastes; they are paired
 	// with the pastes in that order. Nil takes them in the draft's order.
 	rank func(m []string) int
-	// reuses is true when the agent gives an id to a new paste once no
-	// placeholder in the box shows it (Codex). A paste whose placeholder
-	// is gone from the draft is then spent: it fills nothing after.
+	// reuses is true when the agent gives a deleted placeholder's id to
+	// the next paste that needs it (Codex). A label held by a paste may
+	// then stand for a paste that came after the last read that showed
+	// it; the older paste is spent once a newer one takes its id, and
+	// fills nothing after. A placeholder missing from one read, the box
+	// scrolled or the stitcher starting over, keeps its paste.
 	reuses bool
 }
 
@@ -64,11 +67,14 @@ type pasteTracker struct {
 	rows    int
 	heights []int
 	// nums maps a placeholder's id (pasteRule.id) to the paste that filled
-	// it, spent holds the pastes a reusing rule let go (pasteRule.reuses),
-	// and cuts holds the text behind each placeholder the agent put in
-	// place of the middle of a long draft, by its number (see expand).
+	// it, spent holds the pastes whose id a newer paste took under a
+	// reusing rule (pasteRule.reuses), and shown holds, for each id such a
+	// rule paired, how many pastes had come when a read last showed it.
+	// cuts holds the text behind each placeholder the agent put in place
+	// of the middle of a long draft, by its number (see expand).
 	nums  map[pasteKey]int
 	spent map[int]bool
+	shown map[pasteKey]int
 	cuts  map[string]string
 }
 
@@ -152,7 +158,7 @@ func (p *pasteTracker) resize(rows int) {
 func (p *pasteTracker) reset() {
 	p.mu.Lock()
 	p.pastes, p.heights = nil, nil
-	p.nums, p.spent, p.cuts = nil, nil, nil
+	p.nums, p.spent, p.shown, p.cuts = nil, nil, nil, nil
 	p.mu.Unlock()
 }
 
@@ -220,7 +226,7 @@ func (p *pasteTracker) expand(draft, prev string, prof *profile) string {
 func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []bool, held map[int]pasteKey) string {
 	at := rule.placeholder.FindAllStringSubmatchIndex(out, -1)
 	ms, fills, order := make([][]string, len(at)), make([]string, len(at)), make([]int, len(at))
-	shown := map[string]bool{}
+	got := make([]int, len(at)) // the paste behind each placeholder, or -1
 	for k, loc := range at {
 		m := make([]string, len(loc)/2)
 		for g := range m {
@@ -228,20 +234,7 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 				m[g] = out[loc[2*g]:loc[2*g+1]]
 			}
 		}
-		ms[k], fills[k], order[k] = m, m[0], k
-		shown[rule.id(m)] = true
-	}
-	if rule.reuses {
-		for key, i := range p.nums {
-			if key.rule == r && !shown[key.id] {
-				delete(p.nums, key)
-				delete(held, i)
-				if p.spent == nil {
-					p.spent = map[int]bool{}
-				}
-				p.spent[i] = true
-			}
-		}
+		ms[k], fills[k], order[k], got[k] = m, m[0], k, -1
 	}
 	if rule.rank != nil {
 		slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(rule.rank(ms[a]), rule.rank(ms[b])) })
@@ -264,7 +257,7 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 				// count.
 				continue
 			}
-			used[i] = true
+			used[i], got[k] = true, i
 			if p.nums == nil {
 				p.nums = map[pasteKey]int{}
 			}
@@ -272,6 +265,9 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 			fills[k] = text
 			break
 		}
+	}
+	if rule.reuses {
+		p.reuse(draft, r, rule, ms, order, got, fills, used, held)
 	}
 	var b strings.Builder
 	last := 0
@@ -282,4 +278,52 @@ func (p *pasteTracker) fill(out, draft string, r int, rule pasteRule, used []boo
 	}
 	b.WriteString(out[last:])
 	return b.String()
+}
+
+// reuse finds the placeholders a reusing agent gave again (pasteRule.reuses).
+// Codex labels a paste with the plain label when no paste of its size is
+// left in the box, else with one number above the highest still there. So
+// the labels in the box show their pastes in the order the pastes came,
+// and a label still held by a paste stands for a newer one when that label
+// was deleted and the newer paste took it: a paste that came after the
+// last read that showed the label, and that got no label of its own in
+// this one. Such a paste takes the label, the newest the highest, and the
+// older paste is spent. From the screen alone this reads the same as that
+// newer paste deleted before the read; the rule takes the newer text, as
+// Codex would have, when a label was deleted and pasted again. The caller
+// holds p.mu.
+func (p *pasteTracker) reuse(draft string, r int, rule pasteRule, ms [][]string, order, got []int, fills []string, used []bool, held map[int]pasteKey) {
+	// free reports whether paste i is paired with no placeholder and was
+	// collapsed into one.
+	free := func(i int) bool {
+		_, ok := held[i]
+		text := p.pastes[i]
+		return !used[i] && !p.spent[i] && !ok && !strings.Contains(draft, text) &&
+			(rule.collapses == nil || rule.collapses(text, p.heights[i]))
+	}
+	upper := len(p.pastes)
+	for n := len(order) - 1; n >= 0; n-- {
+		k := order[n]
+		key := pasteKey{r, rule.id(ms[k])}
+		if h, ok := held[got[k]]; ok && h == key {
+			i := got[k]
+			for j := upper - 1; j >= p.shown[key]; j-- {
+				if free(j) && rule.fits(ms[k], p.pastes[j]) {
+					if p.spent == nil {
+						p.spent = map[int]bool{}
+					}
+					p.spent[i], used[j], got[k] = true, true, j
+					p.nums[key], fills[k] = j, p.pastes[j]
+					break
+				}
+			}
+		}
+		if got[k] >= 0 {
+			upper = min(upper, got[k])
+			if p.shown == nil {
+				p.shown = map[pasteKey]int{}
+			}
+			p.shown[key] = len(p.pastes)
+		}
+	}
 }

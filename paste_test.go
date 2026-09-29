@@ -292,8 +292,8 @@ func TestPasteExpandCodex(t *testing.T) {
 }
 
 // Codex gives the plain label back once no paste of that size is left in
-// the box: the next paste of that size shows under it, and a paste whose
-// label left the box fills nothing again.
+// the box: the next paste of that size shows under it, and the paste whose
+// label it took fills nothing again.
 func TestPasteExpandCodexReusedLabel(t *testing.T) {
 	var p pasteTracker
 	a, b := strings.Repeat("a", 1001), strings.Repeat("b", 1001)
@@ -309,4 +309,57 @@ func TestPasteExpandCodexReusedLabel(t *testing.T) {
 	if got := p.expand("x "+ph, "x ", &codex); got != "x "+b {
 		t.Fatalf("the label back for the next paste: got %.60q…, want the b paste", got)
 	}
+}
+
+// Codex gives a deleted label to the next paste that needs it, also
+// between two reads: the draft must hold the paste the box shows, not the
+// one deleted. A label missing from one read and back in the next, with
+// no paste since, still holds its paste. Codex numbers a new paste one
+// above the highest label of its size in the box, so the plain label and
+// #2 still shown keep theirs when a new one shows as #2 or #3.
+func TestPasteExpandCodexLabelGivenAgain(t *testing.T) {
+	a, b, c := strings.Repeat("a", 1001), strings.Repeat("b", 1001), strings.Repeat("c", 1001)
+	ph, ph2 := "[Pasted Content 1001 chars]", "[Pasted Content 1001 chars] #2"
+	paste := func(p *pasteTracker, text string) { p.feed([]byte(string(pasteStart) + text + string(pasteEnd))) }
+	expand := func(p *pasteTracker, draft, prev, want, what string) {
+		t.Helper()
+		if got := p.expand(draft, prev, &codex); got != want {
+			t.Fatalf("%s: got %.80q…, want %.80q…", what, got, want)
+		}
+	}
+
+	// Deleted and pasted again, same size, before the next read.
+	var p pasteTracker
+	paste(&p, a)
+	expand(&p, "x "+ph, "", "x "+a, "the first paste")
+	paste(&p, b)
+	expand(&p, "x "+ph, "x "+a, "x "+b, "the label given again within one read")
+	expand(&p, "x "+ph, "x "+b, "x "+b, "the read after")
+
+	// The label missing from one read (scrolled out, or the stitcher
+	// starting over) and back, no paste since.
+	p = pasteTracker{}
+	paste(&p, a)
+	expand(&p, "x "+ph, "", "x "+a, "the first paste")
+	expand(&p, "x ", "x "+a, "x ", "the label out of the draft")
+	expand(&p, "x "+ph, "x ", "x "+a, "the label back")
+
+	// A second paste of the size, the first still in the box: #2.
+	p = pasteTracker{}
+	paste(&p, a)
+	expand(&p, ph, "", a, "the first paste")
+	paste(&p, b)
+	expand(&p, ph+" "+ph2, a, a+" "+b, "a second label")
+
+	// #2 deleted and given again, the plain label kept.
+	paste(&p, c)
+	expand(&p, ph+" "+ph2, a+" "+b, a+" "+c, "#2 given again")
+
+	// The plain label deleted with #2 in the box: the new paste is #3.
+	p = pasteTracker{}
+	paste(&p, a)
+	paste(&p, b)
+	expand(&p, ph+" "+ph2, "", a+" "+b, "two pastes")
+	paste(&p, c)
+	expand(&p, ph2+" "+ph+" #3", a+" "+b, b+" "+c, "#3 after the plain label went")
 }

@@ -98,7 +98,7 @@ Dim (SGR 2) right after `› ` [measured]. Possible texts [source]: `Ask Codex t
 ## 4. Pastes
 
 - **Threshold 1000 characters**: `LARGE_PASTE_CHAR_THRESHOLD: usize = 1000`, test `char_count > 1000` [source `chat_composer.rs:341,1191`, re-checked]. 3-line, 12-line and 1000-char pastes stayed inline; 1001 chars became a placeholder [measured, paste files `p3/p12/p1000/p1001.txt` present]. Line count does not matter [measured].
-- **Format** `[Pasted Content N chars]` in cyan (`ESC[38;5;6m`); a second pending paste of the same size gets ` #2`, then `#3`; once all of a size are gone the base label is reused [measured for #2; source `chat_composer.rs:124-128,1913`]:
+- **Format** `[Pasted Content N chars]` in cyan (`ESC[38;5;6m`); a second pending paste of the same size gets ` #2`, then `#3`; once all of a size are gone the base label is reused [measured for #2; source `chat_composer.rs:124-128,1913`]. The suffix is one above the highest of that size still pending, and deleting a placeholder drops it from the pending list at once, so a deleted `#2` is given again while the base label stays, and a label deleted and pasted again between two reads names the new paste [source 0.158.0 `next_large_paste_placeholder`, `reconcile_deleted_elements`]:
 ```
 ^[[1m›^[[0m before ^[[38;5;6m[Pasted Content 1199 chars]^[[39m after^[[38;5;6m[Pasted Content 1199 chars] #2^[[39m
 ```

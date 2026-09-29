@@ -465,7 +465,8 @@ func wrapLine(rows []string, starts []int, line string, at, width int) ([]string
 // scrollModel is how a box at its height cap scrolls to keep the cursor in
 // view: its profile's scroll model (section 4 step 17 of docs/SPEC.md).
 // The stitcher needs none, since it lines each view up wherever it sits;
-// the fuzz draws the box with it.
+// the fuzz draws the box with it, and TestReplayScrollModel holds each
+// profile's to where its agent's captures leave the cursor.
 type scrollModel int
 
 const (

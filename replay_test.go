@@ -27,12 +27,18 @@ import (
 // that moment would. It returns each draft saved, in order.
 func replayBytes(t *testing.T, cols, rows int, data []byte) []string {
 	t.Helper()
+	return replayBytesAs(t, &claude, cols, rows, data)
+}
+
+// replayBytesAs is replayBytes with the session drawn by prof.
+func replayBytesAs(t *testing.T, prof *profile, cols, rows int, data []byte) []string {
+	t.Helper()
 	s := &session{
 		screen: vt.NewEmulator(cols, rows),
 		rec:    newRecord([]string{"claude"}, "/w"),
 		store:  testStore(t),
 		pastes: &pasteTracker{},
-		prof:   &claude,
+		prof:   prof,
 	}
 	// Claude Code queries the terminal; the emulator's answers must drain.
 	go io.Copy(io.Discard, s.screen)
@@ -62,13 +68,19 @@ func replayBytes(t *testing.T, cols, rows int, data []byte) []string {
 // the next editor copy, name.editor-N.txt.
 func replayRecord(t *testing.T, name string) {
 	t.Helper()
+	replayRecordAs(t, &claude, name)
+}
+
+// replayRecordAs is replayRecord with the session drawn by prof.
+func replayRecordAs(t *testing.T, prof *profile, name string) {
+	t.Helper()
 	data := readFixture(t, "2.1.282/"+name+".rec")
 	s := &session{
 		screen: vt.NewEmulator(120, 40),
 		rec:    newRecord([]string{"claude"}, "/w"),
 		store:  testStore(t),
 		pastes: &pasteTracker{},
-		prof:   &claude,
+		prof:   prof,
 	}
 	go io.Copy(io.Discard, s.screen)
 	var now time.Time
@@ -509,6 +521,136 @@ func TestReplayCodexCatchesAWrongWrapModel(t *testing.T) {
 		}
 		t.Logf("with %s, red: %s", m.name, strings.Join(red, ", "))
 	}
+}
+
+// Each profile's scroll model must be the one its agent's captures show:
+// every time the box scrolled, the cursor landed on a row the model puts
+// it on. The model only draws the fuzz's box (stitch_test.go), where a
+// wrong one would make the fuzz easier or harder than the agent without a
+// test noticing. The captures scroll both ways: Codex's tall moves 40 rows
+// up and back down a row at a time, and Claude Code's tall-wrapped,
+// deletes and bursts move up over rows out of sight mid-box, and
+// trailing-rows deletes rows at the end. So, as a check that can fail,
+// each profile with the other model must go red.
+func TestReplayScrollModel(t *testing.T) {
+	codexTall := func(t *testing.T, p *profile) { replayCodex(t, p, "tall", 1) }
+	claudeBin := func(name string) func(*testing.T, *profile) {
+		return func(t *testing.T, p *profile) { replayBytesAs(t, p, 120, 40, readFixture(t, "2.1.282/"+name+".bin")) }
+	}
+	claudeRec := func(name string) func(*testing.T, *profile) {
+		return func(t *testing.T, p *profile) { replayRecordAs(t, p, name) }
+	}
+	for _, c := range []struct {
+		prof     *profile
+		other    scrollModel
+		captures []func(*testing.T, *profile)
+	}{
+		{&codex, scrollMidBox, []func(*testing.T, *profile){codexTall}},
+		{&claude, scrollOneRow, []func(*testing.T, *profile){
+			claudeBin("tall-wrapped"), claudeRec("deletes"), claudeRec("bursts"), claudeRec("trailing-rows")}},
+	} {
+		t.Run(c.prof.name, func(t *testing.T) {
+			var all []boxScroll
+			for _, run := range c.captures {
+				all = append(all, scrollsIn(replayViews(t, c.prof, run))...)
+			}
+			if len(all) == 0 {
+				t.Fatal("no capture scrolled the box")
+			}
+			wrong := 0
+			for _, sc := range all {
+				if !scrollLands(c.prof.scroll, sc) {
+					t.Errorf("the box scrolled %+d rows with the cursor on row %d of %d, where %s's model never puts it", sc.by, sc.cursor, sc.rows, c.prof.name)
+				}
+				if !scrollLands(c.other, sc) {
+					wrong++
+				}
+			}
+			if wrong == 0 {
+				t.Errorf("with the other scroll model all %d scrolls still land", len(all))
+			}
+			t.Logf("%d scrolls; %d of them where the other model never puts the cursor", len(all), wrong)
+		})
+	}
+}
+
+// boxScroll is one scroll of a box at its height cap between two reads:
+// by rows (the text moved up by, when positive), leaving the cursor on
+// row cursor of rows.
+type boxScroll struct{ by, cursor, rows int }
+
+// scrollLands reports whether a box drawn by model m, as boxSim draws it,
+// can leave the cursor where sc did. Typing or moving past the bottom
+// scrolls just far enough, so the cursor is on the last row, in both
+// models; rows deleted at the end of the draft bring the box's end up
+// with the cursor on the last row too. Past the top, one row at a time
+// leaves the cursor on the first row; mid-box holds it on the middle row
+// over rows out of sight, both ways.
+func scrollLands(m scrollModel, sc boxScroll) bool {
+	switch {
+	case sc.cursor == sc.rows-1:
+		return true
+	case m == scrollOneRow:
+		return sc.by < 0 && sc.cursor == 0
+	default:
+		return sc.cursor == sc.rows/2
+	}
+}
+
+// replayViews runs a replay with prof and returns every view with text
+// its reader read, in order.
+func replayViews(t *testing.T, prof *profile, run func(*testing.T, *profile)) []view {
+	t.Helper()
+	var views []view
+	p := *prof
+	read := p.read
+	if read == nil {
+		read = codexStandIn
+	}
+	p.read = func(s *screen) (view, bool) {
+		v, ok := read(s)
+		if ok && !v.empty {
+			views = append(views, v)
+		}
+		return v, ok
+	}
+	run(t, &p)
+	return views
+}
+
+// scrollsIn lists the scrolls between consecutive views of a box at its
+// cap: the one shift under which all rows the two views share read the
+// same, but for one row an edit changed, when it is not zero.
+func scrollsIn(views []view) []boxScroll {
+	var out []boxScroll
+	for n := 1; n < len(views); n++ {
+		a, b := views[n-1], views[n]
+		h := len(b.rows)
+		if len(a.rows) != h || h < 3 || !a.capped || !b.capped || b.cursor < 0 {
+			continue
+		}
+		best, most, tie := 0, -1, false
+		for d := -(h - 1); d <= h-1; d++ {
+			same, shared := 0, 0
+			for i := max(0, -d); i < min(h, h-d); i++ {
+				shared++
+				if a.rows[i+d] == b.rows[i] && b.rows[i] != "" {
+					same++
+				}
+			}
+			switch {
+			case shared < 2 || same < shared-1:
+			case same > most:
+				best, most, tie = d, same, false
+			case same == most:
+				tie = true
+			}
+		}
+		if most >= 0 && !tie && best != 0 {
+			out = append(out, boxScroll{best, b.cursor, h})
+		}
+	}
+	return out
 }
 
 // charWrap is character wrap, the model of aider and goose in docs/SPEC.md
