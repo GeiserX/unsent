@@ -204,7 +204,9 @@ func claudeSessionPids() []int {
 //	────────────────────
 //
 // The marker is followed by a no-break space (U+00A0). An empty box shows a
-// dim hint after it. In shell mode the marker is "!".
+// dim hint after it, or a placeholder (claudePlaceholder). In shell mode the
+// marker is "!". A named session has its name in the top rule
+// (claudeTitledRule).
 // The box grows up to half the window height minus five rows, then scrolls
 // inside itself. Rows wrap at the window width minus four columns.
 func claudeBox(s *screen) (view, bool) {
@@ -214,7 +216,7 @@ func claudeBox(s *screen) (view, bool) {
 		if !shell && !hasMarker(first, "❯") {
 			continue
 		}
-		if !isRule(s.rows[y-1].text(), s.cols) {
+		if top := s.rows[y-1].text(); !isRule(top, s.cols) && !claudeTitledRule(top, s.cols) {
 			continue
 		}
 		end := -1
@@ -232,7 +234,7 @@ func claudeBox(s *screen) (view, bool) {
 			v.under = end + 1
 		}
 		v.capped = end-y >= s.rows2cap()
-		if (s.rows[y].textFrom(2) == "" || s.rows[y].faintFrom(2)) && end == y+1 {
+		if (s.rows[y].textFrom(2) == "" || s.rows[y].faintFrom(2) || claudePlaceholder(s.rows[y])) && end == y+1 {
 			v.empty = true
 			return v, true
 		}
@@ -249,6 +251,33 @@ func claudeBox(s *screen) (view, bool) {
 		return v, true
 	}
 	return view{}, false
+}
+
+// claudeTitledRule reports whether a row is the top rule of a named
+// session's box: a rule with the name near its right end, as in
+// "──────── calls ─". Claude Code 2.1.284 draws it from the /rename that
+// names the session on, and from the first frame of a resumed named session
+// (docs/research/claude.md section 13). The label of history browsing
+// ("─── History 1/1 ───…") sits at the left end and is still no rule: the
+// box shows an old message then, not the draft.
+func claudeTitledRule(t string, cols int) bool {
+	rest, ok := strings.CutSuffix(t, " ─")
+	if !ok {
+		return false
+	}
+	name, ok := strings.CutPrefix(strings.TrimLeft(rest, "─"), " ")
+	return ok && strings.HasPrefix(rest, "─") && strings.TrimSpace(name) != "" &&
+		!strings.Contains(name, "─") && runewidth.StringWidth(t) >= cols/2
+}
+
+// claudePlaceholder reports whether the box's first row shows Claude Code's
+// placeholder rather than text: the agents view (← on an empty box) draws
+// "❯ describe a task for a new session" with the marker and the text in
+// one grey, and its cursor on the first letter (docs/research/claude.md
+// section 13). Text the user types is drawn in the default colour, and so
+// is the marker of the main box, so neither matches.
+func claudePlaceholder(r screenRow) bool {
+	return len(r.ink) > 3 && r.ink[0] != 0 && r.inkFrom(3, r.ink[0])
 }
 
 // rows2cap is the height at which Claude Code's box stops growing. It is one

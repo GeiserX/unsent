@@ -4,7 +4,7 @@ Lane: `claude`. Source lane output: `.omc/spec/research/claude.json`. Captures l
 
 **Tags.** `measured` = seen on screen or in bytes, with the capture file named. `measured (no capture)` = the lane reports it, but no capture survives to re-check. `source` = read in the 2.1.282 binary's JS (strings dump `/tmp/unsent-spec-claude/strings.txt`). `docs` = public docs. `guess` = inference.
 
-**Environment of every measurement in sections 1 to 9.** tmux 3.7c at 120x40, `env -i` with `TERM=xterm-256color`, throwaway `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` (so a 401 banner on screen), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_TELEMETRY=1`, no plugins or hooks, empty non-git cwd (`start.sh`). The `TMUX` variable was stripped by `env -i`. Anything about hints, start-up timing or keyboard protocol may differ in the maintainer's real terminal and config. Nothing was submitted. Sections 10 and 11 are later runs with their own environments, stated there.
+**Environment of every measurement in sections 1 to 9.** tmux 3.7c at 120x40, `env -i` with `TERM=xterm-256color`, throwaway `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY` (so a 401 banner on screen), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_TELEMETRY=1`, no plugins or hooks, empty non-git cwd (`start.sh`). The `TMUX` variable was stripped by `env -i`. Anything about hints, start-up timing or keyboard protocol may differ in the maintainer's real terminal and config. Nothing was submitted. Sections 10 to 13 are later runs with their own environments, stated there.
 
 ## 1. The box
 
@@ -19,6 +19,7 @@ Lane: `claude`. Source lane output: `.omc/spec/research/claude.json`. Captures l
 | The hint exists: `vjr()` returns `Try "fix lint errors"` etc., shown only when `v<1&&!D&&be` | source | strings dump |
 | Top rule carries `─── History n/m ───` (label dim) while browsing history | measured | `cap-up2.txt` |
 | The label is produced only while the history index is non-zero (`"History"` or `` `History ${n}/${m}` ``) | source | strings dump |
+| In a named session the top rule carries the name at its right end, `──…── calls ─`, from 2.1.282 on (section 13); the History label sits at the left end | measured | `testdata/claude/2.1.284/` |
 | Footer below the box: `⏸ manual mode on · ? for shortcuts · ← for agents` when empty; `⏸ manual mode on` with a draft; `paste again to expand` after a placeholder paste; `! for shell mode` in shell mode | measured | `cap-empty.txt`, `cap-keys.txt`, `cap-paste4.txt`, `cap-shell.txt` |
 | A right-aligned dim hint row sits above the top rule at times (`ctrl+g to edit in Grab-editor.sh`, `◐ medium · /effort`) | measured | `cap-up2.txt`, `cap280-empty.txt` |
 | The slash menu is drawn above the top rule; the box stays intact and holds `/mode` as the draft | measured | `cap-slash.txt` |
@@ -136,10 +137,10 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 ## 8. Detection recipe for unsent's reader
 
 1. **Is it Claude Code?** Command basename `claude` (as now). Optional confirmation: `OSC 0 ;✳ Claude Code` and `ESC[?1049h` in the first output bytes [measured].
-2. **Find the box.** Bottom-up, a row starting with `❯` or `!` followed by U+00A0, a space or end of row, with a rule directly above; then the next rule below. Rule = every cell `─`, length ≥ cols/2. This is exactly `claudeBox` today [source].
+2. **Find the box.** Bottom-up, a row starting with `❯` or `!` followed by U+00A0, a space or end of row, with a rule directly above; then the next rule below. Rule = every cell `─`, length ≥ cols/2. The top rule may also be a named session's, `─…─ <name> ─` (section 13). This is exactly `claudeBox` today [source].
 3. **Labelled top rule** (`─── History n/m ───`): keep rejecting it. It means the user is browsing history; the reader returns not-ok and the last draft is kept.
 4. **Rows.** Strip 2 columns, trim trailing spaces (drops the fake cursor). In shell mode prefix `!`.
-5. **Empty.** One row whose text after column 2 is blank or all dim. Cross-check if wanted: the footer row contains `? for shortcuts` only when the box is empty [measured].
+5. **Empty.** One row whose text after column 2 is blank or all dim, or the agents view's placeholder: marker and text in one non-default colour (section 13). Cross-check if wanted: the footer row contains `? for shortcuts` only when the box is empty [measured].
 6. **Cursor.** Use the terminal cursor even though it is hidden. Never read inside a `?2026` pair; every keystroke frame is wrapped on this build.
 7. **Capped.** Rows between rules ≥ `rows2cap()` (keep `-6`).
 8. **Width.** `cols - 4`, word wrap, hard break for longer words.
@@ -165,7 +166,7 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 
 1. Rule glyph or width changes (rounded box, `╌`, rules not full width).
 2. Marker changes (`❯` → `>`, U+00A0 dropped; `hasMarker` already accepts a space).
-3. A label written into the top rule in the normal state (today only while browsing history).
+3. A label written into the top rule in the normal state. It happened: a named session's name sits in the top rule from 2.1.282 on, and the reader lost the box until it learned that shape (section 13).
 4. Continuation indent ≠ 2 or wrap ≠ cols-4: breaks un-wrapping and stitching silently, without failing safe.
 5. A higher cap than `rows/2 - 5`: `capped` would read false on a scrolled box (dangerous direction).
 6. A renderer that stops parking the terminal cursor at the insertion point.
@@ -374,6 +375,44 @@ Why Warp sends Ctrl+C in legacy form under flags 5 is not known [guess: Warp kee
 **A burst scrolls out before the first read** [measured, 2026-09-29, Claude Code 2.1.284, two runs at the v0.6 gate]: 599 characters (`word001` to `word075`) written in one tmux write into a capped box left unsent's saves holding only the last 487, from `word015` on, because the first words scrolled out of the box before unsent's first read. It is a synthetic burst, not typing.
 
 **What this section could not measure.** Every key in Warp (the gate run above pressed three). iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
+
+## 13. Slash commands and named sessions (measured 2026-09-29)
+
+**Environment.** Claude Code 2.1.284 (the binary copied from the MacBook; 2.1.282 and 2.1.283 draw the same rule after `/rename`) on a Mac mini, under `unsent claude` built from v0.6.0 with `UNSENT_DEBUG_DIR` set, in a private tmux server at 120x40, started under `env -i` with a scratch `HOME`, `CLAUDE_CONFIG_DIR` and `UNSENT_HOME`, a dummy `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `HTTPS_PROXY` and `HTTP_PROXY` on a closed local port and `CLAUDE_CODE_MAX_RETRIES=0`. `settings.json` held `"tui":"fullscreen"` and a stub status line; one run used the main-screen renderer (a theme only). Each run was one case, one run each. unsent's raw logs of the runs worth replaying are in [`testdata/claude/2.1.284/`](../../testdata/claude/README.md), and `TestReplayClaudeSlashCommandsAndNames` replays them.
+
+**Named sessions.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| `/rename <name>` and Enter runs the command once, whether the completion menu is open (no argument) or closed (argument typed, or menu closed with Esc). Claude Code prints `⎿  Session renamed to: <name>` and redraws the box empty | measured | `rename-enter.rec`, `rename-after-esc.rec` |
+| From then on the top rule carries the name at its right end, in the rule's colour (`38;5;244`): `──…── calls ─`. The bottom rule stays plain, and the name never shows in the box row | measured | `title-in-rule.rec`, `screens/titled-empty.txt` |
+| At 80, 60, 40 and 30 columns the rule stays full width, the name one `─` from its right end | measured (no capture) | tmux `capture-pane` of a resize run |
+| A session resumed by name (`--resume <name>`) has the titled rule from its first frame | measured | `resumed-named.rec` |
+| The main-screen renderer draws the same rule | measured | `rename-main-screen.rec`, `screens/titled-draft-main.txt` |
+| The window title becomes `ESC]0;✳ <name> BEL`. The emulator ends the sequence at the `0x9c` byte of ✳, so unsent up to v0.1.1 printed ` <name>` into the box and saved it, leading space included; `stringSeqs` (v0.2.0) strips it | measured | `agents-view.rec` holds the bytes; a v0.1.1 build on the same run |
+| Up to v0.6.0 the reader took only a rule of plain `─` for the top of the box, so after `/rename` it found no box for the rest of the run. The `/rename` line stayed the draft and was left behind as an orphan at exit; text typed later (`a real prompt typed after the rename`, `half typed after rename` at a window close) was never saved; and no line was printed at exit, since the box had been read before the rename | measured | `views.jsonl` and `drafts/` of each run; the replays |
+
+**Other slash commands and pickers.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| `/clear` empties the box: counted as sent | measured | `slash-clear.rec` |
+| `/help` and `/model` open a dialog that hides the box. The Esc that closes it brings the box back empty, which unsent counts as a clear, so the command goes to history (2.13: doubt counts as a clear) | measured | `slash-help.rec`, `slash-model.rec` |
+| `/exit` leaves with no box over several frames. Up to v0.6.0 a save that read two of them forgot the send at the second, and `/exit` was left behind as an orphan; unsent now keeps the send until a box or another key comes | measured | `slash-*.rec` replayed with a save after every frame |
+| `/resume` opens a picker: a `▔` line, `Resume session`, the search field in a `╭╮` frame (`│ ⌕ alph │`), the matches, `Type to Search · Enter to select · Esc to clear`. The reader never takes the field for the box | measured | `resume-picker-close.rec`, `screens/resume-picker.txt` |
+| A window closed with the picker open left `/resume` behind as an orphan: the box was last seen holding it. Claude Code had run it, so unsent now sends a draft whose box a submit key took away for good to history at exit | measured | `resume-picker-close.rec` |
+
+**The agents view.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| ← on an empty box opens the agents view: `Your conversation moved to the background — enter opens it · esc returns to it · ctrl+c twice quits`, the session lists, then a box between plain rules drawn dim (SGR 2) | measured | `agents-view.rec`, `screens/agents-view.txt` |
+| Its box shows `❯ describe a task for a new session`: the marker and the text in `38;5;246` (not SGR 2), the reverse-video cursor on the `d`. Footer: `⏵⏵ auto mode · enter to return · space to reply · ctrl+x to delete · ? for shortcuts` | measured | same |
+| Up to v0.6.0 unsent read the placeholder as a draft and left it behind when Claude Code was quit from that view (Ctrl+C twice); it also reached history | measured | the replay |
+| Esc goes back to the main box, with a plain top rule even in a named session | measured | `agents-view.rec` |
+| Opening the view started a Claude Code background daemon and a forked `--resume` session outside unsent's terminal, and both outlived the run | measured (no capture) | `ps` after the run |
+
+**Not measured.** How text typed into the agents view's box is drawn (unsent reads it as a draft unless the marker and all of it share one colour). The History label in a named session (the reader keeps rejecting a rule with a label at its left end). The placeholder's colour under other themes.
 
 ## Risks
 

@@ -491,9 +491,13 @@ type session struct {
 	armed   bool
 	cleared bool
 	// leftOnSubmit is set when the screen after a submit key typed into the
-	// box shows no box, until a box is read again. closed is set once the
-	// window closed or unsent was asked to stop (see closing).
+	// box shows no box, until a box is read again or another key is typed
+	// (the screens of a teardown that takes several frames, /exit, keep
+	// it); goneOnSubmit stays set through the keys too (a picker the key
+	// opened). closed is set once the window closed or unsent was asked to
+	// stop (see closing).
 	leftOnSubmit bool
+	goneOnSubmit bool
 	closed       bool
 
 	rec    *record
@@ -683,7 +687,7 @@ func (s *session) save() {
 			if s.armed && e.before != nil {
 				s.look(e.before)
 			}
-			s.armed = false
+			s.armed, s.leftOnSubmit = false, false
 		case keyClear:
 			s.armed, s.cleared = false, true
 		case keySubmit:
@@ -742,11 +746,12 @@ func (s *session) look(scr *screen) bool {
 		// may have left for good with it (/exit): see finish. After the
 		// close, the agent leaves because of it, not because of a key.
 		if !s.closed {
-			s.leftOnSubmit = armed
+			s.leftOnSubmit = s.leftOnSubmit || armed
+			s.goneOnSubmit = s.goneOnSubmit || armed
 		}
 		return false
 	}
-	s.leftOnSubmit = false
+	s.leftOnSubmit, s.goneOnSubmit = false, false
 	s.matched = true
 	sent := false
 	if v.empty {
@@ -857,10 +862,18 @@ func (s *session) closing() {
 // so its file goes away; a non-empty one stays for `unsent restore`.
 func (s *session) finish() {
 	s.rec.Ended = time.Now()
-	if s.leftOnSubmit && !s.cleared && s.rec.Draft != "" && s.sendOff() == nil {
+	switch {
+	case s.rec.Draft == "":
+	case s.leftOnSubmit && !s.cleared && s.sendOff() == nil:
 		// The agent left on the submit key (/exit): it took the draft, which
 		// must not come back as one left behind, nor be put back in the box
 		// when the conversation is reopened.
+		s.rec.Draft = ""
+	case !s.leftOnSubmit && s.goneOnSubmit && s.store.archive(s.rec) == nil:
+		// The submit key took the box away and it never came back: the
+		// agent ran the draft (a /resume picker the window closed on). It
+		// was not left in the box, but nothing proves a send, so it goes to
+		// history, as a box that empties after such a screen does.
 		s.rec.Draft = ""
 	}
 	if s.rec.Draft == "" {

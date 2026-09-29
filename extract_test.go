@@ -115,6 +115,35 @@ func TestClaudeBoxNotOnScreen(t *testing.T) {
 	}
 }
 
+// A named session's top rule carries its name at the right end (2.1.284).
+// History browsing's label, at the left end, still hides the box, alone or
+// with a name.
+func TestClaudeTitledRule(t *testing.T) {
+	titled := strings.Repeat("─", 92) + " calls ─"
+	for _, c := range []struct {
+		row string
+		ok  bool
+	}{
+		{titled, true},
+		{strings.Repeat("─", 80) + " notas · día 2 ─", true},
+		{"─── History 1/1 " + strings.Repeat("─", 84), false},
+		{"─── History 1/1 " + strings.Repeat("─", 70) + " calls ─", false},
+		{strings.Repeat("─", 10) + " calls ─", false},
+		{strings.Repeat("─", 92) + "  ─", false},
+		{"calls " + strings.Repeat("─", 94) + " ─", false},
+		{strings.Repeat("─", 92) + " calls", false},
+		{rule, false},
+	} {
+		if got := claudeTitledRule(c.row, 100); got != c.ok {
+			t.Errorf("claudeTitledRule(%q) = %v", c.row, got)
+		}
+	}
+	s := screenFromText(strings.Replace(claudeScreen("❯ typed after the rename▮"), rule+"\n❯", titled+"\n❯", 1), 100)
+	if v, ok := claudeBox(s); !ok || v.empty || v.rows[0] != "typed after the rename" {
+		t.Fatalf("under a titled rule: ok=%v rows=%q", ok, v.rows)
+	}
+}
+
 func TestProfileFor(t *testing.T) {
 	if profileFor("/usr/local/bin/claude") != &claude {
 		t.Fatal("no profile for claude")
