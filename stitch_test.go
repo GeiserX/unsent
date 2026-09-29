@@ -449,7 +449,9 @@ func fuzzSeeds() int64 {
 // measured at 4 seeds (the race detector's), 50 (CI's) and 150. Codex's
 // box scrolls a row at a time on every seed, and its end row keeps more
 // line breaks: at 150 seeds 62% of its saves are identical, against 56%
-// for Claude Code, but only 56% at 4 seeds.
+// for Claude Code, but only 56% at 4 seeds. pi's box scrolls a row at a
+// time too, with no end row; with repeated words 50% of its saves are
+// identical at 4 seeds, against 59% at 50 and 150.
 
 // fuzzFloors are the floors each mode's rates must stay above.
 type fuzzFloors struct {
@@ -464,6 +466,7 @@ func TestStitchFuzzUniqueWords(t *testing.T) {
 	}{
 		{&claude, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.95, 0.86, 0.55}}},
 		{&codex, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.96, 0.87, 0.56}}},
+		{&pi, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.97, 0.87, 0.56}}},
 	} {
 		for _, m := range c.floors {
 			t.Run(c.prof.name+"/"+m.mode, func(t *testing.T) { fuzzRate(t, c.prof, 0, m) })
@@ -478,6 +481,7 @@ func TestStitchFuzzUniqueWords(t *testing.T) {
 func TestStitchFuzzRepeatedWords(t *testing.T) {
 	t.Run("claude", func(t *testing.T) { fuzzRate(t, &claude, 40, fuzzFloors{"window", 0.95, 0.84, 0.56}) })
 	t.Run("codex", func(t *testing.T) { fuzzRate(t, &codex, 40, fuzzFloors{"window", 0.94, 0.84, 0.63}) })
+	t.Run("pi", func(t *testing.T) { fuzzRate(t, &pi, 40, fuzzFloors{"window", 0.95, 0.85, 0.50}) })
 }
 
 // fuzzRate runs the fuzz for prof over every seed. A profile whose box

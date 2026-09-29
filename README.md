@@ -12,13 +12,13 @@
 
 **AutoRecover for your AI agent prompts.**
 
-`unsent` saves text you have typed and not sent yet, in two places: the input box of a coding agent that runs in your terminal, and the command line at your shell prompt. Today that means Claude Code, Codex and zsh. Other agents run through `unsent` unchanged, and nothing of theirs is saved yet. [Supported agents](#supported-agents) says which version of each was last checked, and when.
+`unsent` saves text you have typed and not sent yet, in two places: the input box of a coding agent that runs in your terminal, and the command line at your shell prompt. Today that means Claude Code, Codex, pi and zsh. Other agents run through `unsent` unchanged, and nothing of theirs is saved yet. [Supported agents](#supported-agents) says which version of each was last checked, and when.
 
 Remember Word's AutoRecover? The laptop dies at 3 a.m. the night before the deadline, you reopen Word, and there it is on the left: *Document Recovery: thesis_FINAL_v3 (AutoRecovered)*. That little panel has saved more university projects than any all-nighter.
 
 `unsent` brings that to the box where you type to your agent.
 
-You spend ten minutes writing a careful prompt. Then the terminal window closes, the machine reboots for an update, the agent crashes, or you press Ctrl+C one time too many, and the prompt is gone. Claude Code and Codex save your *conversations*, not the message you haven't sent yet. The request to change that in Claude Code, [anthropics/claude-code#18755](https://github.com/anthropics/claude-code/issues/18755), was closed as not planned.
+You spend ten minutes writing a careful prompt. Then the terminal window closes, the machine reboots for an update, the agent crashes, or you press Ctrl+C one time too many, and the prompt is gone. Claude Code, Codex and pi save your *conversations*, not the message you haven't sent yet. The request to change that in Claude Code, [anthropics/claude-code#18755](https://github.com/anthropics/claude-code/issues/18755), was closed as not planned.
 
 With `unsent`, the next time you start the agent in that folder you see this line, before it starts and again after it exits, because the agent's screen covers the first one while it runs:
 
@@ -26,7 +26,7 @@ With `unsent`, the next time you start the agent in that folder you see this lin
 unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to copy it.
 ```
 
-Reopen the conversation you typed it in and you don't need the notice. In Claude Code that is `claude --resume`, `claude -c`, the resume picker or `/resume`; in Codex it is `codex resume <id>`, `codex resume --last` or the picker that `codex resume` opens. The draft goes back into the empty box on its own, as one paste, and a line under the box says `unsent: put back your draft from 18:42 today, not sent`. Nothing is sent: you decide what to do with it. A new chat is another conversation, so it gets the notice and never a paste. So do `/clear` and `--fork-session` in Claude Code, and `/new` and `codex fork` in Codex.
+Reopen the conversation you typed it in and you don't need the notice. In Claude Code that is `claude --resume`, `claude -c`, the resume picker or `/resume`; in Codex it is `codex resume <id>`, `codex resume --last` or the picker that `codex resume` opens. The draft goes back into the empty box on its own, as one paste, and a line under the box says `unsent: put back your draft from 18:42 today, not sent`. Nothing is sent: you decide what to do with it. A new chat is another conversation, so it gets the notice and never a paste. So do `/clear` and `--fork-session` in Claude Code, and `/new` and `codex fork` in Codex. pi doesn't say which conversation it has open, so a pi draft comes back through the notice and `unsent restore` ([What differs in pi](#what-differs-in-pi)).
 
 ## Supported agents
 
@@ -34,7 +34,8 @@ Reopen the conversation you typed it in and you don't need the notice. In Claude
 | --- | --- | --- | --- |
 | Claude Code | Supported | 2.1.284, 2026-09-29 | Rig runs: keys and Ctrl+Z in Warp on 2.1.284 (2026-09-29); drafts put back through `--resume <id>`, `-c`, the picker and `/resume`, the notice in a new chat, and keys in tmux and Ghostty on 2.1.283 (2026-09-28). CI checks the box, pastes and the sent log against captures of 2.1.282, and slash commands and a named session against runs of 2.1.284, on every push, and `unsent` names 2.1.282 as the version it last verified. Measurements: [docs/research/claude.md](docs/research/claude.md). |
 | Codex CLI | Supported | 0.158.0, 2026-09-29 | Rig run: the box, pastes, every delete key in both key forms Codex asks tmux for, Ctrl+Z, the sent log, and drafts put back through `codex resume <id>`, `codex resume --last` and the picker, with the notice in a new chat. Its captures replay in CI. Measurements: [docs/research/codex.md](docs/research/codex.md), sections 10 and 11. |
-| Every other agent, such as Gemini CLI, GitHub Copilot CLI, opencode, pi, agy, cursor-agent, Amp, droid, Qwen Code, Crush, Kiro, goose and aider | Not yet supported | none | It runs through `unsent` unchanged and nothing is saved. `unsent` says so before the agent starts and again after it exits. |
+| pi | Supported, without put-back | 0.87.1, 2026-09-29 | Rig run: the box, its new-line and submit keys, every delete key, pastes and their renumbering, Ctrl+Z, pickers and dialogs, a closed window, `kill -9`, a paste on the first frame of a new chat and of `pi -c`, and the sent log, which matched pi's own session file byte for byte. Its captures replay in CI. pi names its open conversation nowhere `unsent` can read, so drafts are not put back into a reopened one. Measurements: [docs/research/pi.md](docs/research/pi.md). |
+| Every other agent, such as Gemini CLI, GitHub Copilot CLI, opencode, agy, cursor-agent, Amp, droid, Qwen Code, Crush, Kiro, goose and aider | Not yet supported | none | It runs through `unsent` unchanged and nothing is saved. `unsent` says so before the agent starts and again after it exits. |
 
 A rig run is the real agent at that version, started through `unsent` in a private tmux server with a throwaway home folder and config, a dummy API key, and every request pointed at a closed local port, so nothing reaches a model or leaves the machine. Each saved draft is compared byte for byte with the copy the agent itself hands to your editor on Ctrl+G. "Replay in CI" means the bytes recorded in that run are in [`testdata/`](testdata/) and go through `unsent`'s reader on every push. An agent with no rig run is not called supported.
 
@@ -65,6 +66,7 @@ Start your agent through it:
 ```sh
 unsent claude
 unsent codex
+unsent pi
 ```
 
 Everything else stays the same. Same terminal, same keys, same arguments, so `unsent claude --resume` and `unsent codex resume --last` work too. To stop typing `unsent`, run setup once:
@@ -75,7 +77,7 @@ unsent status         # am I protected? one line per fact
 unsent setup --undo   # remove the block again
 ```
 
-Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude` and `codex`, into a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, and a function of the same name is left alone. An alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path, skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
+Setup adds one marked block to `~/.zshrc` or `~/.bashrc`, picked from `$SHELL` (or `unsent setup bash`). It turns each agent `unsent` can read, today `claude`, `codex` and `pi`, into a shell function that runs it through `unsent`. An alias such as `alias claude='claude --model opus'` keeps working, and a function of the same name is left alone. An alias that points at a path, and launchers that start the agent through `env`, `command`, `exec` or a full path, skip the wrapper: setup warns about them and never edits them. `unsent status` asks a new shell what each agent name runs and what bypasses it, without starting an agent or editing a file. Run setup again after an upgrade that adds agents. `--undo` removes the block and nothing else, and your drafts stay. To uninstall, run `unsent setup --undo` and `brew uninstall unsent`.
 
 `UNSENT_NOTICE=0` turns off the notices and the line under the box, for sessions nobody watches. Drafts still go back into their conversation's box, and a line saying drafts are not being saved still shows.
 
@@ -127,6 +129,15 @@ It prints the JSON to add to `~/.claude/settings.json` (or `settings.json` in `$
 - **New lines and sends.** Ctrl+J makes a new line, and so do Shift+Enter and Alt+Enter in a terminal that sends them as keys of their own. Enter sends the box, and so does Tab, which queues the message while Codex is still working. Both count as a send in the sent log. Ctrl+C on a draft clears it into history, and on an empty box it quits Codex.
 - **Long pastes.** Codex shows a paste over 1,000 characters as `[Pasted Content 1234 chars]`, and a second one of the same size as `[Pasted Content 1234 chars] #2`. The count includes line breaks. `unsent` saves the pasted text in its place. A draft over 1,000 characters that goes back into the box shows as that placeholder too, while Codex holds the whole text; Ctrl+G opens it in your editor.
 
+## What differs in pi
+
+`unsent pi` saves the box the way `unsent claude` does. Four things differ.
+
+- **Reopening a conversation.** pi doesn't write down which conversation a running pi has open: it keeps no file per process, and it writes a conversation's file only once a reply comes. So `pi -c`, `pi -r`, `pi --session` and `/resume` look the same from outside until the next message, and a pi draft never goes back into the box by itself. The notice before and after pi runs names it, and `unsent restore` copies it. For the same reason the sent log is one per run, not one per conversation.
+- **New lines and sends.** Ctrl+J and Shift+Enter make a new line, and so does `\` then Enter. Enter sends, and so does Alt+Enter, pi's follow-up key, when pi is idle; Esc then Enter reads as Alt+Enter and sends too, so it is never a new line. Ctrl+C on a draft clears it into history, and pi's undo, Ctrl+-, brings it back, which `unsent` saves again. Up with the cursor at the start of a draft shows pi's history while pi keeps your draft aside, and `unsent` keeps the draft as it was until you edit or come back down.
+- **Long pastes.** pi shows a paste of more than 10 lines as `[paste #1 +12 lines]` and one over 1,000 characters as `[paste #2 1001 chars]`. Deleting one with Backspace renumbers the ones after it; `unsent` follows the renumbering and saves the pasted text in each place, with each tab as four spaces, as pi keeps it.
+- **Ctrl+Z.** As with Codex, while pi is stopped your shell gets keys in the form pi asked the terminal for, so Ctrl+C at that prompt can show as `^[[99;5u`. After `fg`, pasting works as before.
+
 ## Your half-typed zsh command line survives too
 
 A long command typed at the zsh prompt and not yet run is lost the same way: the window closes, or Ctrl+C clears it. `unsent setup zsh` also saves that line as you type it, with a few zsh builtins in the same block, so no process starts with the shell and nothing wraps it.
@@ -141,7 +152,7 @@ A line you run with Enter keeps nothing, because zsh's own history has it (`UNSE
 
 ## Sent messages
 
-Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. For Claude Code and Codex the log belongs to the conversation: resume it (`claude --resume`, `claude -c`, the resume picker or `/resume`; `codex resume <id>`, `codex resume --last` or its picker) and new messages join the same log, after a line saying when it was resumed. `unsent log <id>` also takes the agent's own id for the conversation: Claude Code's session id, or Codex's thread id. After you start a new session, the old one's messages are one command away:
+Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. For Claude Code and Codex the log belongs to the conversation (pi's is one per run): resume it (`claude --resume`, `claude -c`, the resume picker or `/resume`; `codex resume <id>`, `codex resume --last` or its picker) and new messages join the same log, after a line saying when it was resumed. `unsent log <id>` also takes the agent's own id for the conversation: Claude Code's session id, or Codex's thread id. After you start a new session, the old one's messages are one command away:
 
 ```sh
 unsent log                 # sessions with sent messages, newest first
@@ -171,7 +182,7 @@ unsent forget --log 20260927-101500-4242   # delete one session's sent log, by t
 
 A send and a clear both empty the box, and the key you pressed tells them apart. A draft counts as sent only when Enter was the last key before the box emptied, with no Ctrl+C or Esc Esc next to it, and the box was on screen when you pressed it. Typing the next message into the emptied box doesn't change that. When `unsent` can't be sure, it treats the draft as cleared and keeps it in history. A missed send costs one history entry, never text.
 
-To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_CLAUDE=delete` does the same for Claude Code alone, and `UNSENT_ON_SEND_CODEX=delete` for Codex alone; each wins over `UNSENT_ON_SEND`. Turning it off doesn't delete existing logs; `unsent forget --log` does.
+To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_CLAUDE=delete` does the same for Claude Code alone, `UNSENT_ON_SEND_CODEX=delete` for Codex alone and `UNSENT_ON_SEND_PI=delete` for pi alone; each wins over `UNSENT_ON_SEND`. Turning it off doesn't delete existing logs; `unsent forget --log` does.
 
 ## Works everywhere you type
 
@@ -189,9 +200,9 @@ To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_C
 
 A few things make that more than a screenshot:
 
-- **Long drafts.** Claude Code's box stops growing at half the window height, and Codex's at the window height minus 4 rows, and then each scrolls inside itself, so the screen only shows part of a long prompt. `unsent` lines each view up, word by word, against what it has already seen, and keeps the parts above and below it. Edits you make after scrolling back up, and resizing the window, both work. The screen can't tell text you deleted from text that only moved out of sight. The delete keys you pressed in the last second can, so `unsent` counts them.
-- **Big pastes.** Claude Code shows a paste of 4 or more lines, or over 800 characters, as `[Pasted text #1 +39 lines]`, and Codex one over 1,000 characters as `[Pasted Content 1234 chars]`. Terminals mark pasted text with special codes, so `unsent` records the paste as it goes in and puts the real text back in place of the placeholder.
-- **Ctrl+Z.** Suspending works as usual: your shell shows the job as stopped, and `fg` brings the agent back. That includes tmux and Ghostty, where Claude Code switches the terminal to a keyboard mode that sends Ctrl+Z as an escape code. While the agent is stopped, your shell gets its keys in the usual form. Codex is the exception: while it's stopped, your shell gets keys in the form Codex asked the terminal for, so Ctrl+C at that prompt can show as `^[[99;5u`. After `fg`, pasting works as before.
+- **Long drafts.** Claude Code's box stops growing at half the window height, Codex's at the window height minus 4 rows and pi's at 30% of it (at least 5 rows), and then each scrolls inside itself, so the screen only shows part of a long prompt. `unsent` lines each view up, word by word, against what it has already seen, and keeps the parts above and below it. Edits you make after scrolling back up, and resizing the window, both work. The screen can't tell text you deleted from text that only moved out of sight. The delete keys you pressed in the last second can, so `unsent` counts them.
+- **Big pastes.** Claude Code shows a paste of 4 or more lines, or over 800 characters, as `[Pasted text #1 +39 lines]`, Codex one over 1,000 characters as `[Pasted Content 1234 chars]`, and pi one of more than 10 lines or over 1,000 characters as `[paste #1 +12 lines]`. Terminals mark pasted text with special codes, so `unsent` records the paste as it goes in and puts the real text back in place of the placeholder.
+- **Ctrl+Z.** Suspending works as usual: your shell shows the job as stopped, and `fg` brings the agent back. That includes tmux and Ghostty, where Claude Code switches the terminal to a keyboard mode that sends Ctrl+Z as an escape code. While the agent is stopped, your shell gets its keys in the usual form. Codex and pi are the exception: while one is stopped, your shell gets keys in the form it asked the terminal for, so Ctrl+C at that prompt can show as `^[[99;5u`. After `fg`, pasting works as before.
 - **Pipes.** When input or output isn't a terminal (`git diff | claude -p "review"`, `claude -p x > out.md`), `unsent` hands over to the agent directly. There's no input box to save, so the wrapper is safe to keep.
 - **Saying when it didn't save.** Claude Code draws on a screen of its own, which hides anything printed while it runs, so `unsent` speaks up after the agent exits. If it never found the input box in a session you typed in, which is what an agent update that changes the box looks like, it says so and names the version it last checked, for example `unsent: could not read claude 2.1.290's box this session (last verified 2.1.282), nothing was saved`. An agent it has no reader for is named before it starts and again after it exits. If `unsent` itself hits a bug, it stops saving, keeps the last draft it saved and passes every byte through for the rest of the session. The agent never notices.
 - **Knowing what's dead.** Each session holds a file lock, and the operating system releases it when the process dies, whether it exits, crashes or the machine reboots. A process ID can't be trusted for this because a reboot reuses them. The lock can.
@@ -212,13 +223,17 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - The sent log holds the box as the agent last drew it before your Enter. A key typed so fast before Enter that the agent never drew it can be missing: measured on Codex 0.158.0, a key 10 to 20 ms before Enter was missing in 3 of 4 messages, and none was missing at 30 ms or more. Enter and Ctrl+Enter count as a send, in whatever form the terminal sends them. A remapped submit key, or Ctrl+X Ctrl+S, reads as a clear, and the message goes to history instead.
 - Pressing Esc while Claude Code works on a message can put that message back in the box. The sent log still holds it, although Claude Code didn't answer it.
 - A draft with a tab in it isn't pasted back, because Claude Code's box turns each tab into four spaces. It goes to the clipboard instead, and the line under the box says so.
-- A conversation you typed in but never sent can't be resumed, since neither Claude Code nor Codex keeps anything to resume for it. Its draft only comes back through the notice and `unsent restore`.
+- A conversation you typed in but never sent can't be resumed, since neither Claude Code, Codex nor pi keeps anything to resume for it. Its draft only comes back through the notice and `unsent restore`.
 - A draft goes back into the box only when the command line reads as a chat start: `claude` with its own options. Started with a prompt (`claude "fix it"`) or a subcommand, it gets the notice instead. With `--as` or `UNSENT_AGENT` the command's arguments are read the same way, so a launcher started bare or with Claude Code's options restores, and `npx @anthropic-ai/claude-code` gets the notice. For Codex a chat start is `codex` with its own options, `codex resume` or `codex fork`; a prompt (`codex "fix it"`), an image to attach with `-i`, or any other subcommand gets the notice.
 - The line saying a draft was put back is drawn under the box only when Claude Code runs on the alternate screen. Otherwise the line printed after exit says it.
 - A draft goes back into a reopened Codex conversation only when `unsent` can tell which conversation the running Codex is in. With `-c`, `--enable`, `--disable`, `--search` or `--no-daemon`, Codex runs the conversation itself and names it. A plain `codex` hands it to a shared background server, which names it only when that `codex` started the server; one left running by an earlier `codex` names none. After `/new` or `/resume` one Codex holds two conversations and names neither. In those cases the notice and `unsent restore` reach the draft.
 - Codex draws a tab as one space and spaces at the end of a line as blank cells, so a draft saved from its box has spaces there.
 - Codex started with `--no-alt-screen` draws its box in a layout `unsent` doesn't read, and `unsent` says so after it exits.
-- An entry of Codex's history brought back with Up isn't saved as a draft until you edit it: Codex keeps it. Sending it puts it in the sent log.
+- An entry of Codex's history brought back with Up isn't saved as a draft until you edit it: Codex keeps it. Sending it puts it in the sent log. The same goes for pi.
+- pi draws spaces at the end of a line as blank cells, so a draft saved from its box has none there, and two or more spaces where a row wraps come back as one.
+- pi's `editorPaddingX` setting, when it isn't 0, puts spaces at the start of every row of the box, and they end up in the saved draft.
+- A pi draft cleared with Ctrl+C and brought back with Ctrl+- is saved again, but a paste placeholder in it stays the placeholder in the live draft; the draft history kept at the Ctrl+C has the pasted text.
+- pi's fullscreen mode (`--tui-mode fullscreen`) was not measured, and neither was a paste pi reads from the clipboard itself (Ctrl+V, or a right-click in fullscreen), which never crosses the terminal: such a paste over pi's placeholder threshold stays the placeholder in the saved draft.
 - macOS and Linux, including WSL. Native Windows has no pseudo-terminals of this kind.
 
 ## Development
@@ -227,9 +242,9 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 go test -race ./...
 ```
 
-The tests include a fake agent that draws its box the way Claude Code does. Typing, pasting, Ctrl+C, Ctrl+Z and a closed window all run end to end without Claude Code installed. Codex's recorded sessions in `testdata/codex/` replay through its reader, so its tests don't need Codex installed either.
+The tests include a fake agent that draws its box the way Claude Code does. Typing, pasting, Ctrl+C, Ctrl+Z and a closed window all run end to end without Claude Code installed. Codex's and pi's recorded sessions in `testdata/codex/` and `testdata/pi/` replay through their readers, so their tests don't need Codex or pi installed either.
 
-`unsent capture claude` (or `unsent capture codex`), run from a checkout of this repo, records a test fixture: every key and all of the agent's output go to `testdata/<agent>/<version>/capture-<time>.rec`, the window sizes to a `.json` beside it, and each Ctrl+G saves the box as an editor copy instead of opening your editor. Setting `UNSENT_DEBUG_DIR=<folder>` logs the same keys and output there for any session, next to each save's view. Both are off unless you ask, and their files are `0600`, but they hold everything you type: check them before you share or commit them.
+`unsent capture claude` (or `unsent capture codex`, `unsent capture pi`), run from a checkout of this repo, records a test fixture: every key and all of the agent's output go to `testdata/<agent>/<version>/capture-<time>.rec`, the window sizes to a `.json` beside it, and each Ctrl+G saves the box as an editor copy instead of opening your editor. Setting `UNSENT_DEBUG_DIR=<folder>` logs the same keys and output there for any session, next to each save's view. Both are off unless you ask, and their files are `0600`, but they hold everything you type: check them before you share or commit them.
 
 ## License
 

@@ -1,0 +1,4 @@
+tab    here  
+second line, trailing spaces   
+
+after a blank line

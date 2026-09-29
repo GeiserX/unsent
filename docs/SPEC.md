@@ -123,7 +123,7 @@ Restore pastes the recovered draft into the empty box and never sends it. A draf
   | Gemini CLI | a `chats/session-*.jsonl` file created at start [measured, gemini §7]; which field names the session: to measure | to measure | |
   | agy | `conversationId` in `history.jsonl` [measured format, agy §Built-in persistence]; for the running process: to measure | to measure | |
   | Kiro | the `<id>` of `sessions/cli/<id>.history`, whose session files exist before any submit [measured, kiro §How it was measured; source, kiro §Draft persistence]; which one is the running process's: to measure | to measure | |
-  | pi | to measure | `pi -c` and resume [source, pi §Draft persistence] | |
+  | pi | none another process can read before the session's first reply: no file keyed by pid, nothing held open, and the session file is written with the first assistant message; so restore stays off [measured, pi "Session identity", "Profile run"] | `pi -c`, `pi -r`, `pi --session <id>`, `/resume`, none of which writes anything until the next entry [measured, pi "Resume forms"] | measured, pi |
   | cursor-agent | the `<chatId>` folder of `chats/<md5(cwd)>/<chatId>/` [source, cursor-agent §6] | a resume picker [source, cursor-agent §2] | |
   | Copilot, opencode and every tier 2 and 3 agent | to measure | to measure | |
 
@@ -316,7 +316,7 @@ The shell prompt is in scope, not optional (decision 5). A command typed at the 
   | Gemini CLI | Enter, only when the trimmed text is not empty | source, gemini §5 |
   | Copilot CLI | Enter; Ctrl+Q (queue); Ctrl+D with the cursor at the end; Ctrl+Enter under kitty; Esc then Enter | source, copilot §8; Esc then Enter measured |
   | opencode | Enter | source, opencode §7 |
-  | pi | Enter; Alt+Enter when idle | source, pi Keys |
+  | pi | Enter; Alt+Enter when idle; Esc then Enter in one read | measured, pi "Keys as they reached pi" |
   | droid | Enter; Ctrl+Enter; Esc then Enter | source, droid Keys; Esc then Enter measured |
   | aider | Enter, Ctrl+J, Ctrl+O | source, aider §5 |
   | Qwen Code | Enter, except while a completion list is open | source, qwen Keys |
@@ -501,7 +501,7 @@ It is opt-in and never runs in CI. Per run:
   - Claude Code: pastes expanded, byte-identical to the pasted draft behind a placeholder [measured, claude §10]; no trailing newline [measured, claude §3].
   - Gemini: a 1,054-byte copy with pastes expanded; the trailing newline was not recorded [measured, gemini §6].
   - Copilot and Qwen: exact buffer, but paste placeholders stay unexpanded [measured, copilot §10; qwen Keys]. The rig compares their copies against unsent's save with placeholders collapsed back, or on scenarios without collapsed pastes.
-  - pi: expansion seen on screen; the byte-exact file is source only [pi §External editor]. Crush: a byte match backed only by research notes, and its round trip trims whitespace [measured (lane), source, crush §9]. Kimi: never exercised [source, others: Kimi].
+  - pi: exact draft, pastes expanded, no trailing newline [measured, pi "Capture run on pi 0.87.1"]. Crush: a byte match backed only by research notes, and its round trip trims whitespace [measured (lane), source, crush §9]. Kimi: never exercised [source, others: Kimi].
   - goose and Kiro have no non-submitting editor key, so their ground truth is the typed input plus the screen [source, goose §10, kiro §Draft persistence].
 
   Traps: Codex needs `-c sandbox_mode="danger-full-access"` or it writes to the real `~/.codex/editor` [measured, codex §5]; pi's round trip resets its paste map and clears scrollback [measured, pi §External editor].

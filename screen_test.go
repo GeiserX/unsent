@@ -21,7 +21,14 @@ import (
 // screen and returns a snapshot at the end of every frame, in order.
 func codexFrames(t *testing.T, name string) []*screen {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "codex", "0.158.0", name+".rec"))
+	return captureFrames(t, codexCaptures.folder, name)
+}
+
+// captureFrames replays folder/name.rec's output through a shadow screen
+// and returns the screen after every complete frame.
+func captureFrames(t *testing.T, folder, name string) []*screen {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(folder, name+".rec"))
 	if err != nil {
 		t.Fatal(err)
 	}

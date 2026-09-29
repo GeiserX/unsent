@@ -521,9 +521,11 @@ type session struct {
 	// paste (pasted, from the input side) or a restore has changed the box
 	// since it was emptied: by a submit or clear key, or by any keys once a
 	// save reads the draft it held gone. recalled is set by a recall key
-	// typed while the box is empty and not edited since: until another key,
-	// a paste or a restore, the box holds an entry of the agent's own
-	// history, which the agent keeps, not a draft. Text that comes into
+	// typed while the box is empty and not edited since, or by any recall
+	// key when the profile's browse history from a draft (keyset.browses):
+	// until another key, a paste or a restore, the box holds an entry of
+	// the agent's own history, which the agent keeps, not a draft. Text
+	// that comes into
 	// the empty box with no recall key (Codex giving back a queued or
 	// refused message) is a draft.
 	edited   bool
@@ -725,7 +727,7 @@ func (s *session) save() {
 			switch {
 			case e.kind == keyOther:
 				s.edited, s.recalled = true, false
-			case !s.edited && s.rec.Draft == "":
+			case e.kind == keyRecall && (s.prof.keys.browses || !s.edited && s.rec.Draft == ""):
 				s.recalled = true
 			}
 		case keyClear:
@@ -830,8 +832,26 @@ func (s *session) look(scr *screen) bool {
 		s.cleared = false
 	}
 	v.deleted, v.deletedAhead = s.deletes.recent()
+	if s.recalled && s.rec.Draft != "" && s.prof.keys.browses {
+		// A history entry brought into a box that holds a draft, which the
+		// agent keeps aside and puts back when the user comes back down: the
+		// draft stays as it was, and so does what the stitcher knows of it.
+		return true
+	}
 	before := s.stitch
-	draft := s.pastes.expand(s.stitch.update(v, s.prof.unwrap), s.rec.Draft, s.prof)
+	text := s.stitch.update(v, s.prof.unwrap)
+	if s.stitch.restarted && s.rec.Draft != "" && s.rec.Draft != before.text {
+		// The box shows none of what the stitcher knows, and the draft is
+		// not what the stitcher knows either: the agent put the pastes
+		// behind its placeholders in the box itself (Codex and pi, back from
+		// Ctrl+G), and the box scrolled. Line the view up against the draft
+		// with the pastes in it, so the rows out of sight stay.
+		alt := stitcher{text: s.rec.Draft, a: len(s.rec.Draft), b: len(s.rec.Draft)}
+		if t := alt.update(v, s.prof.unwrap); !alt.restarted {
+			s.stitch, text = alt, t
+		}
+	}
+	draft := s.pastes.expand(text, s.rec.Draft, s.prof)
 	s.verifyRestore(draft, v.width)
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
@@ -1129,8 +1149,14 @@ type keyset struct {
 	submit, clear    [][]key
 	// recall are the keys that put an entry of the agent's own history
 	// in an empty box (Codex's Up and Down): what they bring is not a
-	// draft until it is edited.
+	// draft until it is edited. browses is true when the recall keys
+	// bring history into the box whatever it holds, which the agent keeps
+	// aside until they bring it back (pi: Up with the cursor at the start
+	// of a draft's first row), and also after keys that typed nothing
+	// (pi's Esc, which cancels a turn): the box then shows no draft until
+	// another key.
 	recall  []key
+	browses bool
 	suspend []key
 }
 

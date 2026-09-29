@@ -1,6 +1,6 @@
 # pi captures
 
-Real terminal traffic of pi (`@earendil-works/pi-coding-agent`), recorded for the pi profile. One folder per pi version. Every draft in them is dummy text typed for the capture. No test replays them yet; they are the fixtures the pi profile is built on (docs/research/pi.md, "Capture run on pi 0.87.1").
+Real terminal traffic of pi (`@earendil-works/pi-coding-agent`), recorded for the pi profile. One folder per pi version. Every draft in them is dummy text typed for the capture. `agent_pi_test.go` replays every record with editor copies through pi's profile and checks the saved draft against each copy, and reads the dialogs and pickers as frames that hold no box (docs/research/pi.md, "Capture run on pi 0.87.1" and "Profile run on pi 0.87.1").
 
 ## What each file is
 
@@ -16,6 +16,8 @@ Real terminal traffic of pi (`@earendil-works/pi-coding-agent`), recorded for th
 pi 0.87.1 (the npm `latest` on 2026-09-29, installed with `npm install --ignore-scripts @earendil-works/pi-coding-agent@latest`, run by Node 26.0.0) ran on a Mac mini with macOS 26.6.1, in a private tmux 3.6b server (`tmux -L unsent-071 -f /dev/null`, `TERM=tmux-256color`) at 120x40, with `extended-keys on` and `extended-keys-format csi-u`. It ran under `env -i` with a scratch `HOME`, `PI_CODING_AGENT_DIR`, `TMPDIR` and XDG folders, `PI_OFFLINE=1`, `PI_SKIP_VERSION_CHECK=1`, `PI_TELEMETRY=0`, no provider key, no `GITHUB_TOKEN`, `GH_TOKEN` or `CI`, and a `PATH` holding only unsent, pi, node and the system folders (checked: no other agent on it). No model was configured, so every submit failed with `Error: No API key found for the selected model.` `$EDITOR` and `$VISUAL` were unsent's copy-and-exit script.
 
 A pi session file is written only once the session has an assistant message, so with no model nothing is ever written and nothing can be resumed. The identity and resume captures therefore used a second scratch agent folder with one custom provider in its `models.json`: `baseUrl` `http://127.0.0.1:9/v1`, `api` `openai-completions`, `apiKey` `dummy`, one model `dummy-model`, with `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY` at the same dead port. Every request failed on the machine with `Error: Connection error.`, pi retried three times, and the failure was recorded as an assistant error message. These captures are `identity`, `resume-c`, `slash-new`, `resume-picker`, `resume-session`, `slash-resume`, `fork`, `resume-unknown`, `resume-unsent-id` and `send-paste`, run in that order in one folder, so each one sees the sessions the ones before it left.
+
+The records `wrap`, `paste-renumber`, `edge-deletes`, `scroll-steps`, `early-paste` and `early-paste-resume` came from a second run the same day, in a new scratch folder on the same machine with the same setup, under `unsent capture pi` built with the pi profile, so the reader ran while they were recorded. `early-paste-resume` was started with `pi -c` in a dead-port agent folder where one failed send had made a session file.
 
 Differences from that setup:
 
@@ -43,6 +45,12 @@ Differences from that setup:
 | `slash-new`, `slash-resume` | `/new` inside a resumed session, then a submit in the new one; `/resume` inside a new session and Enter on the first entry |
 | `resume-unknown`, `resume-unsent-id` | `pi --session` of an id with no file: `No session found matching '<id>'`, exit status 1 |
 | `send-paste` | dead port: a draft with a 1,001-character placeholder sent with Enter, Esc, then Up recalling it expanded, Ctrl+G |
+| `wrap` | a word that ends at the wrap width with a space after it (pi moves it down), a word longer than a row, a row that starts with the space after one, a line that fills its row before a blank line, a placeholder moved whole to the next row; Ctrl+G |
+| `paste-renumber` | two 1,001-character pastes, the first deleted with Backspace (the second becomes `#1`) and a third pasted after; then two again, the second deleted; Ctrl+G after each |
+| `edge-deletes` | 20 rows in a box of 12, then Ctrl+W, Backspace, Alt+Backspace, Ctrl+U, Ctrl+K, Delete, Ctrl+D, Alt+D, Alt+Delete, Shift+Delete and Shift+Backspace on the last row, with a Ctrl+G after each group |
+| `scroll-steps` | 20 rows, Up 16 times a key at a time into the rows out of sight, an edit, Down 16 times back; Ctrl+G |
+| `early-paste` | a 1,367-character paste with 7 line breaks on the first frame that shows the box, sent with LF, then with CR; a paste with a tab, spaces at line ends and a final line break; a path pasted after a word; Ctrl+G after each |
+| `early-paste-resume` | dead port, `pi -c`: the same long paste on the first frame of the resumed session; Ctrl+G |
 
 ## Adding one
 

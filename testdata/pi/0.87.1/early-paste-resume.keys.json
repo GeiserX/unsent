@@ -1,0 +1,41 @@
+[
+{
+"until": "\\(auto\\)",
+"timeout": 30,
+"gap": 0
+},
+{
+"paste": "Línea 1 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 2 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 3 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 4 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 5 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 6 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 7 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno \nLínea 8 del borrador largo: ¿qué pasó con el ñandú? Pingüino, café, acción, canción; texto de relleno texto de relleno texto de relleno texto de relleno texto de relleno ",
+"raw": true
+},
+{
+"wait": 1.0
+},
+{
+"screen": "early-paste-resume"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-d"
+]
+},
+{
+"wait": 1.5
+}
+]

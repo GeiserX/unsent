@@ -218,7 +218,7 @@ Unchanged and re-seen: the inline main screen (0 `ESC[?1049h` in 23 records), th
 
 **Submit keys: Enter, Alt+Enter, and Esc then Enter when the two arrive in one read. New line: Ctrl+J, Shift+Enter, `\` then Enter.** A submit empties the box at once; with no model the prompt is not drawn in the transcript, only the error, and with a model it is drawn above the box [measured, `submit`, `identity`, `send-paste`].
 
-**Ctrl+Z.** pi binds it to `app.suspend`: `ui.stop()`, then `process.kill(0, "SIGTSTP")`, and it redraws when a SIGCONT comes (`handleCtrlZ`, `interactive-mode.js` [source]). Run alone under `script` (its own terminal session, so an orphaned process group), Ctrl+Z made pi write `ESC[4B CR CR LF ESC[?25h ESC[?2004l ESC[<u ESC[>4;0m`: the cursor below the box, cursor on, bracketed paste off, kitty pop, modifyOtherKeys off. The kernel dropped the SIGTSTP, so pi kept running (state `S`, not `T`) with its screen stopped: text typed then was echoed by the terminal and went into the box when the rig sent SIGCONT by hand, after which pi set its modes again and redrew with `ESC[2J ESC[H ESC[3J` [measured, `suspend-direct.rec` at 2.9 s and 7.1 s, `sessions/suspend-direct-ps.txt`, `screens/suspend-direct-after-cont.txt`]. Without that SIGCONT pi would stay like that: the same hang unsent's suspend exists for. Through unsent, which takes Ctrl+Z for an agent with no profile, zsh printed `suspended  unsent capture pi`, unsent showed state `T`, and `fg` brought the box back with the draft, which the next Ctrl+G copy matched [measured, `suspend`]. So pi's profile keeps Ctrl+Z as unsent's, and its `suspended` bytes are the teardown above.
+**Ctrl+Z.** pi binds it to `app.suspend`: `ui.stop()`, then `process.kill(0, "SIGTSTP")`, and it redraws when a SIGCONT comes (`handleCtrlZ`, `interactive-mode.js` [source]). Run alone under `script` (its own terminal session, so an orphaned process group), Ctrl+Z made pi write `ESC[4B CR CR LF ESC[?25h ESC[?2004l ESC[<u ESC[>4;0m`: the cursor below the box, cursor on, bracketed paste off, kitty pop, modifyOtherKeys off. The kernel dropped the SIGTSTP, so pi kept running (state `S`, not `T`) with its screen stopped: text typed then was echoed by the terminal and went into the box when the rig sent SIGCONT by hand, after which pi set its modes again and redrew with `ESC[2J ESC[H ESC[3J` [measured, `suspend-direct.rec` at 2.9 s and 7.1 s, `sessions/suspend-direct-ps.txt`, `screens/suspend-direct-after-cont.txt`]. Without that SIGCONT pi would stay like that: the same hang unsent's suspend exists for. Through unsent, which takes Ctrl+Z for an agent with no profile, zsh printed `suspended  unsent capture pi`, unsent showed state `T`, and `fg` brought the box back with the draft, which the next Ctrl+G copy matched [measured, `suspend`]. So pi's profile keeps Ctrl+Z as unsent's. That its `suspended` bytes should be the teardown above does not hold: see "Profile run" below, where pi's repaint after `fg` sets none of its modes again, so the profile writes nothing.
 
 ### A send that fails
 
@@ -291,9 +291,46 @@ A reader that takes "two rules, content rows, one reverse-video cursor" as the b
 ### What this run could not capture
 
 - A kitty-capable terminal, flag-7 release events, fullscreen mode, a Ctrl+V or right-click clipboard paste, and a streaming reply.
-- The paste settle delay and a restore: unsent has no pi reader yet.
+- The paste settle delay and a restore: unsent had no pi reader yet (the profile run below measured the paste on the first frame; restore stays off).
 - The resume forms with no model: no session file is ever written then, so they ran on the dead-port provider instead.
 - History recalled in a resumed session (`populateHistory`): not tried.
+
+## Profile run on pi 0.87.1 (measured 2026-09-29)
+
+**Environment.** The setup of the capture run above, same machine, pi, Node, tmux and scratch layout, in a new scratch folder, with unsent built from the branch that adds the pi profile. Six more captures were recorded with `unsent capture pi`, now running pi's reader too: `wrap`, `paste-renumber`, `edge-deletes`, `scroll-steps`, `early-paste` (no model) and `early-paste-resume` (`pi -c` on the dead-port provider, after one failed send made a session file). Two live runs went through `unsent pi`: a draft left at tmux `kill-session`, and a send scenario on the dead port. All are in [`testdata/pi/0.87.1/`](../../testdata/pi/0.87.1/) but the two live runs, whose results are below.
+
+### What this run corrects or adds
+
+| Said above | Measured | Evidence |
+| --- | --- | --- |
+| The profile's `suspended` bytes are pi's own Ctrl+Z teardown | Between unsent's Ctrl+Z and the next key after `fg`, pi repainted the box (a full `ESC[2J ESC[H ESC[3J` frame, from the size nudge) and sent no `ESC[>7u`, `ESC[>4;2m` or `ESC[?2004h`. Written at the suspend, the teardown would leave pi without its kitty flags and modifyOtherKeys after `fg`, where Shift+Enter arrives as a plain `CR` and sends the box. So unsent writes nothing, as for Codex, and turns bracketed paste on again as it resumes pi | `suspend.rec`, 2.9 s to 7.7 s; `TestPiSuspendPolicy` |
+| Word wrap "breaks after the last space" (source) | A word that ends exactly at the wrap width with a space after it moves to the next row: 12 nine-letter words, 119 columns, then ` and these words…` put `edgewordC` on row 2. A word longer than a row breaks at the edge, and when the edge falls right before a space, that space starts the next row (` tail after a long word`). A placeholder that does not fit moves whole, spaces and all. A line that fills the row exactly gets no extra row | `wrap`, `screens/wrap.txt`, `wrap.editor-1.txt` |
+| Paste ids renumber on Backspace (measured) | Also for two placeholders of the same size: deleting the first renumbers the second to `#1`, deleting the second leaves the first as it was, and the next paste gets `#2`; the editor copy put each text where it was | `paste-renumber`, `screens/renumber-*.txt` |
+| Ctrl+G sets the file back "minus one trailing `\n`" | And the box then shows the expanded text: a 1,367-character paste became 16 rows in a box of 12, scrolled to its end with `↑ 4 more`. unsent's stitcher knew only the placeholder by then, and until the fix in this branch the live draft kept only the rows in view (the whole text went to history). It now lines such a view up against the saved draft | `early-paste`, `TestPiRoundTripKeepsTheDraft` |
+| (not measured) Delete keys at the edge of a box at its cap | Ctrl+W, Backspace, Alt+Backspace, Ctrl+U, Ctrl+K, Delete, Ctrl+D, Alt+D, Alt+Delete, Shift+Delete and Shift+Backspace on the last row of a 20-row draft; every editor copy matched | `edge-deletes` |
+| Scrolling keeps the cursor on the edge (source; one lane run) | Up one key at a time, 16 times from the last of 20 rows: the cursor walked to the top row, then each Up scrolled one row with the cursor on it (`↑ 3 more`, `↓ 5 more`); Down back the same way | `scroll-steps`, `screens/steps-up.txt` |
+
+### Restore caps (SPEC 2.3), each as measured
+
+- **How the running session's id is read:** it cannot be, before the first append (above, "Session identity"). The profile reads none, its sent log is per run, and restore-in-box is off.
+- **Resume forms:** `pi -c`, `pi -r` (a picker), `pi --session <id or prefix>`, `/resume` inside a session; `pi --fork <id>` and `/new` start another session. None writes anything that names the session until the next entry.
+- **Settle delay:** 0 at the resolution of the rig. A 1,367-character paste with 7 line breaks and accents, sent as a bracketed paste on the first frame that shows the box (9 ms after pi first drew its cursor in a new chat, 25 ms after in `pi -c`), went in whole, and the Ctrl+G copy was byte-identical.
+- **Empty reads:** nothing pi-specific was seen; three would do, as for Claude Code and Codex.
+- **Newline encoding inside a bracketed paste:** LF and CR both arrive as LF; the copies were byte-identical either way.
+- **What cannot go back faithfully:** a tab becomes four spaces and control characters other than LF are dropped. A paste that starts with `/`, `~` or `.` right after a word character gets a space in front (`see` then a pasted `/tmp/x.txt` gave `see /tmp/x.txt`), which cannot happen in an empty box. Spaces at the ends of lines and a final line break stay.
+- **Whether the editor copy holds placeholders:** no, every placeholder is expanded, and the copy is exact.
+
+So items 4 and 6 of the profile done definition are measured, and restore-in-box stays off for pi because item 4's first answer is that there is no session id to key a restore to. That is hard, not impossible: pi writing its session id to a file keyed by its pid, as Claude Code does, or naming the new session's file at start, would be enough. Reading the session file whose name carries the child's start time would name a new chat's session once it has a reply, but not a resumed one, so it was not built.
+
+### The live runs
+
+- **Window closed.** `unsent pi`, two lines typed (`live draft kept at a window close, ñandú`), tmux `kill-session`: `unsent list` then showed the orphan, and `unsent show 1` printed the two lines exactly.
+- **Send scenario (SPEC 5.2).** On the dead port: `before ` plus a 1,001-character paste plus ` after, dummy`, sent with Enter; a second message sent with Alt+Enter; a third cleared with Ctrl+C. The sent log held the first two messages, the paste expanded, and they equal the `user` messages of pi's own session file byte for byte; the third was in history. No key was missing from a logged message.
+
+### Open questions left
+
+- A kitty-capable terminal (flag-7 release events), fullscreen mode, a Ctrl+V or right-click clipboard paste, a streaming reply, and a queued message given back by Esc during streaming: not run.
+- `editorPaddingX` above 0: not run; the reader would save the padding as leading spaces.
 
 ## Verification notes
 Checked against the lane's scratch dir `/tmp/pi-profile` (clone at `2b0a123d`, raw logs, fixtures, grab file) plus `npm view` and `curl`:
