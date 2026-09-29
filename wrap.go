@@ -228,7 +228,7 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 		case sig := <-sigs:
 			// The window is closing or someone asked us to stop: save what
 			// is in the box first, then pass the signal on.
-			s.save()
+			s.closing()
 			cmd.Process.Signal(sig)
 			// In case it was stopped by Ctrl+Z: a stopped agent would never
 			// act on the signal.
@@ -457,8 +457,10 @@ type session struct {
 	armed   bool
 	cleared bool
 	// leftOnSubmit is set when the screen after a submit key typed into the
-	// box shows no box, until a box is read again.
+	// box shows no box, until a box is read again. closed is set once the
+	// window closed or unsent was asked to stop (see closing).
 	leftOnSubmit bool
+	closed       bool
 
 	rec    *record
 	store  *store
@@ -515,6 +517,9 @@ func (s *session) input(keys []byte) {
 		}
 		s.deletes.push(s.prof.keys.deletes(typed))
 		s.keys.push(s.prof.keys, typed)
+		if s.pastes.holdsEsc() {
+			s.keys.hold()
+		}
 	}
 }
 
@@ -700,8 +705,11 @@ func (s *session) look(scr *screen) bool {
 	if !ok {
 		// The box is not on screen (a menu, a permission prompt, an editor):
 		// keep the last draft we saw. Right after a submit key, the agent
-		// may have left for good with it (/exit): see finish.
-		s.leftOnSubmit = armed
+		// may have left for good with it (/exit): see finish. After the
+		// close, the agent leaves because of it, not because of a key.
+		if !s.closed {
+			s.leftOnSubmit = armed
+		}
 		return false
 	}
 	s.leftOnSubmit = false
@@ -799,6 +807,16 @@ func (s *session) sendOff() error {
 		return s.store.archive(s.rec)
 	}
 	return nil
+}
+
+// closing saves what is in the box as the window closes or unsent is
+// asked to stop. From then on a screen with no box is the agent leaving
+// because of the close, not on a submit key (look): a draft still in the
+// box at the close is kept, while an agent that had already left on the
+// key (/exit) took its draft.
+func (s *session) closing() {
+	s.save()
+	s.closed = true
 }
 
 // finish runs when the agent exits. An empty box leaves nothing to recover,

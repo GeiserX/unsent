@@ -244,6 +244,91 @@ func TestSendTypingRightAfterEnter(t *testing.T) {
 	}
 }
 
+// noBox is the screen Claude Code leaves when it exits: no box on it.
+const noBox = "\x1b[H\x1b[2Jbye\r\n"
+
+// kept fails unless the session, finished, left text as its draft in
+// drafts/.
+func (s sendSession) kept(text string) {
+	s.t.Helper()
+	s.finish()
+	for _, r := range s.store.load(false) {
+		if r.ID == s.rec.ID && r.Draft == text {
+			return
+		}
+	}
+	s.t.Errorf("draft %q not kept after the exit (record holds %q)", text, s.rec.Draft)
+}
+
+// Esc right after Enter, while the send is still starting, puts the message
+// back in Claude Code's box (docs/research/claude.md section 10). The paste
+// tracker holds a lone Esc at the end of a read back as the possible start
+// of ESC[200~, but it is still a key: it disarms the Enter as a delivered
+// Esc does, so an exit screen with no box after it is not the agent leaving
+// with the draft. An Esc typed into the box the agent had emptied comes
+// after a send, which the sent log keeps as for a later Esc.
+func TestSendHeldEscDisarmsTheEnter(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		keys []string
+		sent []string
+	}{
+		{"one read", []string{"\r\x1b"}, nil},
+		{"next read", []string{"\r", "\x1b"}, []string{"taken back"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s := newSendSession(t, &claude)
+			s.draw("taken back")
+			s.save()
+			for i, k := range c.keys {
+				if i > 0 {
+					s.draw("")
+				}
+				s.input([]byte(k))
+			}
+			s.draw("taken back")
+			s.save()
+			s.write([]byte(noBox))
+			s.save()
+			s.expect(c.sent, nil)
+			s.kept("taken back")
+		})
+	}
+}
+
+// A window closed right after Enter, before the agent answered it, keeps
+// the draft: the agent leaves because of the close, so an exit screen
+// with no box does not count as a send.
+func TestSendCloseKeepsTheDraftStillInTheBox(t *testing.T) {
+	s := newSendSession(t, &claude)
+	s.draw("closing mid-send")
+	s.save()
+	s.input([]byte("\r"))
+	s.closing()
+	s.write([]byte(noBox))
+	s.save()
+	s.expect(nil, nil)
+	s.kept("closing mid-send")
+}
+
+// /exit and Enter left the screen with no box before the window closed:
+// that was the agent leaving on the submit key, and it stays a send.
+func TestSendExitBeforeTheCloseStaysASend(t *testing.T) {
+	s := newSendSession(t, &claude)
+	s.draw("/exit")
+	s.save()
+	s.input([]byte("\r"))
+	s.write([]byte(noBox))
+	s.closing()
+	s.write([]byte("\x1b[?25h"))
+	s.save()
+	s.finish()
+	s.expect([]string{"/exit"}, nil)
+	if s.rec.Draft != "" {
+		t.Fatalf("draft %q after /exit", s.rec.Draft)
+	}
+}
+
 // Output that leaves the box as it was, such as the window title Claude
 // Code sets right after Enter, is not the answer to Enter: a save that
 // reads it in between must not lose the send.

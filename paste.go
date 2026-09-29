@@ -86,6 +86,15 @@ func normalizeNewlines(s string) string {
 	return strings.ReplaceAll(s, "\r", "\n")
 }
 
+// holdsEsc reports whether feed is holding back a lone Esc typed outside a
+// paste: the Esc key, or the start of a paste marker, which only the next
+// read tells apart.
+func (p *pasteTracker) holdsEsc() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return !p.in && len(p.pending) == 1 && p.pending[0] == 0x1b
+}
+
 // inPaste reports whether a paste has started and not yet ended.
 func (p *pasteTracker) inPaste() bool {
 	p.mu.Lock()

@@ -151,6 +151,23 @@ func fakeAgent() {
 	}
 	var draft []string
 	pastes := 0
+	// UNSENT_FAKE_ESC_BACK makes a lone Esc right after a send put the
+	// message back in the box, as Claude Code's Esc does while a send is
+	// still starting (docs/research/claude.md section 10).
+	escBack := os.Getenv("UNSENT_FAKE_ESC_BACK") == "1"
+	var lastSent []string
+	// UNSENT_FAKE_HUP_LEAVES makes a hang-up leave the alternate screen
+	// before the agent dies of it, as Claude Code does when its window
+	// closes: the last screen unsent reads has no box.
+	if os.Getenv("UNSENT_FAKE_HUP_LEAVES") == "1" {
+		hup := make(chan os.Signal, 1)
+		signal.Notify(hup, syscall.SIGHUP)
+		go func() {
+			<-hup
+			os.Stdout.WriteString("\x1b[?1049l\x1b[H\x1b[2J")
+			os.Exit(128 + int(syscall.SIGHUP))
+		}()
+	}
 	var pasting, esc, away bool
 	var paste strings.Builder
 	// A picker (the --resume one, or the one /resume opens) hides the box
@@ -257,6 +274,9 @@ func fakeAgent() {
 			case strings.HasPrefix(in, "\x1b\x1b"): // Esc Esc clears the box
 				draft = nil
 				in = in[2:]
+			case in == "\x1b" && escBack && lastSent != nil && len(draft) == 0:
+				draft, lastSent = lastSent, nil
+				in = ""
 			case in == "\x1b": // a lone Esc: a second one clears the box
 				if wasEsc {
 					draft = nil
@@ -278,6 +298,9 @@ func fakeAgent() {
 				editDraft(strings.Join(draft, ""))
 				in = in[1:]
 			case in[0] == '\r' || in[0] == 3: // send, or Ctrl+C: the box empties
+				if in[0] == '\r' {
+					lastSent = draft
+				}
 				draft = nil
 				in = in[1:]
 			default:
@@ -366,6 +389,9 @@ func runWrappedIn(t *testing.T, home, command string, argv []string, script func
 type wrapRun struct {
 	t     *testing.T
 	type_ func(string)
+	// write types keys and returns at once, with no wait for a draw or a
+	// save.
+	write func(string)
 	// screen is everything the terminal showed so far.
 	screen func() string
 	// saved holds when the last timed save to end began, and decided when
@@ -496,6 +522,7 @@ func runWrappedWith(t *testing.T, home, command string, argv []string, script fu
 		defer mu.Unlock()
 		return string(shown)
 	}
+	w.write = func(s string) { user.WriteString(s) }
 	w.type_ = func(s string) {
 		mu.Lock()
 		before := len(shown)
@@ -739,6 +766,53 @@ func TestWrapSavesOnHangup(t *testing.T) {
 	rs := st.orphans()
 	if len(rs) != 1 || rs[0].Draft != "closing the window now" {
 		t.Fatalf("orphans %+v", rs)
+	}
+}
+
+// Esc pressed about 50 ms after Enter, while the send is still starting,
+// puts the message back in Claude Code's box, and closing the window then
+// leaves Claude Code's exit screen, which has no box (docs/research/claude.md
+// section 10). The message is still in the box when the window closes, so
+// unsent keeps it as a draft, under either on-send setting, whether the Esc
+// came in Enter's own read or in the next one.
+func TestWrapEscRightAfterEnterKeepsTheDraftPutBack(t *testing.T) {
+	const text = "sent then taken back with esc"
+	for _, c := range []struct {
+		name string
+		keys []string
+	}{
+		{"one read", []string{"\r\x1b"}},
+		{"next read", []string{"\r", "\x1b"}},
+	} {
+		for _, onSend := range []string{"log", "delete"} {
+			t.Run(c.name+"/"+onSend, func(t *testing.T) {
+				t.Setenv("UNSENT_FAKE_ESC_BACK", "1")
+				t.Setenv("UNSENT_FAKE_HUP_LEAVES", "1")
+				t.Setenv("UNSENT_ON_SEND", onSend)
+				_, st, _, _ := runWrappedWith(t, t.TempDir(), "claude", []string{"claude"}, func(w *wrapRun) {
+					w.type_(text)
+					// Right after a save, so the next one reads the box
+					// only once the message is back in it.
+					w.waitSave()
+					for i, k := range c.keys {
+						if i > 0 {
+							time.Sleep(30 * time.Millisecond)
+						}
+						w.write(k)
+					}
+					w.waitSave()
+					syscall.Kill(os.Getpid(), syscall.SIGHUP)
+					time.Sleep(time.Second)
+				})
+				if rs := st.orphans(); len(rs) != 1 || rs[0].Draft != text {
+					var drafts []string
+					for _, r := range rs {
+						drafts = append(drafts, r.Draft)
+					}
+					t.Fatalf("drafts left %q, want %q", drafts, text)
+				}
+			})
+		}
 	}
 }
 

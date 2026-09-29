@@ -23,6 +23,31 @@ func TestPasteTrackerSplitMarkers(t *testing.T) {
 	}
 }
 
+// A lone Esc at the end of a read is held back, outside a paste only, and
+// only while it is alone: the next read tells an Esc key from a paste.
+func TestPasteTrackerHoldsALoneEsc(t *testing.T) {
+	var p pasteTracker
+	for _, c := range []struct {
+		in    string
+		typed string
+		holds bool
+	}{
+		{"text\x1b", "text", true},
+		{"x", "\x1bx", false},
+		{"\x1b", "", true},
+		{"[200~pasted\x1b", "", false}, // a paste after all, and inside it
+		{"[201~\x1b[", "", false},
+		{"A", "\x1b[A", false},
+	} {
+		if typed := string(p.feed([]byte(c.in))); typed != c.typed || p.holdsEsc() != c.holds {
+			t.Fatalf("after %q: typed %q, holds an Esc %v; want %q, %v", c.in, typed, p.holdsEsc(), c.typed, c.holds)
+		}
+	}
+	if got := p.all(); len(got) != 1 || got[0] != "pasted" {
+		t.Fatalf("pastes %q", got)
+	}
+}
+
 func TestPasteExpand(t *testing.T) {
 	var p pasteTracker
 	forty := make([]string, 40)

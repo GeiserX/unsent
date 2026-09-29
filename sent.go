@@ -122,21 +122,37 @@ func (l *keyLog) push(ks keyset, typed []byte) {
 	kinds, esc := ks.kindsOf(keys)
 	l.esc = esc
 	for _, k := range kinds {
-		after := l.last
-		l.last = k
-		if n := len(l.events); k == keyOther && n > 0 && l.events[n-1].kind == keyOther {
-			continue
-		}
-		e := &keyEvent{kind: k}
-		l.events = append(l.events, e)
-		switch {
-		case k == keySubmit:
-			l.pending, l.waiting = append(l.pending, e), true
-		case k == keyOther && after == keySubmit:
-			// Typed into the agent's answer to the submit key, if it has
-			// drawn one: a box that is empty there was sent.
-			l.pending = append(l.pending, e)
-		}
+		l.add(k)
+	}
+}
+
+// hold notes a lone Esc the paste tracker holds back until the next read
+// tells it from the start of a paste (pasteTracker.holdsEsc). It counts as
+// another key now, as a delivered Esc does, so the submit key before it no
+// longer vouches for the box emptying. The Esc itself is pushed when it
+// arrives, so Esc Esc still reads as a clear.
+func (l *keyLog) hold() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.add(keyOther)
+}
+
+// add appends one key, a run of other keys as one. The caller holds l.mu.
+func (l *keyLog) add(k keyKind) {
+	after := l.last
+	l.last = k
+	if n := len(l.events); k == keyOther && n > 0 && l.events[n-1].kind == keyOther {
+		return
+	}
+	e := &keyEvent{kind: k}
+	l.events = append(l.events, e)
+	switch {
+	case k == keySubmit:
+		l.pending, l.waiting = append(l.pending, e), true
+	case k == keyOther && after == keySubmit:
+		// Typed into the agent's answer to the submit key, if it has
+		// drawn one: a box that is empty there was sent.
+		l.pending = append(l.pending, e)
 	}
 }
 
