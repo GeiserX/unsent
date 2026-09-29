@@ -816,6 +816,28 @@ func TestStitchEnterThenPauseKeepsSpacingExact(t *testing.T) {
 	}
 }
 
+// Backspace with the cursor on the top row deletes text before it, so the
+// words the view no longer shows above its start were deleted, not
+// scrolled out of sight: the draft loses them. With no delete key pressed
+// the same view means the box scrolled, and they stay. Only the fuzz used
+// to reach this rule.
+func TestStitchBackspaceOnTheTopRowDeletesWhatIsAboveIt(t *testing.T) {
+	const text = "one two three four five six"
+	// The box shows the draft from "three" on, with the cursor on its top
+	// row; the last view showed the whole draft.
+	view := func(deleted int) view {
+		return view{rows: []string{"three four", "five six"}, width: 12, capped: true, cursor: 0, deleted: deleted}
+	}
+	st := stitcher{text: text, a: 0, b: len(text)}
+	if got := st.update(view(8), claude.unwrap); got != "three four five six" {
+		t.Fatalf("after a Backspace on the top row: %q", got)
+	}
+	st = stitcher{text: text, a: 0, b: len(text)}
+	if got := st.update(view(0), claude.unwrap); got != text {
+		t.Fatalf("with no key pressed the box only scrolled: %q", got)
+	}
+}
+
 func TestStitchEmptyTopRowReplacesTheSameBreak(t *testing.T) {
 	// The last view began with a blank row; this one too, with a word typed
 	// below it. The blank row's line break is the one already in the text,

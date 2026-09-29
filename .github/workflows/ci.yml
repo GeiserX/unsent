@@ -19,16 +19,23 @@ jobs:
         # the slowest one rather than the sum.
         #
         # race holds the whole suite but the stitcher's fuzz, which the race
-        # detector slows several times over; fuzz holds the fuzz alone.
-        # Neither measures coverage: a coverage counter is an atomic add,
-        # the race detector instruments every one of them, and the two
-        # together cost six times the CPU. On the Mac mini the race step
-        # takes 199 s on its own and 292 s with -coverprofile.
+        # detector slows several times over; fuzz holds the fuzz alone, its
+        # twelve runs in parallel.
         #
-        # So cover runs the same tests once more without the detector, only
-        # to measure them, and it is the profile Codecov gets. It is a Linux
-        # job alone, since only Linux uploads. Each test still runs under
-        # -race on both systems; cover adds no check of its own.
+        # Only cover measures coverage, and it is the one job that runs
+        # neither in parallel nor under the detector. Coverage counters are
+        # written by the code under test, so concurrency makes several cores
+        # write the same counters, and the detector instruments every write.
+        # Both are measured, on the Mac mini and on this runner:
+        #
+        #   race, with -coverprofile          292 s against 199 s without
+        #   fuzz in parallel, with            367 s of CPU against 232 s
+        #   the Linux fuzz job, with          9m27s against 4m01s on macOS
+        #
+        # Coverage costs nothing in a run that is sequential and detector-
+        # free, which is what cover is. It runs the same tests as race, adds
+        # no check of its own, and is a Linux job alone since only Linux
+        # uploads. Every test still runs under -race on both systems.
         suite: [race, fuzz, cover]
         exclude:
           - os: macos-latest
@@ -48,14 +55,13 @@ jobs:
       - if: matrix.suite == 'race'
         run: go test -race -count=1 -skip Fuzz ./...
       - if: matrix.suite == 'fuzz'
-        run: go test -count=1 -run Fuzz ${{ matrix.os == 'ubuntu-latest' && '-coverprofile=coverage.out' || '' }} ./...
+        run: go test -count=1 -run Fuzz ./...
         env:
           UNSENT_FUZZ_SEEDS: "50"
       - if: matrix.suite == 'cover'
         run: go test -count=1 -skip Fuzz -coverprofile=coverage.out ./...
-      # Codecov adds the two uploads up (codecov.yml waits for both).
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.suite != 'race'
+        if: matrix.suite == 'cover'
         uses: codecov/codecov-action@v7
         with:
           files: coverage.out
