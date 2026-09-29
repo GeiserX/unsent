@@ -88,8 +88,12 @@ func (r screenRow) faintFrom(x int) bool {
 func snapshot(e *vt.Emulator) *screen {
 	w, h := e.Width(), e.Height()
 	s := &screen{rows: make([]screenRow, h), cols: w, alt: e.IsAltScreen()}
+	// A save snapshots the screen after every frame: one array of each for
+	// the whole screen, not three per row, keeps that cheap.
+	cells, faint, look := make([]string, w*h), make([]bool, w*h), make([]cellLook, w*h)
 	for y := 0; y < h; y++ {
-		row := screenRow{cells: make([]string, w), faint: make([]bool, w), look: make([]cellLook, w)}
+		i, j := y*w, (y+1)*w
+		row := screenRow{cells: cells[i:j:j], faint: faint[i:j:j], look: look[i:j:j]}
 		for x := 0; x < w; x++ {
 			c := e.CellAt(x, y)
 			switch {
@@ -103,13 +107,18 @@ func snapshot(e *vt.Emulator) *screen {
 				row.cells[x] = c.Content
 				row.faint[x] = c.Style.Attrs&uv.AttrFaint != 0
 			}
-			// A blank cell has a look too: a tinted row is mostly blanks.
-			if c != nil && !c.Style.IsZero() {
+			// A blank cell has a look too: a tinted row is mostly blanks. Most
+			// cells have none, so test the four fields the look keeps rather
+			// than compare the whole style.
+			if c == nil {
+				continue
+			}
+			if st := &c.Style; st.Fg != nil || st.Bg != nil || st.Attrs&(uv.AttrBold|uv.AttrReverse) != 0 {
 				row.look[x] = cellLook{
-					fg:      colorOf(c.Style.Fg),
-					bg:      colorOf(c.Style.Bg),
-					bold:    c.Style.Attrs&uv.AttrBold != 0,
-					reverse: c.Style.Attrs&uv.AttrReverse != 0,
+					fg:      colorOf(st.Fg),
+					bg:      colorOf(st.Bg),
+					bold:    st.Attrs&uv.AttrBold != 0,
+					reverse: st.Attrs&uv.AttrReverse != 0,
 				}
 			}
 		}
