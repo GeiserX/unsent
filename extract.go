@@ -60,6 +60,12 @@ type profile struct {
 	// and the middle's line count. Nil when the agent never does that.
 	truncated *regexp.Regexp
 	keys      keyset
+	// suspended is what the agent writes to the terminal as it suspends
+	// itself: its keyboard protocol, mouse reports and alternate screen
+	// turned off. unsent writes it when it suspends the agent instead, so
+	// the shell gets its keys as it expects them; the agent must turn them
+	// on again as it repaints after the resume. Nil writes nothing.
+	suspended []byte
 	// verified is the agent version the reader was last checked against,
 	// and version the arguments that make the agent print its own: when
 	// the reader never finds the box, the user learns both.

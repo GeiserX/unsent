@@ -37,9 +37,11 @@ Usage:
                              print draft N (default: this folder's newest)
   unsent restore [--agent <agent>] [N]
                              copy draft N to the clipboard and mark it restored
-  unsent log [--here] [--agent <agent>]
+  unsent log [--here] [--agent <agent>] [--json]
                              list sessions with sent messages, newest first
-  unsent log <session> [--copy N]
+                             (--json prints a JSON array, its shape in the
+                             README)
+  unsent log <session> [--copy N | --json]
                              print a session's sent messages (session: a number
                              from unsent log, its id, or the agent's own session
                              id); --copy N copies message N to the clipboard
@@ -205,7 +207,7 @@ func contains(rs []*record, r *record) bool {
 // options are the flags list, show, restore and log take.
 type options struct {
 	all, here bool
-	json      bool   // list and show --json
+	json      bool   // list, show and log --json
 	agent     string // "" for every agent
 	copy      int    // log --copy N; 0 when not given
 	rest      []string
@@ -258,6 +260,11 @@ func parseOptions(args []string, allowed ...string) (options, error) {
 // keeps reports whether a record passes the agent and --here filters.
 func (o options) keeps(r *record, cwd string) bool {
 	return (o.agent == "" || r.agent() == o.agent) && (!o.here || samePath(r.Cwd, cwd))
+}
+
+// keepsSent is keeps for a sent log.
+func (o options) keepsSent(l *sentLog, cwd string) bool {
+	return (o.agent == "" || l.Agent == o.agent) && (!o.here || samePath(l.Cwd, cwd))
 }
 
 func cmdList(args []string, stdout, stderr io.Writer) int {
@@ -492,13 +499,15 @@ func unplaced(r *record) int {
 // cmdLog lists the sessions with a sent log, or prints one session's
 // messages, or copies one of them.
 func cmdLog(args []string, stdout, stderr io.Writer) int {
-	o, err := parseOptions(args, "--here", "--agent", "--copy")
+	o, err := parseOptions(args, "--here", "--agent", "--copy", "--json")
 	switch {
 	case err != nil:
 	case len(o.rest) > 1:
 		err = fmt.Errorf("unexpected argument %q", o.rest[1])
 	case o.copy > 0 && len(o.rest) == 0:
 		err = fmt.Errorf("--copy needs a session: unsent log <session> --copy N")
+	case o.copy > 0 && o.json:
+		err = fmt.Errorf("--copy and --json do not go together")
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
@@ -517,22 +526,31 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 		var shown []int
 		width := 0
 		for i, l := range logs {
-			if (o.agent == "" || l.Agent == o.agent) && (!o.here || samePath(l.Cwd, cwd)) {
+			if o.keepsSent(l, cwd) {
 				shown = append(shown, i)
 				width = max(width, len(l.Agent))
 			}
+		}
+		if o.json {
+			items := []sentLogJSON{}
+			for _, i := range shown {
+				items = append(items, sentJSONOf(logs[i], i+1))
+			}
+			return printJSON(stdout, stderr, items)
 		}
 		if len(shown) == 0 {
 			fmt.Fprintln(stdout, "No sent messages.")
 			return 0
 		}
 		for _, i := range shown {
-			l := logs[i]
+			// The row previews the last message's first raw line, as it did
+			// before log --json; first_line is the JSON's own field.
+			l, j := logs[i], sentJSONOf(logs[i], i+1)
 			last := ""
 			if n := len(l.messages); n > 0 {
 				last, _, _ = strings.Cut(l.messages[n-1].Text, "\n")
 			}
-			fmt.Fprintf(stdout, "%3d  %s  %-*s  %s  %-24s  %4d sent  %s\n", i+1, l.Session, width, l.Agent, when(l.Started), shortPath(l.Cwd, 24), len(l.messages), preview(last, 40))
+			fmt.Fprintf(stdout, "%3d  %s  %-*s  %s  %-24s  %4d sent  %s\n", j.N, j.ID, width, j.Agent, when(l.Started), shortPath(l.Cwd, 24), j.Messages, preview(last, 40))
 		}
 		return 0
 	}
@@ -554,6 +572,19 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "Copied message %d, %s, to the clipboard.\n", o.copy, lines(text))
 		return 0
 	}
+	if o.json {
+		msgs := []any{}
+		l.walk(func(n int, m sentMessage) {
+			pastes := m.Pastes
+			if pastes == nil {
+				pastes = []string{}
+			}
+			msgs = append(msgs, sentMessageJSON{N: n, Sent: rfc3339(m.Time), Text: m.Text, Pastes: pastes})
+		}, func(r sentResume) {
+			msgs = append(msgs, sentResumeJSON{Resumed: rfc3339(r.Resumed)})
+		})
+		return printJSON(stdout, stderr, sentShowJSON{sentJSONOf(l, slices.Index(logs, l)+1), msgs})
+	}
 	fmt.Fprintf(stdout, "%s in %s, started %s, session %s", l.Agent, shortPath(l.Cwd, 60), when(l.Started), l.Session)
 	if l.AgentSession != "" {
 		fmt.Fprintf(stdout, ", %s session %s", l.Agent, l.AgentSession)
@@ -562,22 +593,67 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 	if l.Dropped > 0 {
 		fmt.Fprintf(stdout, "(%d earlier messages were dropped to keep the log under %d MB)\n", l.Dropped, sentMaxBytes>>20)
 	}
-	resumes := l.resumes
-	resumed := func(before int) {
-		for len(resumes) > 0 && resumes[0].after <= before {
-			fmt.Fprintf(stdout, "\n(resumed %s, session %s)\n", when(resumes[0].Resumed), resumes[0].Session)
-			resumes = resumes[1:]
-		}
-	}
-	for i, m := range l.messages {
-		resumed(i)
-		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", i+1, when(m.Time), m.Text)
+	l.walk(func(n int, m sentMessage) {
+		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", n, when(m.Time), m.Text)
 		for _, p := range m.Pastes {
 			fmt.Fprintf(stdout, "--- a paste that could not be placed in the message ---\n%s\n", p)
 		}
-	}
-	resumed(len(l.messages))
+	}, func(r sentResume) {
+		fmt.Fprintf(stdout, "\n(resumed %s, session %s)\n", when(r.Resumed), r.Session)
+	})
 	return 0
+}
+
+// sentJSONFormat is the version of the shape log --json and log <session>
+// --json print, documented in the README; the rule of draftFormat holds.
+const sentJSONFormat = 1
+
+// sentLogJSON is one session as log --json prints it.
+type sentLogJSON struct {
+	Format       int    `json:"format"`
+	N            int    `json:"n"`  // the number log <session> takes
+	ID           string `json:"id"` // unsent's id of the run that started the log
+	Agent        string `json:"agent"`
+	AgentSession string `json:"agent_session"`
+	Folder       string `json:"folder"`
+	Started      string `json:"started"`
+	Updated      string `json:"updated"`    // the last send
+	Messages     int    `json:"messages"`   // how many
+	FirstLine    string `json:"first_line"` // of the last message
+	Dropped      int    `json:"dropped"`    // oldest messages trimmed away
+}
+
+// sentShowJSON is one session as log <session> --json prints it: the
+// list's fields, with messages holding the messages themselves, in order,
+// and a sentResumeJSON where the conversation was reopened.
+type sentShowJSON struct {
+	sentLogJSON
+	Messages []any `json:"messages"`
+}
+
+// sentMessageJSON is one sent message: n is the number --copy takes, text
+// has its pastes expanded, and pastes holds the ones it could not place.
+type sentMessageJSON struct {
+	N      int      `json:"n"`
+	Sent   string   `json:"sent"`
+	Text   string   `json:"text"`
+	Pastes []string `json:"pastes"`
+}
+
+// sentResumeJSON marks where a later run reopened the conversation.
+type sentResumeJSON struct {
+	Resumed string `json:"resumed"`
+}
+
+func sentJSONOf(l *sentLog, n int) sentLogJSON {
+	j := sentLogJSON{
+		Format: sentJSONFormat, N: n, ID: l.Session, Agent: l.Agent, AgentSession: l.AgentSession,
+		Folder: l.Cwd, Started: rfc3339(l.Started), Messages: len(l.messages), Dropped: l.Dropped,
+	}
+	if k := len(l.messages); k > 0 {
+		j.Updated, j.FirstLine = rfc3339(l.messages[k-1].Time), firstLine(l.messages[k-1].Text)
+	}
+	return j
 }
 
 // findSent picks sent logs by their number in unsent log, unsent's session

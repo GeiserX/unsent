@@ -125,8 +125,24 @@ unsent log                 # sessions with sent messages, newest first
 unsent log 1               # every message sent in session 1
 unsent log 1 --copy 3      # copy message 3 of it to the clipboard
 unsent log --here --agent claude   # only Claude Code's sessions in this folder
+unsent log --json          # the same list as a JSON array, for a script or an agent
+unsent log 1 --json        # session 1 and all its messages as one JSON object
 unsent forget --log 20260927-101500-4242   # delete one session's sent log, by the id unsent log shows
 ```
+
+`unsent log --json` prints the same list, with the same filters, newest first. `unsent log N --json` prints one session with the same fields, except that `messages` holds the messages themselves instead of their count. Nothing but the JSON goes to the output. The rules of `list --json` hold: fields are only ever added, and a renamed or retyped field bumps `format`.
+
+| Field | What it holds |
+| --- | --- |
+| `format` | the version of this shape, now `1` |
+| `n` | the number `unsent log` takes |
+| `id` | unsent's id for the run that started the log |
+| `agent`, `agent_session` | the agent, and its own id of the conversation, `""` when unknown |
+| `folder` | the folder the session ran in, as a real path |
+| `started`, `updated` | when the session started and when its last message was sent, RFC 3339 times with the offset |
+| `messages` | in the list, how many messages the session sent. For one session, its messages in order, each with `n` (the number `--copy` takes), `sent` (the time), `text` (pastes expanded) and `pastes` (the raw text of each paste that could not be placed). An entry `{"resumed": <time>}` marks where the conversation was reopened. |
+| `first_line` | the last message's first line with text, cut to 100 characters |
+| `dropped` | how many of the oldest messages were removed to keep the log under 5 MB, `0` when none. The kept messages are numbered from 1. |
 
 `unsent forget --log` takes the session id, not the number: the numbers move when another session sends its first message.
 
@@ -159,7 +175,7 @@ A few things make that more than a screenshot:
 
 - **Long drafts.** Claude Code's box stops growing at half the window height and scrolls inside itself, so the screen only shows part of a long prompt. `unsent` lines each view up, word by word, against what it has already seen, and keeps the parts above and below it. Edits you make after scrolling back up, and resizing the window, both work. The screen can't tell text you deleted from text that only moved out of sight. The delete keys you pressed in the last second can, so `unsent` counts them.
 - **Big pastes.** Claude Code shows a paste of 4 or more lines, or over 800 characters, as `[Pasted text #1 +39 lines]`. Terminals mark pasted text with special codes, so `unsent` records the paste as it goes in and puts the real text back in place of the placeholder.
-- **Ctrl+Z.** Suspending works as usual: your shell shows the job as stopped, and `fg` brings the agent back.
+- **Ctrl+Z.** Suspending works as usual: your shell shows the job as stopped, and `fg` brings the agent back. That includes tmux and Ghostty, where Claude Code switches the terminal to a keyboard mode that sends Ctrl+Z as an escape code. While the agent is stopped, your shell gets its keys in the usual form.
 - **Pipes.** When input or output isn't a terminal (`git diff | claude -p "review"`, `claude -p x > out.md`), `unsent` hands over to the agent directly. There's no input box to save, so the wrapper is safe to keep.
 - **Saying when it didn't save.** Claude Code draws on a screen of its own, which hides anything printed while it runs, so `unsent` speaks up after the agent exits. If it never found the input box in a session you typed in, which is what an agent update that changes the box looks like, it says so and names the version it last checked, for example `unsent: could not read claude 2.1.290's box this session (last verified 2.1.282), nothing was saved`. An agent it has no reader for is named before it starts and again after it exits. If `unsent` itself hits a bug, it stops saving, keeps the last draft it saved and passes every byte through for the rest of the session. The agent never notices.
 - **Knowing what's dead.** Each session holds a file lock, and the operating system releases it when the process dies, whether it exits, crashes or the machine reboots. A process ID can't be trusted for this because a reboot reuses them. The lock can.
@@ -177,7 +193,7 @@ Drafts live in `~/.local/state/unsent/`. Set `XDG_STATE_HOME` or `UNSENT_HOME` t
 - If a whole long draft lands in the box between two saves, only the part on screen is recovered. Typing never goes that fast.
 - In a draft taller than the box, a few edits can't be read off the screen for certain: for example, typing a word identical to the next word hidden below the box, or typing, deleting and scrolling at the edge of the box within one 0.4-second save. Then the live draft can come out slightly wrong. In simulation that's about 1 save in 100 with ordinary text, a little more with heavily repeated words or with Ctrl+W. Thanks to the promise above, the correct text is still in history.
 - A draft that changes wholesale, like a prompt recalled with the Up arrow, is saved from what's on screen, and the old draft goes to history.
-- The sent log holds the box as Claude Code last drew it before your Enter. A key typed so fast before Enter that Claude Code never drew it can be missing. Only plain Enter counts as a send for now: Ctrl+Enter, a remapped submit key, or Enter in a keyboard mode that encodes it differently reads as a clear, and the message goes to history instead.
+- The sent log holds the box as Claude Code last drew it before your Enter. A key typed so fast before Enter that Claude Code never drew it can be missing. Enter and Ctrl+Enter count as a send, in whatever form the terminal sends them. A remapped submit key, or Ctrl+X Ctrl+S, reads as a clear, and the message goes to history instead.
 - Pressing Esc while Claude Code works on a message can put that message back in the box. The sent log still holds it, although Claude Code didn't answer it.
 - A draft with a tab in it isn't pasted back, because Claude Code's box turns each tab into four spaces. It goes to the clipboard instead, and the line under the box says so.
 - A conversation you typed in but never sent can't be resumed, since Claude Code keeps no transcript for it. Its draft only comes back through the notice and `unsent restore`.

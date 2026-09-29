@@ -208,6 +208,33 @@ Key captures (`capture-pane -p -e`, row index, runs of `─` collapsed):
 
 Claude Code did not put back the draft left in the box when the window closed: the resumed box was empty [measured, `cap-s2-resume-id.txt`].
 
+**Re-measured on 2.1.283 (2026-09-28).** A v0.5.1 run saw a prompt interrupted with Esc come back in the box on resume. The setup was the one above, with the 2.1.283 binary and 120x40. Each conversation was opened twice after its window was closed with tmux `kill-session`: once with `claude --resume <id>` alone, and once through `unsent claude --resume <id>`. Most runs set `CLAUDE_CODE_MAX_RETRIES=1`, so a send fails within a second; run (a) kept the default ten retries.
+
+| Case | Box at the close | Claude Code alone, 8 s after resume | Through unsent | Sent log | Tag |
+| --- | --- | --- | --- | --- | --- |
+| (a) one failed send, then a second message, Enter, Esc 1.5 s later while it retried | the second message: Esc put it back in the box | empty | empty on the first frame (0.4 s), then unsent pasted the second message; the row under the box read `unsent: put back your draft from 22:16 today, not sent` | both messages, the second at its Enter | measured |
+| (a) the same, Esc 47 ms after Enter | the second message | empty | empty, nothing pasted: unsent had no draft for the conversation | both messages, the second written at the close | measured, 4 of 5 runs; debug log for one |
+| (b) two sends that failed, no Esc | empty | empty | empty, nothing pasted (no draft) | both messages | measured |
+| (b) one send, window closed while it was still retrying | empty (the message sat above the box) | empty | not run; unsent had no draft | the message | measured |
+| (c) one failed send, then a draft typed and never sent | the draft | empty | empty on the first frame, then pasted, with the line under the box | the send only | measured |
+| (c) a new chat with only a typed draft | the draft | `No conversation found with session ID: <id>` | not run | none | measured |
+
+So 2.1.283 behaves as 2.1.282: Claude Code never puts anything back in a resumed box [measured]. What came back in the v0.5.1 run was unsent's restore. Esc during a send puts the message back in the live box, unsent saves it there as a draft, and the draft left at the close is restored on resume. An Esc interrupt also leaves the message in the transcript as a `user` entry and a `{"type":"last-prompt","lastPrompt":"…"}` line, and in `history.jsonl` [measured, `grep` of the transcript].
+
+The fast Esc is a bug in unsent, not a Claude Code fact. Claude Code drew its answer to Enter 21 ms after the key and put the text back 141 ms after it, so no 0.4 s save saw the box empty. unsent's paste tracker keeps a lone Esc at the end of a read as the possible start of `ESC[200~` (`pasteTracker.feed`), so the key log never saw the Esc and the submit stayed armed. The window close leaves Claude Code's exit screen, which has no box, and `session.finish` took that for the `/exit` case: it wrote the draft to the sent log and removed it from `drafts/`. With `UNSENT_ON_SEND=delete` the draft left no trace in unsent's store at all; only Claude Code's own transcript and `history.jsonl` still held it [measured, one run]. When a Right arrow followed the Esc, the draft was kept and restored [measured, one run]. That the held Esc is the cause is [guess from the code and that control run].
+
+**Fixed in v0.6 (2026-09-29).** A lone Esc the paste tracker holds back now counts as a key for send detection, as a delivered Esc does (`pasteTracker.holdsEsc`, `keyLog.hold`), and a screen with no box after a window close no longer counts as the agent leaving on Enter (`session.closing`). Re-run on the Mac mini with the 2.1.283 binary, a theme-only `settings.json`, one failed send first, then a second message, Enter, `send-keys Escape` 50 ms later and `kill-session` 2.5 s after:
+
+| Build | `UNSENT_ON_SEND` | Esc after Enter | Box at the close | `drafts/` after | Sent log | Tag |
+| --- | --- | --- | --- | --- | --- | --- |
+| before the fix | log | 68 ms | the second message | nothing | both messages, the second written at the close | measured |
+| before the fix | delete | 60 ms | the second message | nothing | none | measured |
+| before the fix | log | 60 ms, a save read the empty box | the second message | the second message | both messages | measured, the control |
+| the fix | log | 65 ms | the second message | the second message | both messages | measured |
+| the fix | delete | 67 ms | the second message | the second message | none | measured |
+
+So under the fix the sent log holds the Esc'd message, as for an Esc that comes after a save [measured]: the Esc was typed into the empty box Claude Code drew about 40 ms after Enter, and an empty box right after a submit key is a send. The draft Esc put back stays in `drafts/`, where restore finds it when the conversation is reopened (not re-run here). When Enter and Esc come in one read, the Esc disarms the Enter before any box is read, and the sent log gets nothing [tested with the fake agent, `TestWrapEscRightAfterEnterKeepsTheDraftPutBack`, not measured on Claude Code].
+
 **SessionStart hook.** With a `SessionStart` command hook in the scratch `settings.json` that logs its stdin:
 
 - `--resume <id>`, `-c` and a picker choice each fired it once with `{"session_id":<the resumed id>,"transcript_path":…,"cwd":…,"hook_event_name":"SessionStart","source":"resume"}`. A new chat fired it with `"source":"startup"` and a `model` field. The picker's fresh id fired nothing before the choice [measured, `hook-log.jsonl`].
@@ -273,6 +300,81 @@ The line under the box replaces Claude Code's footer row. Typing after it made C
 
 **On the main screen.** With a `settings.json` holding only a theme, the same binary and environment, at 80x24, Claude Code draws on the main screen: six lines printed before `unsent claude --resume <id>` and unsent's notice stay above the banner, and the box sits lower on the terminal than on unsent's shadow screen, which starts blank. A row number from the shadow screen then names another row of the terminal (on the box's row, in a run before the fix). So unsent draws the line under the box only while the agent is on the alternate screen, and cuts it to the width; on the main screen the restore went in, nothing was drawn over the box, and after exit the terminal read `unsent: put back your draft from 10:30 today, not sent` [measured, one run each]. On this renderer `/exit` and Enter left `/exit` behind as a draft: the exit is not the no-box screen the fullscreen renderer leaves [measured, `drafts/` after the run; why the last read still found the box is not traced].
 
+## 12. Keyboard protocols in real terminals (measured 2026-09-28)
+
+**Environment.** Claude Code 2.1.283 (the binary copied from the MacBook) on a Mac mini with macOS 26.6.1, under `unsent capture claude`, at 120x40. The environment was the one of section 11: `env -i`, scratch `HOME` and `CLAUDE_CONFIG_DIR`, a dummy `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `HTTPS_PROXY` and `HTTP_PROXY` on a closed local port, `CLAUDE_CODE_MAX_RETRIES=0`, `DISABLE_AUTOUPDATER=1`, `DISABLE_TELEMETRY=1`. The terminal's `TERM`, `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `COLORTERM`, `TERMINFO` and `TMUX` were passed through, since Claude Code picks its keyboard mode from them. The config was a copy of a configured install's `settings.json`, its one enabled plugin (Warp's notification plugin) with the install path rewritten, and an empty `CLAUDE.md`, with no credentials. The status line was a stub, and the `SessionStart` hook scripts did not exist on the mini. Terminals: tmux 3.6b with `set -s extended-keys on` and `set -as terminal-features 'xterm*:extkeys'`, driven by `send-keys` with no client attached; Ghostty 1.3.1 with every setting at its default (`--config-default-files=false`), typed at through System Events. Warp was measured only later, at the v0.6 gate (below). The logs, trimmed to input and to mode and protocol sequences, are in [`testdata/keys/`](../../testdata/keys/README.md), whose README gives the key order.
+
+**What Claude Code pushes, and when.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| With `TERM_PROGRAM=tmux` and `TMUX` set (tmux) or `TERM_PROGRAM=ghostty` (Ghostty), Claude Code writes `ESC[<u ESC[>5u ESC[>4;2m` 0.25 to 0.46 s after start, before its first frame: a kitty pop, kitty flags 5 (disambiguate plus report alternate keys), and modifyOtherKeys level 2. It writes the same three again right after `ESC[?1049h`, and again with the first key typed | measured | `testdata/keys/tmux-extkeys/keys.txt`, `testdata/keys/ghostty/keys.txt` |
+| The push comes before the kitty query `ESC[?u`, so it does not wait for an answer. Ghostty answered `ESC[?5u` (flags 5 on). tmux 3.6b did not answer the query | measured | same |
+| With only `TERM=tmux-256color` (no `TMUX`, no `TERM_PROGRAM`) Claude Code sends the `ESC[?u` query and pushes nothing. That is why section 4 saw no push under tmux: `env -i` had removed `TMUX` | measured | `testdata/keys/tmux-extkeys/no-tmux-env.txt` |
+| The gate is a list of terminals, `["iTerm.app","kitty","WezTerm","ghostty","tmux","windows-terminal","WarpTerminal"]`, checked for the `extendedKeys` capability | source | `strings` of the 2.1.283 binary |
+| At Ctrl+Z and at exit it pops: `ESC[<u`, `ESC[>4m` (twice), with mouse, focus and bracketed paste turned off | measured | same |
+
+**How each key arrived.**
+
+| Key | tmux 3.6b, extended keys on | Ghostty 1.3.1 |
+| --- | --- | --- |
+| Ctrl+W | `ESC[27;5;119~` | `ESC[119;5u` |
+| Ctrl+U | `ESC[27;5;117~` | `ESC[117;5u` |
+| Ctrl+K | `ESC[27;5;107~` | `ESC[107;5u` |
+| Alt+Backspace | `ESC[27;3;127~` | `0x7f`: Option is not Alt under Ghostty's default `macos-option-as-alt`, so this is a plain Backspace |
+| Ctrl+D | `ESC[27;5;100~` | `ESC[100;5u` |
+| Shift+Enter | `ESC[27;2;13~` | `ESC[13;2u` |
+| Ctrl+Z | `ESC[27;5;122~` | `ESC[122;5u` |
+| letters, spaces | plain bytes | plain bytes |
+
+All [measured]. tmux sends modifyOtherKeys form even though it did not answer the kitty query; Ghostty sends kitty CSI-u. With no push, the same keys arrived as `0x17`, `0x15`, `0x0b`, `ESC 0x7f`, `0x04`, `0x0d` and `0x1a` [measured, `no-tmux-env.txt`]. There Shift+Enter was a plain Enter and sent the box to the closed port, so later runs pressed Ctrl+U first to leave the box empty.
+
+**Ctrl+Z.**
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| Under the push, Ctrl+Z never reached unsent as the lone byte `0x1a`, in either terminal, so unsent did not suspend | measured | `keys.txt` of both |
+| Claude Code took it: it popped the protocols, left the alternate screen and printed `Claude Code has been suspended. Run `fg` to bring Claude Code back.` and `Note: ctrl + z now suspends Claude Code, ctrl + _ undoes input.` | measured | screen after the key, in both |
+| It did not stop. `ps` showed Claude Code `Ss+` and unsent `S+`, and the shell never got the terminal back. `fg` and Enter went to Claude Code and did nothing. The next Ctrl+C arrived as `0x03`, the flags being popped, and ended Claude Code, and unsent with it | measured | `ps`, `keys.txt` |
+| Why it did not stop: Claude Code leads its own session on unsent's pseudo-terminal, so its process group has no parent in that session, and the kernel drops a stop signal to such a group | guess | |
+| With no push, `0x1a` arrived and unsent suspended itself and Claude Code, and the shell printed `zsh: suspended` | measured | `no-tmux-env.txt`, screen |
+
+So the case 2.8 feared happens in both terminals: the session looks suspended, and it is stuck until a Ctrl+C ends it [measured]. That Ctrl+C ends Claude Code, so a draft in the box then would be left only in unsent's last save [guess: the box was empty at Ctrl+Z in these runs].
+
+**unsent's suspend with the key decoder** (Claude Code 2.1.284, same environment, 2026-09-28). unsent now finds Ctrl+Z in every form and suspends on it, and Claude Code never gets the key.
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| `ESC[27;5;122~` (tmux) and `ESC[122;5u` (Ghostty) suspend unsent and Claude Code; the shell prints `zsh: suspended` and gets the terminal; `fg` brings Claude Code back with the draft in the box, and typing and Ctrl+W work after it | measured | tmux `capture-pane`, Ghostty screenshots, `unsent list` |
+| Without anything written on suspend, the shell got the agent's keyboard mode: Ctrl+C at the prompt printed `;5;99~` (tmux), so `fg` typed after it failed | measured | tmux `capture-pane` |
+| With Claude Code's own suspend output written first (mouse and focus reports off, `ESC[<u`, `ESC[?1049l`, `ESC[>4m`, `ESC[<u`, cursor on), the shell ran on the main screen and Ctrl+C cleared its line, in tmux and Ghostty | measured | same |
+| On the size nudge after the resume, Claude Code writes `ESC[?1049h ESC[<u ESC[>5u ESC[>4;2m`, mouse modes and `ESC[?1004h`; the next key after that brought `ESC[?2004h`; `ESC[?2031h` never came back | measured | raw log of the tmux run |
+| After `fg` the Ctrl keys came in the pushed form again (`ESC[27;5;119~` in tmux, `ESC[119;5u` in Ghostty) | measured | raw logs |
+
+Open: zsh turns bracketed paste off when it runs `fg`, and Claude Code turns it on again only with the next key, so a paste that is the first input after `fg` may arrive unbracketed [guess, not measured].
+
+**Other input that is not a key** [measured, `ghostty/keys.txt`]. Ghostty sent a focus report `ESC[I` at start, and answered Claude Code's queries on input: XTVERSION (`ESC P>|ghostty 1.3.1 ESC \`), `ESC[?5u`, DA1 twice, DECRPM for modes 2026 and 1016 (`ESC[?2026;2$y`, `ESC[?1016;2$y`), a kitty graphics reply (`ESC _Gi=31;OK ESC \`) and a cell size report (`ESC[6;17;8t`). tmux answered with XTVERSION and DA1 only.
+
+**Synchronized output depends on the terminal.** Claude Code asks `ESC[?2026$p` at start. Ghostty answered it and got every frame wrapped in `ESC[?2026h` … `ESC[?2026l`. tmux 3.6b did not answer, and the whole tmux run has no such mark [measured, both captures, counted in the raw logs]. The CLAUDE.md fact that every redraw after a key is wrapped was measured on tmux 3.7c.
+
+**Warp, first attempt (2026-09-28): not measured.** Warp 0.2026.07.29.09.05.02 had never run on the mini. Its first-run screens (Get started, Customize, Choose a theme) took Enter, but the last one, "Create an account", has Enter on Continue and only a mouse click reaches Skip. A System Events `click at` returned Warp's text area and did not press Skip. A permission prompt from another process then took the keyboard focus, and the run was stopped rather than type with that prompt in front. No Warp shell was reached, so there are no Warp bytes. Warp is on the push list, so the likely outcome is a push as in Ghostty; that is a guess until the run is done.
+
+**Warp, measured at the v0.6 gate (2026-09-29).** Warp 0.2026.07.29.09.05.02 with `TERM_PROGRAM=WarpTerminal`, Claude Code 2.1.284 under `unsent claude`, a `settings.json` with no plugin and no hooks, the environment above. Keys typed through System Events: text, Ctrl+W, Ctrl+Z, `fg` at the shell, text, Ctrl+C twice. The trimmed log is [`testdata/keys/warp/`](../../testdata/keys/README.md#the-warp-run).
+
+| Fact | Tag | Evidence |
+| --- | --- | --- |
+| Claude Code pushes `ESC[<u ESC[>5u ESC[>4;2m` 0.61 s after start, again after `ESC[?1049h` and with the first key, as in Ghostty | measured | `warp/keys.txt` |
+| Warp answers XTVERSION with `ESC P>\|Warp(v0.2026.07.29.09.05.stable_02) ESC \`, the kitty query with `ESC[?5u`, DA1 with `ESC[?62c`, DECRPM 2026 and the kitty graphics query; not the 1016 query or `ESC[16t`, and no focus report at start | measured | same |
+| Ctrl+W arrives as `ESC[119;5u` and Ctrl+Z as `ESC[122;5u` | measured | same |
+| Ctrl+C arrives as `0x03`, under flags 5, twice | measured | same |
+| unsent suspends on that Ctrl+Z; `fg` brings Claude Code back with the draft in the box | measured | `zsh: suspended`, `ps` (`T`, `Ts+`), screenshots |
+
+Why Warp sends Ctrl+C in legacy form under flags 5 is not known [guess: Warp keeps Ctrl+C as the interrupt byte]; unsent's Claude keyset reads either form as a clear.
+
+**A burst scrolls out before the first read** [measured, 2026-09-29, Claude Code 2.1.284, two runs at the v0.6 gate]: 599 characters (`word001` to `word075`) written in one tmux write into a capped box left unsent's saves holding only the last 487, from `word015` on, because the first words scrolled out of the box before unsent's first read. It is a synthetic burst, not typing.
+
+**What this section could not measure.** Every key in Warp (the gate run above pressed three). iTerm2, kitty and WezTerm. Ghostty with `macos-option-as-alt` on. Whether a SIGCONT sent to Claude Code brings it back after its own suspend. What each key did to the box, beyond two tmux screens: after Ctrl+D the box read `echo foxtrot`, so Ctrl+U had emptied it and Alt+Backspace took `golf`; after Shift+Enter a `ctrl+g to edit in Editor` hint showed above the box, which suggests a line break went in [guess]. One run each.
+
 ## Risks
 
 - `pastePlaceholder` misses `[...Truncated text #N +M lines...]`, `[Image #N]`, `[Audio #N]`. A box value over 10,000 characters is shown with its middle collapsed [source]; if that text was typed or came back from `$EDITOR`, unsent's paste tracker never saw it as a paste. The previous full draft is still archived by `keepOld` (the new text shares only 1,000 characters with it, so `similar` fails and it goes to history) [source, `wrap.go:538`], but the current draft saves with the literal placeholder [guess].
@@ -284,7 +386,7 @@ The line under the box replaces Claude Code's footer row. Typing after it made C
 
 ## Open questions
 
-1. Does the main REPL push kitty keyboard / modifyOtherKeys in Ghostty, kitty, WezTerm, iTerm2? Measure raw output outside tmux. Highest priority for `deleteKeys`.
+1. Does the main REPL push kitty keyboard / modifyOtherKeys in Ghostty, kitty, WezTerm, iTerm2? Measure raw output outside tmux. Highest priority for `deleteKeys`. Answered for Ghostty, tmux and Warp (yes, from start; section 12); kitty, WezTerm and iTerm2 are still open.
 2. When does the dim `Try "…"` hint show? Needs the real config (or decoding `be`).
 3. Does the `History n/m` label stay after editing a recalled entry?
 4. Does the box ever jump on large moves (start/end of buffer, mouse click) as CLAUDE.md says? Needs a per-step capture.
