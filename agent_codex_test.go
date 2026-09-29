@@ -252,9 +252,179 @@ func TestCodexRecalledEntrySent(t *testing.T) {
 	}
 }
 
+// codexKeysSession is a session with Codex's keys on the shadow screen of
+// sent_test.go, where the test draws the box by hand: each redraw lands
+// exactly where the test puts it, which no capture can do for Codex's own
+// put-backs (a turn cannot run on the dead base URL).
+func codexKeysSession(t *testing.T) sendSession {
+	t.Helper()
+	p := claude
+	p.keys = codex.keys
+	return newSendSession(t, &p)
+}
+
+// A box emptied with delete keys is as empty as one a submit or clear key
+// emptied: Up then brings back a history entry, which is not a draft.
+func TestCodexRecallAfterTheBoxIsDeletedEmpty(t *testing.T) {
+	for _, c := range []struct{ name, empty string }{
+		{"Backspace", "\x7f\x7f\x7f"},
+		{"Ctrl+C", "\x03"}, // the control: a clear key
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s := codexKeysSession(t)
+			s.input([]byte("abc"))
+			s.draw("abc")
+			s.save()
+			s.input([]byte(c.empty))
+			s.draw("")
+			s.save()
+			s.input([]byte("\x1b[A"))
+			s.draw("first entry for history")
+			s.save()
+			if s.rec.Draft != "" {
+				t.Fatalf("the history entry was saved as the draft %q", s.rec.Draft)
+			}
+			s.input([]byte("!"))
+			s.draw("first entry for history!")
+			s.save()
+			if s.rec.Draft != "first entry for history!" {
+				t.Fatalf("the edited entry is not the draft: %q", s.rec.Draft)
+			}
+		})
+	}
+}
+
+// Up right after a send brings back the prompt just sent: it is in the
+// sent log once, and the box holds a history entry, not a draft.
+func TestCodexRecallAfterASend(t *testing.T) {
+	for _, submit := range []string{"\r", "\t"} {
+		s := codexKeysSession(t)
+		s.input([]byte("the prompt"))
+		s.draw("the prompt")
+		s.save()
+		s.input([]byte(submit))
+		s.draw("")
+		s.save()
+		s.input([]byte("\x1b[A"))
+		s.draw("the prompt")
+		s.save()
+		if s.rec.Draft != "" {
+			t.Fatalf("%q: the prompt sent and brought back with Up was saved as the draft", submit)
+		}
+		s.expect([]string{"the prompt"}, nil)
+	}
+	// Typed and sent within one save, with Codex's answer to Enter split
+	// across two reads mid-frame: no save read the prompt, nor the screen
+	// Enter was typed into. Up still brings back a history entry.
+	s := codexKeysSession(t)
+	s.input([]byte("the prompt"))
+	s.draw("the prompt")
+	s.write(frameBegin)
+	s.input([]byte("\r"))
+	s.write(append([]byte(drawBox(100, "")), frameEnd...))
+	s.save()
+	s.input([]byte("\x1b[A"))
+	s.draw("the prompt")
+	s.save()
+	if s.rec.Draft != "" {
+		t.Fatalf("a prompt sent unseen and brought back with Up was saved as the draft")
+	}
+}
+
+// Text Codex puts back into the empty box by itself is a draft, although
+// no key edited the box since the last submit or clear key: a message
+// queued with Tab that an interrupted turn gives back, a send Codex
+// refuses, a thread's box on a switch (codex-rs tui input_restore.rs).
+// Here the Tab-send, then Ctrl+C on the empty box to interrupt the turn,
+// then the queued message drawn back.
+func TestCodexTextGivenBackIsADraft(t *testing.T) {
+	s := codexKeysSession(t)
+	s.input([]byte("queued while the turn runs"))
+	s.draw("queued while the turn runs")
+	s.save()
+	s.input([]byte("\t"))
+	s.draw("")
+	s.save()
+	s.input([]byte("\x03"))
+	s.save()
+	s.draw("queued while the turn runs")
+	s.save()
+	if s.rec.Draft != "queued while the turn runs" {
+		t.Fatalf("the message given back is not saved: draft %q", s.rec.Draft)
+	}
+}
+
+// The window closes, or Codex is killed, with a draft in the box: Codex
+// keeps it in no file, and unsent keeps it as an orphan. kill9 kills the
+// Codex process, killsession closes the window, daemon-killsession closes
+// it under the shared background server, and daemon-quit quits with
+// Ctrl+C on an empty box, which leaves nothing. Codex drew nothing after
+// a kill or a closed window: the captures end at the draft.
+var codexCloses = []struct {
+	name   string
+	closed bool
+	draft  string
+}{
+	{"kill9", false, "kill nine draft zebra\nsecond line of it"},
+	{"killsession", true, "kill session draft yak\nsecond line of it"},
+	{"daemon-killsession", true, "daemon draft walrus"},
+	{"daemon-quit", false, ""},
+}
+
+func codexCloseCheck(t *testing.T, prof *profile) error {
+	t.Helper()
+	for _, c := range codexCloses {
+		s, err := replayCodexSession(t, prof, c.name)
+		if err != nil {
+			return err
+		}
+		if c.closed {
+			s.closing()
+		}
+		s.save()
+		s.finish()
+		var kept []string
+		for _, r := range s.store.orphans() {
+			kept = append(kept, r.Draft)
+		}
+		var want []string
+		if c.draft != "" {
+			want = []string{c.draft}
+		}
+		if !slices.Equal(kept, want) {
+			return fmt.Errorf("%s: orphans %q, want %q", c.name, kept, want)
+		}
+		for _, h := range s.store.load(true) {
+			if h.ID != s.rec.ID {
+				return fmt.Errorf("%s: %q in history", c.name, h.Draft)
+			}
+		}
+	}
+	return nil
+}
+
+func TestCodexWindowCloseKeepsTheDraft(t *testing.T) {
+	if err := codexCloseCheck(t, &codex); err != nil {
+		t.Fatal(err)
+	}
+	// A check that can fail: a reader that takes every box for empty loses
+	// the drafts.
+	empty := codex
+	empty.read = func(scr *screen) (view, bool) {
+		v, ok := codexBox(scr)
+		v.rows, v.empty = nil, true
+		return v, ok
+	}
+	if codexCloseCheck(t, &empty) == nil {
+		t.Error("with every box read empty the close check stayed green")
+	}
+}
+
 // Ctrl+Z is unsent's, in the form tmux sent it (ESC[122;5u), and unsent
 // writes nothing for Codex as it suspends it: Codex's repaint after the
-// resume turns none of its modes on again (testdata/codex/0.158.0/suspend).
+// resume turns none of its modes on again (testdata/codex/0.158.0/suspend),
+// so unsent turns bracketed paste back on itself as it resumes Codex
+// (TestWrapResumeTurnsBracketedPasteBackOn).
 func TestCodexSuspendPolicy(t *testing.T) {
 	if at, end := findKey([]byte("ab\x1b[122;5ucd"), suspendKeys(&codex)); at != 2 || end != 10 {
 		t.Fatalf("Ctrl+Z found at %d..%d", at, end)
@@ -278,6 +448,25 @@ func TestCodexSuspendPolicy(t *testing.T) {
 		if bytes.Contains(resumed, []byte(mode)) {
 			t.Fatalf("Codex set %q again after the resume; its suspend output can go back in the profile", mode)
 		}
+	}
+	// In suspend-paste, recorded by unsent with this policy, the shell's fg
+	// turned bracketed paste off and unsent turned it on again: tmux sent
+	// the paste typed after fg with its marks, and nothing was sent (a
+	// build without session.resuming sent the draft at the paste's first
+	// line break).
+	data = readCodexRec(t, "suspend-paste")
+	want := "\x1b[200~\rpasted line one\rpasted line two\rpasted line three\x1b[201~"
+	var in []byte
+	eachChunk(t, data, func(_ time.Time, dir byte, chunk []byte) {
+		if dir == 'i' {
+			in = append(in, chunk...)
+		}
+	})
+	if !bytes.Contains(in, []byte(want)) {
+		t.Fatalf("the paste after fg did not reach Codex as one bracketed paste: %q", in)
+	}
+	if !bytes.Contains(in, []byte("draft before the stop")) || bytes.Contains(bytes.Replace(in, []byte(want), nil, 1), []byte("\r")) {
+		t.Fatal("no draft before the stop, or an Enter reached Codex")
 	}
 }
 

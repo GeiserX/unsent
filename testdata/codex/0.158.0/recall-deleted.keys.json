@@ -1,0 +1,123 @@
+[
+{
+"until": "rig%",
+"timeout": 10
+},
+{
+"type": "unsent codex -c 'sandbox_mode=\"danger-full-access\"'"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"type": "first entry for history"
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"type": "abc"
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.2
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.2
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./dump.sh recall-deleted",
+"out": "recall-deleted-emptied"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "recall-deleted-recalled"
+},
+{
+"sh": "./dump.sh recall-deleted",
+"out": "recall-deleted-recalled"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 2.5
+},
+{
+"sh": "./dump.sh recall-deleted",
+"out": "recall-deleted-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 3.0
+},
+{
+"until": "rig%",
+"timeout": 15
+},
+{
+"sh": "./dump.sh recall-deleted",
+"out": "recall-deleted-end"
+},
+{
+"screen": "recall-deleted-exit"
+}
+]

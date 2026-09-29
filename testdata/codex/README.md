@@ -1,6 +1,6 @@
 # Codex captures
 
-Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks. `replay_test.go` replays every capture that has editor copies through Codex's profile (its reader, wrap, scroll, paste rule and keys) and checks each draft against the editor copy, and `inline` to check that its box is never read. `agent_codex_test.go` reads the dialogs, menus and history browsing in `dialogs`, `picker`, `slash-new` and `ctrlc-history` as negative screens, checks the sent log in `orphan` and `recall-send`, and puts the drafts of `restore-id`, `restore-last`, `restore-picker` and `restore-long` back through its own restore.
+Real terminal traffic of the OpenAI Codex CLI, recorded for the Codex profile. One folder per Codex version. Every draft in them is dummy text typed for the capture. `screen_test.go` replays `tinted`, `typed`, `dialogs` and `submit` to check the snapshot's cell looks. `replay_test.go` replays every capture that has editor copies through Codex's profile (its reader, wrap, scroll, paste rule and keys) and checks each draft against the editor copy, and `inline` to check that its box is never read. `agent_codex_test.go` reads the dialogs, menus and history browsing in `dialogs`, `picker`, `slash-new` and `ctrlc-history` as negative screens, checks the sent log in `orphan` and `recall-send`, replays `kill9`, `killsession`, `daemon-killsession` and `daemon-quit` through a window close or a kill (the draft kept as an orphan, nothing for the quit), and puts the drafts of `restore-id`, `restore-last`, `restore-picker` and `restore-long` back through its own restore.
 
 ## What each file is
 
@@ -30,6 +30,8 @@ A second run on 2026-09-29, the same setup and the same Codex 0.158.0, ran unsen
 - `restore-id` and `restore-long` were started with `codex resume <id>`, `restore-last` and `early-paste` with `codex resume --last`, `restore-picker` with `codex resume`, `slash-new` with `codex resume --last`, and `inline` with `--no-alt-screen`.
 - `daemon-draft` ran without `-c`, with the full Codex package (`codex-package.json`, `codex-resources`, `codex-path`) beside the binary, which the shared background server needs: with the bare binary Codex quits with `this CLI has no complete local package`.
 - `slash-new` began in a thread that had an orphan: the restore went in 2.4 s after the box, and the draft cleared with Ctrl+C is the restored one.
+
+A third run on 2026-09-29, the same setup and the same Codex 0.158.0, ran `unsent codex` from a `zsh -f` in the pane, with the raw log of `UNSENT_DEBUG_DIR` as the record: `recall-deleted` and `suspend-paste`. In `suspend-paste` zsh printed `suspended`, and after `fg` tmux sent the paste with its marks, because unsent turned bracketed paste back on; the same keys through a build that did not sent the draft at the paste's first line break (on the dead port) and left the three lines in the box.
 
 ## Scenarios
 
@@ -63,6 +65,8 @@ A second run on 2026-09-29, the same setup and the same Codex 0.158.0, ran unsen
 | `recall-send` | a prompt cleared with Ctrl+C, brought back with Up and sent with Enter |
 | `daemon-draft` | a draft under the shared background server, which Codex starts as its own child a moment after it draws the box |
 | `inline` | `--no-alt-screen`: the box drawn under the terminal's text with one footer row, a draft, Ctrl+G |
+| `recall-deleted` | a prompt cleared with Ctrl+C, then `abc` emptied with three Backspaces, then Up brings the prompt back: the draft stays empty |
+| `suspend-paste` | a draft, Ctrl+Z, `fg`, then a three-line bracketed paste, which goes in whole: nothing is sent |
 
 ## Adding one
 

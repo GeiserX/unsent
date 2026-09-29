@@ -584,3 +584,24 @@ func TestWrapSuspendHandsTheTerminalBack(t *testing.T) {
 		})
 	}
 }
+
+// The shell turns bracketed paste off as it runs fg, and the agent does
+// not turn it on again as it repaints, so unsent does as it resumes the
+// agent: without it a paste's line breaks reach the agent as Enter. The
+// fake agent turns it on once, at start.
+func TestWrapResumeTurnsBracketedPasteBackOn(t *testing.T) {
+	old := stopSelf
+	stopSelf = func() {}
+	defer func() { stopSelf = old }()
+	_, _, shown, _ := runWrappedOut(t, "claude", []string{"claude"}, func(type_ func(string)) {
+		type_("x")
+		type_("\x1b[122;5u")
+		type_("\x04")
+	})
+	if n := strings.Count(shown, string(bracketOn)); n != 2 {
+		t.Fatalf("bracketed paste turned on %d times, want at start and at the resume: %q", n, shown)
+	}
+	if i := strings.LastIndex(shown, string(bracketOn)); i < strings.Index(shown, string(claude.suspended)) {
+		t.Fatal("bracketed paste turned on before the suspend, not at the resume")
+	}
+}

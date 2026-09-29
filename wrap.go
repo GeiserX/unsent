@@ -291,6 +291,13 @@ func wrap(agent string, args []string, in, out *os.File, raw *rawLog) int {
 			if cooked != nil {
 				term.MakeRaw(int(in.Fd()))
 			}
+			// The shell turns bracketed paste off as it runs the fg line
+			// (zsh and bash both), and neither agent turns it on again as
+			// it repaints: Codex never, Claude Code only at the next key.
+			// Without it a paste's line breaks reach the agent as Enter.
+			if b := s.resuming(); b != nil {
+				s.out.Write(b)
+			}
 			cmd.Process.Signal(syscall.SIGCONT)
 			// Nudge the size so the agent repaints over whatever the shell
 			// printed while it was away.
@@ -354,6 +361,17 @@ func (s *session) leaving(suspended []byte) []byte {
 		return suspended
 	}
 	return bytes.ReplaceAll(suspended, leaveAlt, nil)
+}
+
+// resuming is what unsent writes as the shell brings the agent back: the
+// agent's bracketed paste, when it had it on.
+func (s *session) resuming() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.bracketed {
+		return bracketOn
+	}
+	return nil
 }
 
 // suspendAt returns where the first of the suspend keys starts and ends in
@@ -497,11 +515,16 @@ type session struct {
 	closed       bool
 	// edited is set once a key other than the profile's recall keys, a
 	// paste (pasted, from the input side) or a restore has changed the box
-	// since the last submit or clear key. Until then a box that holds text
-	// while the draft is empty holds an entry of the agent's own history,
-	// brought back with a recall key, which the agent keeps: not a draft.
-	edited bool
-	pasted atomic.Bool
+	// since it was emptied: by a submit or clear key, or by any keys once a
+	// save reads the draft it held gone. recalled is set by a recall key
+	// typed while the box is empty and not edited since: until another key,
+	// a paste or a restore, the box holds an entry of the agent's own
+	// history, which the agent keeps, not a draft. Text that comes into
+	// the empty box with no recall key (Codex giving back a queued or
+	// refused message) is a draft.
+	edited   bool
+	recalled bool
+	pasted   atomic.Bool
 
 	rec    *record
 	store  *store
@@ -695,19 +718,24 @@ func (s *session) save() {
 				s.look(e.before)
 			}
 			s.armed = false
-			s.edited = s.edited || e.kind == keyOther
+			switch {
+			case e.kind == keyOther:
+				s.edited, s.recalled = true, false
+			case !s.edited && s.rec.Draft == "":
+				s.recalled = true
+			}
 		case keyClear:
-			s.armed, s.cleared, s.edited = false, true, false
+			s.armed, s.cleared, s.edited, s.recalled = false, true, false, false
 		case keySubmit:
 			// What the key sends is a draft, even a history entry brought
 			// back with a recall key.
-			s.edited = true
+			s.recalled = false
 			s.armed = e.before != nil && s.look(e.before)
 			s.edited = false
 		}
 	}
 	if s.pasted.Swap(false) {
-		s.edited = true
+		s.edited, s.recalled = true, false
 	}
 	if answered {
 		// Until the agent draws something after a submit key, the screen is
@@ -799,7 +827,7 @@ func (s *session) look(scr *screen) bool {
 	if dir := os.Getenv("UNSENT_DEBUG_DIR"); dir != "" {
 		logView(filepath.Join(dir, "views.jsonl"), before, v, s.stitch)
 	}
-	if !s.edited && s.rec.Draft == "" && len(s.prof.keys.recall) > 0 {
+	if s.recalled && s.rec.Draft == "" {
 		// A history entry brought into the empty box: the agent keeps it,
 		// and it becomes a draft once it is edited.
 		return true
@@ -839,6 +867,9 @@ func (s *session) look(scr *screen) bool {
 		s.pastes.reset()
 		s.store.dropVersions(s.rec)
 		s.stitched = false
+		// Emptied by any keys, the box is as a submit or clear key leaves
+		// it: a recall key next brings back a history entry.
+		s.edited = false
 	}
 	s.deletes.spend(shrunk(s.rec.Draft, draft))
 	s.rec.Draft = draft

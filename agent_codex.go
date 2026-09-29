@@ -83,9 +83,11 @@ var codex = profile{
 	// brings the box back with the draft, but Codex's repaint after the
 	// resume sets none of its modes again: not the alternate screen, the
 	// kitty flags or bracketed paste (suspend). Writing its leave sequence
-	// here would leave the box drawn on the main screen, and a paste's
-	// line breaks read as Enter. So while it is stopped the shell sits on
-	// Codex's screen, with its key modes on.
+	// here would leave the box drawn on the main screen. So while it is
+	// stopped the shell sits on Codex's screen, with its key modes on. The
+	// shell turns bracketed paste off as it runs fg, and unsent turns it
+	// on again as it resumes Codex (session.resuming), or a paste's line
+	// breaks would reach Codex as Enter.
 	suspended: nil,
 	// The fixtures in testdata/codex; `codex --version` prints
 	// "codex-cli 0.158.0".

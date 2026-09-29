@@ -490,7 +490,11 @@ func replayCodexSession(t *testing.T, prof *profile, name string, recalled ...in
 //   - slash-new: /new through its dialog, and a draft in the new thread;
 //   - edge-deletes: Ctrl+W, Backspace, Alt+Backspace, Ctrl+U, Ctrl+K,
 //     Delete and Ctrl+D on the last row of a box at its cap, where only
-//     the keys tell a deletion from rows scrolled out of sight below.
+//     the keys tell a deletion from rows scrolled out of sight below;
+//   - recall-deleted: a draft cleared with Ctrl+C, another emptied with
+//     Backspace, then Up brings the first back (the first Ctrl+G);
+//   - suspend-paste: Ctrl+Z, fg, then a paste of three lines, which goes
+//     in whole because unsent turns bracketed paste back on.
 var codexReplays = []struct {
 	name     string
 	recalled []int
@@ -499,7 +503,7 @@ var codexReplays = []struct {
 	{"submit", nil}, {"suspend", nil}, {"suspend-direct", nil}, {"resume-id", nil}, {"resume-last", nil},
 	{"fork-last", nil}, {"tinted", nil}, {"paste-exact", nil}, {"orphan", nil}, {"restore-id", nil},
 	{"restore-last", nil}, {"restore-picker", nil}, {"restore-long", nil}, {"early-paste", nil}, {"slash-new", nil},
-	{"edge-deletes", nil}}
+	{"edge-deletes", nil}, {"recall-deleted", []int{1}}, {"suspend-paste", nil}}
 
 func TestReplayCodex(t *testing.T) {
 	for _, r := range codexReplays {

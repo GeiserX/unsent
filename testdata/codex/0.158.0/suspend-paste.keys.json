@@ -1,0 +1,112 @@
+[
+{
+"until": "rig%",
+"timeout": 10
+},
+{
+"type": "unsent codex -c 'sandbox_mode=\"danger-full-access\"'"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"type": "draft before the stop"
+},
+{
+"wait": 0.6
+},
+{
+"keys": [
+"C-z"
+]
+},
+{
+"until": "suspended",
+"timeout": 10
+},
+{
+"wait": 0.8
+},
+{
+"screen": "suspend-paste-stopped"
+},
+{
+"type": "fg"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 2.0
+},
+{
+"until": "draft before the stop",
+"timeout": 10
+},
+{
+"wait": 1.0
+},
+{
+"paste": "\npasted line one\npasted line two\npasted line three"
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-paste-pasted"
+},
+{
+"sh": "./dump.sh suspend-paste",
+"out": "suspend-paste-pasted"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 2.5
+},
+{
+"sh": "./dump.sh suspend-paste",
+"out": "suspend-paste-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 3.0
+},
+{
+"until": "rig%",
+"timeout": 15
+},
+{
+"sh": "./dump.sh suspend-paste",
+"out": "suspend-paste-end"
+},
+{
+"screen": "suspend-paste-exit"
+}
+]
