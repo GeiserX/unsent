@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GeiserX/unsent/main/docs/images/banner.svg" alt="unsent: AutoRecover for your AI agent prompts" width="900">
+  <img src="docs/images/banner.svg" alt="unsent: AutoRecover for your AI agent prompts" width="900">
 </p>
 
 <p align="center">
