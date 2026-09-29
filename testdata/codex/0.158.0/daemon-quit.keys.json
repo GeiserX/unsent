@@ -1,0 +1,6 @@
+[
+{"until": "Ask Codex to do anything", "timeout": 30},
+{"wait": 8},
+{"keys": ["C-c"]},
+{"wait": 3}
+]

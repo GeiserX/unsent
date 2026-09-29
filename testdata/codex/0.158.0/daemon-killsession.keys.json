@@ -1,0 +1,26 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 30
+},
+{
+"wait": 1.5
+},
+{
+"type": "daemon draft walrus"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "daemon-draft"
+},
+{
+"sh": "./ids.sh | sed -n '/child/,/codex processes/p' | grep -v sqlite; for p in $(pgrep -f 'app-server --listen'); do echo daemon $p; lsof -p $p -Fn | grep thread-writer; done",
+"out": "id-daemon-draft"
+},
+{
+"sh": "tmux -L unsent-07 kill-session -t rig; sleep 2; ps -axo pid,ppid,command | grep -F 'unsent-07' | grep -v grep | cut -c1-140; grep -rIl walrus codexhome 2>/dev/null || echo 'walrus: in no file under CODEX_HOME'; for p in $(pgrep -f 'app-server --listen'); do echo daemon $p; lsof -p $p -Fn | grep thread-writer; done",
+"out": "daemon-killsession"
+}
+]

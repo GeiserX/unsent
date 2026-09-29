@@ -1,0 +1,149 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"type": "a draft to clear with ctrl c"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "its second line"
+},
+{
+"wait": 0.4
+},
+{
+"screen": "ctrlc-history-draft"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "ctrlc-history-cleared-draft"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-1"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-2"
+},
+{
+"keys": [
+"Down"
+]
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"Down"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-down-back"
+},
+{
+"type": "typed draft"
+},
+{
+"keys": [
+"Up"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-up-in-draft"
+},
+{
+"keys": [
+"C-r"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-ctrl-r"
+},
+{
+"keys": [
+"Escape"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "ctrlc-history-after-ctrl-r"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "ctrlc-history-cleared"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

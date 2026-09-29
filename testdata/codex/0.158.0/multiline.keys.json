@@ -1,0 +1,88 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"screen": "multiline-empty"
+},
+{
+"type": "first line of a dummy draft"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "fourth, after a blank line"
+},
+{
+"keys": [
+"M-Enter"
+]
+},
+{
+"type": "fifth via Alt+Enter"
+},
+{
+"keys": [
+"S-Enter"
+]
+},
+{
+"type": "sixth via Shift+Enter"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "multiline"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "multiline-after-editor"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "multiline-cleared"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

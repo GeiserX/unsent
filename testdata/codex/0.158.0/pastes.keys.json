@@ -1,0 +1,145 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 30
+},
+{
+"wait": 1.0
+},
+{
+"paste": "p3 line one\np3 line two\np3 line three"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-3-lines"
+},
+{
+"type": " "
+},
+{
+"paste": "thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand thousand t"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-1000"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"type": "before "
+},
+{
+"paste": "overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit o"
+},
+{
+"type": " after "
+},
+{
+"paste": "overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit overlimit o"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-1001-twice"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"BSpace"
+]
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-backspace"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"type": "lf paste: "
+},
+{
+"paste": "multi paste line 01 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 02 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 03 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 04 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 05 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 06 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 07 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 08 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 09 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 10 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 11 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 12 filler filler filler filler filler filler filler filler filler filler",
+"raw": true
+},
+{
+"type": " | cr paste: "
+},
+{
+"paste": "multi paste line 01 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 02 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 03 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 04 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 05 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 06 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 07 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 08 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 09 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 10 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 11 filler filler filler filler filler filler filler filler filler filler\nmulti paste line 12 filler filler filler filler filler filler filler filler filler filler"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "pastes-multiline"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"screen": "pastes-cleared"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.5
+}
+]

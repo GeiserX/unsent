@@ -1,0 +1,23 @@
+lf paste: multi paste line 01 filler filler filler filler filler filler filler filler filler filler
+multi paste line 02 filler filler filler filler filler filler filler filler filler filler
+multi paste line 03 filler filler filler filler filler filler filler filler filler filler
+multi paste line 04 filler filler filler filler filler filler filler filler filler filler
+multi paste line 05 filler filler filler filler filler filler filler filler filler filler
+multi paste line 06 filler filler filler filler filler filler filler filler filler filler
+multi paste line 07 filler filler filler filler filler filler filler filler filler filler
+multi paste line 08 filler filler filler filler filler filler filler filler filler filler
+multi paste line 09 filler filler filler filler filler filler filler filler filler filler
+multi paste line 10 filler filler filler filler filler filler filler filler filler filler
+multi paste line 11 filler filler filler filler filler filler filler filler filler filler
+multi paste line 12 filler filler filler filler filler filler filler filler filler filler | cr paste: multi paste line 01 filler filler filler filler filler filler filler filler filler filler
+multi paste line 02 filler filler filler filler filler filler filler filler filler filler
+multi paste line 03 filler filler filler filler filler filler filler filler filler filler
+multi paste line 04 filler filler filler filler filler filler filler filler filler filler
+multi paste line 05 filler filler filler filler filler filler filler filler filler filler
+multi paste line 06 filler filler filler filler filler filler filler filler filler filler
+multi paste line 07 filler filler filler filler filler filler filler filler filler filler
+multi paste line 08 filler filler filler filler filler filler filler filler filler filler
+multi paste line 09 filler filler filler filler filler filler filler filler filler filler
+multi paste line 10 filler filler filler filler filler filler filler filler filler filler
+multi paste line 11 filler filler filler filler filler filler filler filler filler filler
+multi paste line 12 filler filler filler filler filler filler filler filler filler filler

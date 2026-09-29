@@ -1,0 +1,40 @@
+
+  [38;5;75m>_ [1m[39mOpenAI Codex[0;2m (v0.158.0)[0m
+     [2m/Volumes/Data/unsent-07.GZ7M/work[0m
+
+  [38;5;75mHow’s life between the brackets?[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+  [1mMentions[0m
+  [2mFiles, directories, plugins, skills and tasks[0m
+
+  [1;4m All Results [0m [2m Filesystem Only [0m [2m Plugins [0m
+
+  [2mType to search mentions[0m
+
+[1;7m› Image Gen        Generate or edit images for websites, games, and more                                          Skill
+[0m  [2mOpenAI Docs      OpenAI and Codex docs for models, skills, tasks, and setup                                     Skill
+[0m  [2mPlugin Creator   Scaffold plugins and marketplace entries                                                       Skill
+[0m  [2mReview Agent     Find actionable bugs in code changes                                                           Skill
+[0m  [2mSkill Creator    Create or update a skill                                                                       Skill
+[0m  [2mSkill Installer  Install curated skills from openai/skills or other repos                                       Skill
+[0m
+
+
+  [1menter/tab[0;2m insert · [0;1mesc[0;2m close · [0;1m↑/↓[0;2m select · [0;1m←/→[0;2m filter[0m
+
+[1m›[0m @
+
+  [38;5;223mGPT-6-Astra default[39m · [38;5;151m/Volumes/Data/unsent-07.GZ7M/work[39m
+

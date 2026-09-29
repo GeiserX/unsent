@@ -1,0 +1,40 @@
+Error: Failed to resume session from /Volumes/Data/unsent-07.GZ7M/codexhome/sessions/2026/09/29/rollout-2026-09-29T04-52
+-21-01a0eb13-da0c-7d22-8d9f-1e7d97778ae6.jsonl: thread/resume failed during TUI bootstrap: thread/resume failed: no roll
+out found for thread id 01a0eb13-da0c-7d22-8d9f-1e7d97778ae6 (code -32600)
+unsent: no reader for "codex" yet, running it without saving drafts
+unsent: captured codex 0.158.0 in /Volumes/Data/unsent-07.GZ7M/work/testdata/codex/0.158.0/capture-20260929-045340.rec (
+keys and output), /Volumes/Data/unsent-07.GZ7M/work/testdata/codex/0.158.0/capture-20260929-045340.json (window sizes) a
+nd 0 editor copies. Check every file for real prompt text, names, paths and keys before committing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 1, Tue Sep 29 04:53:40 2026)

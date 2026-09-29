@@ -1,0 +1,118 @@
+[
+{
+"until": "%\\s*$",
+"timeout": 10
+},
+{
+"type": "./start.sh"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"type": "suspend draft, dummy"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "suspend-before"
+},
+{
+"sh": "tmux -L unsent-07 display -p -t rig 'alternate_on=#{alternate_on}'",
+"out": "suspend-alt"
+},
+{
+"keys": [
+"C-z"
+]
+},
+{
+"wait": 1.5
+},
+{
+"screen": "suspend-stopped"
+},
+{
+"sh": "ps -axo pid,ppid,stat,command | grep -E 'bin/codex|bin/unsent|zsh -f' | grep -v grep | cut -c1-120",
+"out": "suspend-ps"
+},
+{
+"type": "fg"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-fg"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"type": " after fg"
+},
+{
+"wait": 0.5
+},
+{
+"screen": "suspend-typed-after"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 0.8
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+},
+{
+"screen": "suspend-exit"
+},
+{
+"type": "exit"
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 0.5
+}
+]

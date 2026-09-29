@@ -1,0 +1,1 @@
+codexhome/thread-writer-locks/01a0eb11-e3e3-7c53-9e65-3442a9d52f57.lock LOCKED [Errno 35] Resource temporarily unavailable

@@ -1,0 +1,40 @@
+
+  [38;5;75m>_ [1m[39mOpenAI Codex[0;2m (v0.158.0)[0m
+     [2m/Volumes/Data/unsent-07.GZ7M/work[0m
+
+  [38;5;75mMay the source be with you.[39m
+
+
+[1;2m› [0mdummy prompt that must fail on the dead base url
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[2m◦[0m [2mReconnecting... waiting for network[0m [2m(38s • [0;1mesc[0;2m to interrupt)[0m
+[2m  └ Connection failed: error sending request[0m
+[2m  └ [0;1mTip:[0m Use [1m/title[0m to choose what appears in your terminal’s title.
+
+
+[1m›[0m [2mAsk Codex to do anything[0m
+
+  [38;5;223mGPT-6-Astra default[39m · [38;5;151m/Volumes/Data/unsent-07.GZ7M/work[39m
+  [1m?[0m for shortcuts                                                                             ⚠ [38;5;179m2 warnings[39m · [1mf2[0m to view

@@ -1,0 +1,28 @@
+pane pid (unsent): 85311
+  PID  PPID COMMAND
+codex processes anywhere under the scratch:
+logs_2 process_uuid -> thread_id:
+pid:79051:6c01c01e-4604-4288-a932-b8bfc3a08e2d|01a0eb0f-1900-7ab0-b4cd-ca9c728315ec|82|1790650060
+pid:79051:6c01c01e-4604-4288-a932-b8bfc3a08e2d|01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b|83|1790650061
+pid:82101:6fc94521-72a0-4574-b8d5-eb8277181b0b|01a0eb12-6cef-7602-9984-7353cfdee7b8|1|1790650248
+pid:82101:6fc94521-72a0-4574-b8d5-eb8277181b0b|01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b|6|1790650255
+pid:84030:00c4ec25-0978-4a01-a340-b999b2042030|01a0eb13-da0c-7d22-8d9f-1e7d97778ae6|1|1790650341
+threads:
+01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b|codexhome/sessions/2026/09/29/rollout-2026-09-29T04-47-04-01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b.jsonl|cli|0|dummy prompt that must fail on the dead base url|1790650024572
+01a0eb11-e3e3-7c53-9e65-3442a9d52f57|codexhome/sessions/2026/09/29/rollout-2026-09-29T04-50-13-01a0eb11-e3e3-7c53-9e65-3442a9d52f57.jsonl|cli|0||1790650213347
+sessions/:
+  sessions/2026/09/29/rollout-2026-09-29T04-47-04-01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b.jsonl
+  sessions/2026/09/29/rollout-2026-09-29T04-50-13-01a0eb11-e3e3-7c53-9e65-3442a9d52f57.jsonl
+history.jsonl:
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650027,"text":"typed but not submitted, dummy"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650030,"text":"dummy prompt that must fail on the dead base url"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650066,"text":"a draft typed after the failed submit"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650169,"text":"a draft in the resumed session"}
+{"session_id":"01a0eb0f-027c-72e3-8a6e-78ebe8f71d9b","ts":1790650206,"text":"a draft in the resumed session"}
+{"session_id":"01a0eb11-e3e3-7c53-9e65-3442a9d52f57","ts":1790650218,"text":"a draft in the resumed session"}
+thread-writer-locks:
+-rw-r--r--   1 rig  staff     0 Sep 29 04:47 .coordination.lock
+-rw-r--r--   1 rig  staff     0 Sep 29 04:52 01a0eb13-da0c-7d22-8d9f-1e7d97778ae6.lock
+84030     1 /Volumes/Data/unsent-07.GZ7M/codexhome/packages/app-server-daemon/releases/0.158.0-aarch64-apple-darwin/bin/
+84051     1 /Volumes/Data/unsent-07.GZ7M/codexhome/packages/app-server-daemon/releases/0.158.0-aarch64-apple-darwin/bin/
+n/Volumes/Data/unsent-07.GZ7M/codexhome/thread-writer-locks/01a0eb13-da0c-7d22-8d9f-1e7d97778ae6.lock

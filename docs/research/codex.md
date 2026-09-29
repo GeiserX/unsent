@@ -8,6 +8,8 @@ Tags on every claim:
 
 ## Summary
 
+Sections 1 to 9 describe 0.151.0. Section 10 is a capture run on 0.158.0 and corrects them where that version differs: it draws on the alternate screen, has a two-row footer, quits on one Ctrl+C, runs a shared background server by default, and holds a lock file that names the running thread [measured].
+
 Codex draws its main screen **inline** (not on the alternate screen); the alternate screen is used only for overlays such as the Ctrl+T transcript [measured]. The box has no border lines: 1 padding row, a bold `›` at column 0 of the first visible text row, continuation rows indented 2 columns, 1 padding row, then the footer [measured, source]. An empty box shows a dim hint [measured]. Rows wrap at `cols - 3` [measured, source]; a logical line that exactly fills that width gets an extra empty continuation row the reader must drop [measured, source]. The box grows to `rows - 4` text rows and then scrolls one row at a time to keep the cursor visible [measured, source]. Pastes over 1000 characters become `[Pasted Content N chars]` [measured, source]. Ctrl+C on a draft moves it into `$CODEX_HOME/history.jsonl`; killing Codex loses the draft [measured]. Codex pushes the kitty keyboard protocol, so in modern terminals the delete keys unsent counts arrive as CSI-u sequences, not the legacy bytes `wrap.go` matches today [measured push, docs encoding; not measured end to end].
 
 ## How it was measured (lane's setup, re-checked)
@@ -207,6 +209,132 @@ Defaults [source `keymap.rs:1414-1485`, re-checked]:
 ## 9. Side effects of the lane's run
 - The first Ctrl+G test (workspace-write sandbox) created an empty `~/.codex/editor/`; the lane removed it with `rmdir` [re-checked: absent].
 - Scratch stays under `/tmp/unsent-spec-codex/` (captures, raw logs, source clone, temp CODEX_HOME with a dummy key).
+
+## 10. Capture run on Codex 0.158.0 (measured 2026-09-29)
+
+**Environment.** `codex-cli 0.158.0`, the native arm64 build, copied from the MacBook to a Mac mini with macOS 26.6.1. It ran in a scratch folder under `/Volumes/Data`, in a private tmux 3.6b server (`tmux -L unsent-07 -f /dev/null`, `TERM=tmux-256color`, 120x40) with `extended-keys on` and `extended-keys-format csi-u`, under `unsent capture codex` with `UNSENT_DEBUG_DIR` set. unsent has no Codex reader, so it printed its not-protected line and passed every byte through while logging both directions. The environment was `env -i` with a scratch `HOME`, `CODEX_HOME`, `TMPDIR` and XDG folders, `OPENAI_API_KEY=dummy`, `OPENAI_BASE_URL=http://127.0.0.1:9/v1`, `HTTPS_PROXY`, `HTTP_PROXY` and `ALL_PROXY` at the same dead port, no other provider key, no `GITHUB_TOKEN`, `GH_TOKEN` or `CI`, and `check_for_update_on_startup = false` in the scratch `config.toml`. Every run passed `-c sandbox_mode="danger-full-access"` except the two daemon runs below. `$EDITOR` was unsent's copy-and-exit script. The captures, screens and probes are in [`testdata/codex/0.158.0/`](../../testdata/codex/0.158.0/), described in [its README](../../testdata/codex/README.md); every session id below is from that throwaway home.
+
+**A rig trap. `OPENAI_BASE_URL` is not enough on 0.158.0.** Codex's own log (`logs_2.sqlite`) shows it opening its responses websocket at `wss://api.openai.com/v1/responses` on every start and every send, with the base URL set [measured, 66 log rows in one home]. Each attempt ended in `Connection refused (os error 61)`, which is the dead proxy. A connection to the real host would not be refused. So the proxy variables, not the base URL, kept this run on the machine. The rig must set them, or `openai_base_url` in the scratch `config.toml` [guess for the config key; its name is in the binary's strings, not tried].
+
+### What 0.158.0 changed from the 0.151.0 profile above
+
+| 0.151.0 profile says | 0.158.0 does | Tag | Evidence |
+| --- | --- | --- | --- |
+| The main screen is inline; only overlays use the alternate screen | The whole TUI runs on the **alternate screen**: `ESC[?1049h` 0.27 s after start, tmux `#{alternate_on}` = 1 with the box showing, plus `ESC[?1007h` (alternate scroll). It leaves the alternate screen around Ctrl+G and on exit | measured | every `.rec`; `sessions/suspend-alt.txt` |
+| One footer row under the bottom padding | **Two footer rows**: `model · cwd`, then `? for shortcuts` with `⚠ 1 warning · f2 to view` on the right. While the box holds text, the left of the second row is blank. During a turn the first row ends in a spinner, and Ctrl+R shows `reverse-i-search:` there | measured | `screens/empty.txt`, `typed.txt`, `submit-4s.txt`, `ctrlc-history-ctrl-r.txt` |
+| An empty box sits under history | An empty box has a large braille logo and a greeting line above it; typing removes the logo. A resumed thread shows a rounded header card instead (`╭─…╮`, `>_ OpenAI Codex (v0.158.0)`, model, directory) | measured | `screens/empty-welcome.txt`, `typed-empty.txt`, `resume-id.txt` |
+| Selection lists use a cyan, non-bold `›` | The trust dialog, the `/` menu and the `@` list mark the chosen row with **bold and reverse video** (`ESC[1;7m› `). The composer `›` is bold only, and a sent message in history is bold and dim (`ESC[1;2m› `), as the source said | measured | `screens/trust-dialog.txt`, `slash-menu.txt`, `at-popup.txt`, `submit-4s.txt` |
+| The `/` popup replaces the footer below the box | The `/` menu is drawn **above** the box (rows 28 to 35, box on row 37); the `@` list too | measured | `screens/slash-menu.txt`, `at-popup.txt` |
+| Two Ctrl+C on an empty box quit | **One** Ctrl+C on an empty box quits. During a turn, Ctrl+C on an empty box interrupts the turn (`■ Conversation interrupted`) and does not quit | measured | `dialogs.rec`, `submit` |
+| Ctrl+C on a draft saves it only once a thread exists; nothing under `sessions/` without a submit | A **thread exists from start**: Ctrl+C before any send wrote `{"session_id":"01a0eb0f-027c-…","ts":…,"text":"typed but not submitted, dummy"}`, and quitting prints `Session ID: <id>` even when nothing was sent | measured | `sessions/id-2-ctrlc.txt`, every `-exit` screen |
+| A cleared paste is stored in `history.jsonl` as its placeholder | Ctrl+C with a placeholder in the box stored the **full pasted text**. Up recalled it as the placeholder again, and Ctrl+G on the recalled entry gave the full 1,509 characters | measured | `placeholder`, `sessions/history-captures.jsonl` |
+| (not covered) | After Ctrl+G returns, the box holds the editor file's text: every placeholder is replaced by its full text, and trailing whitespace is gone. `keep ` came back as `keep`, `omicron ` as `omicron`, and a draft ending in an empty line lost the final line break. The editor copy itself is exact | measured | `placeholder.editor-1.txt` vs the next screen; `deletes.editor-2` to `-5` |
+| Kitty flags: 5 in tmux-xterm, 7 elsewhere, plus modifyOtherKeys 2 in tmux-csi-u (source) | Confirmed on the wire: with `csi-u`, Codex writes `ESC[>4;0m ESC[>7u ESC[>4;2m`; with `xterm`, `ESC[>5u` and no `ESC[>4;2m`. Keys then arrive as the table below shows | measured | `deletes.rec`, `deletes-xterm.rec` |
+| Codex runs in the process unsent starts | Without `-c`, `--enable`, `--disable` or `--search`, Codex installs a copy of itself under `$CODEX_HOME/packages/app-server-daemon/` and starts a **shared background server** (`codex app-server --listen unix:// --managed-daemon`, plus `codex app-server daemon pid-update-loop`). The thread lives there, and the server keeps running after the TUI exits (parent pid 1). With `-c`, the warning `Running without the shared background server: command-line configuration overrides … requires embedded mode` appears under F2 and the thread lives in the TUI process | measured | `daemon-quit`, `daemon-killsession`, `sessions/daemon-killsession.txt` |
+
+Unchanged and re-seen: the bold `›` at column 0 of the first visible row, continuation rows indented 2, one blank row above and one below the text, a dim `Ask Codex to do anything` hint, `rows − 4` text rows at most (36 at 40 rows: rows 2 to 37, padding on 38, footer on 39 and 40), one-row scrolling that keeps the cursor visible with `›` on the first visible row, and the paste threshold [measured, `tall`, `pastes`]. No background tint: tmux answered DSR and DA but not `OSC 10;?`/`OSC 11;?` [measured, first input chunk of every `.rec`].
+
+### Box, wrapping and text
+
+- Wrap width 117 at 120 columns, as before: 116 `a`s and then `漢字` put `漢` on the next row, leaving the first row one cell short; a 115-`x` word followed by ` ñandú` wrapped at the space [measured, `accents`]. The exact-width continuation row was not re-measured.
+- Precomposed accents (`ñandú`, `¿qué pasó?`, `Pingüino`), decomposed ones (`e` + U+0301, `n` + U+0303), `👍🏽` and the flag `🇪🇸` came back byte-identical through Ctrl+G [measured, `accents.editor-1.txt` against the typed bytes].
+- A 45-line draft: an edit 40 rows up scrolled the box to rows 05 to 40; going back down scrolled it to rows 10 to 45, and the editor copy still held the edit, now out of sight. A Ctrl+W 30 rows up changed only that row [measured, `tall.editor-1.txt`, `tall.editor-2.txt`].
+
+### Keys as they reached Codex in tmux
+
+| Key | Bytes, `csi-u` (flags 7 and modifyOtherKeys 2) | Bytes, `xterm` (flags 5) | What Codex did (editor copy) |
+| --- | --- | --- | --- |
+| Ctrl+J | `ESC[106;5u` | `LF` | new line |
+| Alt+Enter | `ESC[13;3u` | not sent | new line |
+| Shift+Enter | `ESC[13;2u` | not sent | new line |
+| Backspace, Shift+Backspace | `0x7f`, `ESC[127;2u` | `0x7f`, `0x7f` | one character back |
+| Ctrl+H | `ESC[104;5u` | `0x08` | one character back |
+| Ctrl+W | `ESC[119;5u` | `0x17` | one word back |
+| Alt+Backspace | `ESC[127;3u` | `ESC 0x7f` | one word back |
+| Ctrl+Backspace | `ESC[127;5u` | tmux cannot send it (typed as text) | one word back |
+| Delete | `ESC[3~` | `ESC[3~` | one character forward |
+| Ctrl+D (in a draft) | `ESC[100;5u` | `0x04` | one character forward |
+| Alt+D, Ctrl+Delete, Alt+Delete | `ESC[100;3u`, `ESC[3;5~`, `ESC[3;3~` | `ESC d`, `ESC[3;5~`, `ESC[3;3~` | one word forward each |
+| Shift+Delete | `ESC[3;2~` | `ESC[3;2~` | forward (nothing at the end of the text) |
+| Ctrl+U | `ESC[117;5u` | `0x15` | kills to the start of the current line only |
+| Ctrl+K | `ESC[107;5u` | `0x0b` | kills to the end of the line |
+| Ctrl+Y | `ESC[121;5u` | `0x19` | yanks the last kill back |
+| Ctrl+_ | `ESC[95;5u` | `0x1f` | nothing: no undo |
+| Ctrl+C | `ESC[99;5u` | `0x03` | clears a draft; quits on an empty box |
+| Ctrl+G | `ESC[103;5u` | `0x07` | external editor |
+| Ctrl+Z | `ESC[122;5u` | not run | see below |
+| Up, Home, End | `ESC[A`, `ESC[1~`, `ESC[4~` | the same | |
+
+[measured, `deletes.rec`, `deletes-xterm.rec`, `multiline.rec`, `suspend-direct.rec`; the effects from `deletes.editor-1` to `-8`, identical in both runs except where the literal `C-BSpace` text sits]. tmux sends no key release or repeat events, so the flag-7 release form was not seen. The encodings are those of kitty's disambiguate mode for these keys, but they came from tmux's modifyOtherKeys 2, not from kitty, Ghostty, WezTerm or iTerm2.
+
+**Ctrl+Z.** Codex handles it itself. Run alone under `script` (its own session), Ctrl+Z made it write `ESC[<1u ESC[?1007l ESC[?1049l ESC[2;1H ESC[?25h ESC[<1u ESC[>4;0m ESC[?2004l ESC[?1004l ESC[0 q ESC[?25h`, then, when the kernel dropped the stop, set every mode again, asked `ESC[6n`, and repainted the same box with the draft intact [measured, `suspend-direct.rec` at 3.39 s]. Through unsent, which takes Ctrl+Z for an agent with no profile, zsh printed `suspended ./start.sh`, Codex showed state `T`, and `fg` brought the box back with the draft; the next Ctrl+G copy matched it [measured, `suspend`]. While stopped, the terminal stayed on Codex's alternate screen with its key modes on, because unsent has no Codex `suspended` bytes to write; the sequence above is what a Codex profile would write [measured screen; design for the fix].
+
+**History.** Up on an empty box recalled the newest entry, from any earlier session in the same `CODEX_HOME`; Down went back to the empty box. Up in a typed draft changed nothing. Ctrl+R opens `reverse-i-search:` in the footer [measured, `ctrlc-history`].
+
+### Pastes
+
+- A 3-line paste and a 1,000-character paste went in as text; 1,001 characters became `[Pasted Content 1001 chars]` in colour 6, and a second one of the same size `[Pasted Content 1001 chars] #2` [measured, `pastes`].
+- A 1,079-character paste with 11 line breaks became `[Pasted Content 1079 chars]`, so N counts line breaks as characters. Sent with LF (`paste-buffer -r`) and with CR (tmux's default), both came back with LF only [measured, `pastes.editor-4.txt`: 22 LF, no CR].
+- One Backspace right after `[Pasted Content 1001 chars]` removed all of it: the editor copy was `keep ` [measured, `placeholder.editor-1.txt`].
+- Ctrl+G opens the full text, never the placeholder [measured, `pastes.editor-2.txt`, 2,016 characters for `before `, two 1,001-character pastes and ` after `].
+
+### A send that fails
+
+Enter sent the prompt. It moved into history as a bold and dim `› ` row, the box went back to the empty hint at once, and a status row above the box showed `◦ Reconnecting... 2/5`, then `5/5`, then `Reconnecting... waiting for network (33s • esc to interrupt)` with the cause below it; after 30 s it was still retrying [measured, `screens/submit-*.txt`]. The box stayed on row 37 during the turn; the height cap during a turn was not measured. Typing during the turn worked, and Ctrl+C cleared that draft into `history.jsonl`; the next Ctrl+C interrupted the turn [measured, `submit`]. With a draft in the box during a turn the footer offers `tab to queue message` [measured, `screens/suspend-direct-typed-after.txt`].
+
+### Session identity
+
+| When | `history.jsonl` | `sessions/` | What another process can read | Tag |
+| --- | --- | --- | --- | --- |
+| Start, before any key | no file | none | the Codex process (unsent's child, with `-c`) holds `$CODEX_HOME/thread-writer-locks/<thread id>.lock` open, with an exclusive `flock` (a second `flock` fails with `EAGAIN`). `state_5.sqlite` has no `threads` row | measured, `sessions/id-0-start.txt`, `flock-resume-id.txt` |
+| Typed, not sent | no file | none | the same lock, nothing new | measured, `id-1-typed.txt` |
+| Ctrl+C on the draft | `{"session_id":"<thread id>","ts":…,"text":"typed but not submitted, dummy"}` | none | the same lock | measured, `id-2-ctrlc.txt` |
+| 0.5 s after a send that fails | plus the sent text, same `session_id` | `sessions/2026/09/29/rollout-2026-09-29T04-47-04-<thread id>.jsonl` (local time), held open by the process; its first line is `session_meta` with the id; a `threads` row with the path | lock and rollout, both naming the id | measured, `id-3-submit-0.5s.txt` |
+| After the turn is interrupted and Ctrl+C on a new draft | plus that draft | the rollout ends in `turn_aborted` | the same | measured, `id-6-ctrlc-after-submit.txt` |
+
+The lock is held by the time the box is drawn: a 50 ms poll of `codex resume <id>` saw the box, the lock and the open rollout in the same pass, 0.33 s after start [measured, `sessions/poll-resume-id.txt`]. A clean exit removes the lock file; after `kill -9` it stays until a later start clears it [measured, `thread-writer-locks/` listings]. `logs_2.sqlite` also maps `process_uuid` `pid:<pid>:<uuid>` to `thread_id`, but its rows arrive in batches: none had appeared 10 s after that resume, and a send showed rows only after several seconds, one of them for a second thread id that is in no `threads` row [measured]. It is a log, not a place to read the running thread from.
+
+**Resume forms.**
+
+| How it was opened | Thread the process then holds | Tag |
+| --- | --- | --- |
+| `codex resume <id>` | the same id: its lock and its rollout; the box was empty | measured, `resume-id` |
+| `codex resume --last` | the same id as `codex resume <id>` here, the only thread of the folder with a send | measured, `resume-last` |
+| `codex resume` (the picker, on the alternate screen, `Resume a previous session`) | nothing while the picker is open (no lock); the chosen id after Enter. The picker listed one thread, the one with a send; the fork and the threads that never sent were not in it | measured, `picker`, `sessions/id-picker-chosen.txt` |
+| `codex fork --last` | a new id, whose rollout exists at once; the screen says `• Thread forked from <id>` | measured, `fork-last` |
+| `/new` inside a session | a new id, **and the old thread's lock and rollout stay open** | measured, `sessions/id-after-new.txt` |
+| `/resume` inside a session, then Enter | the chosen id, with the other lock still held | measured, `id-slash-resume-chosen.txt` |
+| `codex resume <id>` of a thread that never sent | `ERROR: No saved session found with ID <id>. Run codex resume without an ID to choose from existing sessions.`, exit status 1. Through the shared server: `no rollout found for thread id <id> (code -32600)` | measured, `resume-unsent-id`, `screens/daemon-resume-unsubmitted.txt` |
+
+`/status` shows `Session: <id>` in a card, and every exit prints `Session ID: <id>`, or `To continue this session, run: codex resume <id>` once the thread has a send [measured, `screens/status.txt`, `-exit` screens]. Neither is readable without the screen.
+
+So the running thread's id can be read from outside when Codex runs embedded (with a `-c` flag): list the files the child pid holds open and take the `thread-writer-locks/<id>.lock`. It is unambiguous until `/new`, `/resume` or a fork inside the session, after which the process holds several locks and none of them marks which is current [measured]. Under the shared server, which is what a plain `codex` starts, the TUI process holds no lock and no rollout; one server process holds the locks of every thread of every TUI on that `CODEX_HOME`, and keeps them after the TUI exits [measured, `sessions/id-daemon-draft.txt`, `daemon-killsession.txt`]. There the child's pid names no thread, and how unsent could read it is still open: the server's JSON-RPC on `$CODEX_HOME/app-server-control/app-server-control.sock` was not tried, and the binary has a `--no-daemon` switch [source, strings only] that would be reconfiguring the agent, which decision 3 rules out.
+
+### Kill, close, synchronized output
+
+- `kill -9` of Codex: the draft (`kill nine draft zebra`) is in no file under `CODEX_HOME`, SQLite files and WAL included. The terminal stays on the alternate screen with kitty flags and modifyOtherKeys 2 on, and unsent's exit lines are printed over Codex's last frame [measured, `kill9`, `screens/kill9-after.txt`].
+- tmux `kill-session`: both Codex and unsent exit, no process is left, and the draft is in no file [measured, `sessions/ks-kill.txt`]. Under the shared server the TUI exits, the server keeps running with the thread's lock, and the draft is in no file either [measured, `sessions/daemon-killsession.txt`]. The rig has to kill that server itself.
+- **Codex sends synchronized-output marks.** 5,627 `ESC[?2026h`/`ESC[?2026l` pairs in 22 records, balanced in every record. Every paint of the box was inside a pair. Outside the pairs there were only mode switches (bracketed paste, kitty flags, focus, alternate screen, cursor), the startup queries, the window title (`OSC 0;work`, with a spinner during a turn) and the exit text. The median time between the ends of two frames was 35 ms [measured, all records]. Codex needs no quiet-gap read.
+- Text printed before launch survives: unsent's not-protected line printed before Codex started was still in the scrollback above `Session ID:` after exit, because Codex draws on the alternate screen [measured, every `-exit` screen].
+
+### Open questions from above, answered where this run could
+
+- **Box and height cap while a turn runs:** the look is measured (status rows above the box, spinner in the footer); the cap is not.
+- **CSI-u delete keys end to end through unsent:** measured through unsent in tmux with modifyOtherKeys 2, table above. Real Ghostty, kitty, WezTerm and iTerm2 were not run, and release events under flag 7 were not seen.
+- **Does the real terminal's OSC 11 reply reach Codex under unsent?** Not answered: tmux sent no reply, so there was no tint.
+- **Does text printed before launch survive the first frame?** Yes on 0.158.0, because of the alternate screen.
+- **Remote image rows and the pet reserve:** not measured.
+- **0.157.1 mouse selection and warning row:** warnings now sit on the second footer row (`⚠ 1 warning · f2 to view`), and F2 opens a `Warnings · 1 of 1` view; mouse selection was not tried.
+- **Can `history.jsonl` writing be disabled by config?** Not checked.
+- **SPEC 2.3's Codex row, "whether a thread exists before the first submit":** yes, from start [measured].
+
+### What this run could not capture
+
+- The height cap and box during a running turn, and a Tab-queued message.
+- Real terminals other than tmux, and flag-7 release events.
+- A paste on the first frame of the box (the settle delay) and a restore; unsent has no Codex reader yet.
+- A way to name the running thread under the shared server.
+- One inadvertent send: in `suspend-direct` Codex did not stop on Ctrl+Z, so the `fg` and Enter meant for the shell were sent from its box. That send failed on the dead proxy like the others.
 
 ## Verification notes
 

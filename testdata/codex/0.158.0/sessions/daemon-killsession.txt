@@ -1,0 +1,7 @@
+84030     1 /Volumes/Data/unsent-07.GZ7M/codexhome/packages/app-server-daemon/releases/0.158.0-aarch64-apple-darwin/bin/codex app-server --l
+84051     1 /Volumes/Data/unsent-07.GZ7M/codexhome/packages/app-server-daemon/releases/0.158.0-aarch64-apple-darwin/bin/codex app-server dae
+85776     1 tmux -L unsent-07 -f /dev/null new-session -d -s hold -x 120 -y 40 sleep 86400
+walrus: in no file under CODEX_HOME
+daemon 84030
+n/Volumes/Data/unsent-07.GZ7M/codexhome/thread-writer-locks/01a0eb13-da0c-7d22-8d9f-1e7d97778ae6.lock
+n/Volumes/Data/unsent-07.GZ7M/codexhome/thread-writer-locks/01a0eb15-57c8-7f02-9696-059bb7ce816f.lock

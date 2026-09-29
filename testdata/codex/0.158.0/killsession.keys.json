@@ -1,0 +1,30 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.0
+},
+{
+"type": "kill session draft yak"
+},
+{
+"keys": [
+"C-j"
+]
+},
+{
+"type": "second line of it"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "killsession-before"
+},
+{
+"sh": "./ids.sh > snaps/id-ks-before.txt; tmux -L unsent-07 kill-session -t rig; sleep 2; pgrep -fl codex-pkg || echo 'no codex left'; pgrep -fl bin/unsent || echo 'no unsent left'; grep -rl 'yak' codexhome || echo 'yak: in no file under CODEX_HOME'; ls work/testdata/codex/0.158.0/",
+"out": "ks-kill"
+}
+]

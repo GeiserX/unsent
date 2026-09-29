@@ -1,0 +1,122 @@
+[
+{
+"until": "Ask Codex to do anything",
+"timeout": 40
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-0-start"
+},
+{
+"type": "typed but not submitted, dummy"
+},
+{
+"wait": 0.8
+},
+{
+"sh": "./ids.sh",
+"out": "id-1-typed"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-2-ctrlc"
+},
+{
+"type": "dummy prompt that must fail on the dead base url"
+},
+{
+"wait": 0.4
+},
+{
+"keys": [
+"Enter"
+]
+},
+{
+"wait": 0.5
+},
+{
+"screen": "submit-0.5s"
+},
+{
+"sh": "./ids.sh",
+"out": "id-3-submit-0.5s"
+},
+{
+"wait": 3
+},
+{
+"screen": "submit-4s"
+},
+{
+"wait": 8
+},
+{
+"screen": "submit-12s"
+},
+{
+"sh": "./ids.sh",
+"out": "id-4-submit-12s"
+},
+{
+"wait": 20
+},
+{
+"screen": "submit-32s"
+},
+{
+"type": "a draft typed after the failed submit"
+},
+{
+"wait": 0.6
+},
+{
+"screen": "submit-draft-after"
+},
+{
+"keys": [
+"C-g"
+]
+},
+{
+"wait": 1.5
+},
+{
+"sh": "./ids.sh",
+"out": "id-5-draft-after"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 1.0
+},
+{
+"sh": "./ids.sh",
+"out": "id-6-ctrlc-after-submit"
+},
+{
+"screen": "submit-cleared"
+},
+{
+"keys": [
+"C-c"
+]
+},
+{
+"wait": 2.0
+}
+]
