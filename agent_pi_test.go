@@ -228,15 +228,9 @@ var piTyped = map[string][]string{
 
 // piScreensCheck returns the first way piBox misreads the frames above, or
 // nil.
-func piScreensCheck(t *testing.T) error {
+func piScreensCheck(t *testing.T, frames frameSet) error {
 	t.Helper()
-	frames := map[string][]*screen{}
-	get := func(record string) []*screen {
-		if frames[record] == nil {
-			frames[record] = captureFrames(t, piCaptures.folder, record)
-		}
-		return frames[record]
-	}
+	get := func(record string) []*screen { return frames.get(t, piCaptures.folder, record) }
 	for _, c := range piNotABox {
 		f := firstFrame(t, get(c.record), c.shows)
 		if v, ok := piBox(f); ok {
@@ -312,7 +306,7 @@ func piAnchor(t *testing.T, s *screen, text string) int {
 }
 
 func TestPiNegativeScreens(t *testing.T) {
-	if err := piScreensCheck(t); err != nil {
+	if err := piScreensCheck(t, frameSet{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -344,6 +338,9 @@ func TestPiBoxFrames(t *testing.T) {
 func TestPiReaderMutations(t *testing.T) {
 	good := piLayout
 	t.Cleanup(func() { piLayout = good })
+	// Every mutant reads the same captures; decoding them once for all of
+	// them is the emulator's work done once instead of seven times.
+	frames := frameSet{}
 	for _, m := range []struct {
 		name   string
 		mutate func(*piBoxLayout)
@@ -361,7 +358,7 @@ func TestPiReaderMutations(t *testing.T) {
 			m.mutate(&bad)
 			piLayout = bad
 			defer func() { piLayout = good }()
-			if err := piScreensCheck(t); err != nil {
+			if err := piScreensCheck(t, frames); err != nil {
 				t.Logf("red: screens (%v)", err)
 				return
 			}

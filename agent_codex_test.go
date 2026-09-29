@@ -53,15 +53,9 @@ var codexTyped = map[string][]string{
 
 // codexScreensCheck returns the first way codexBox misreads the frames
 // above, or nil.
-func codexScreensCheck(t *testing.T) error {
+func codexScreensCheck(t *testing.T, frames frameSet) error {
 	t.Helper()
-	frames := map[string][]*screen{}
-	get := func(record string) []*screen {
-		if frames[record] == nil {
-			frames[record] = codexFrames(t, record)
-		}
-		return frames[record]
-	}
+	get := func(record string) []*screen { return frames.get(t, codexCaptures.folder, record) }
 	for _, c := range codexNotABox {
 		f := lastFrame(t, get(c.record), c.shows)
 		if v, ok := codexBox(f); ok {
@@ -107,7 +101,7 @@ func codexScreensCheck(t *testing.T) error {
 }
 
 func TestCodexNegativeScreens(t *testing.T) {
-	if err := codexScreensCheck(t); err != nil {
+	if err := codexScreensCheck(t, frameSet{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -119,6 +113,9 @@ func TestCodexNegativeScreens(t *testing.T) {
 func TestCodexReaderMutations(t *testing.T) {
 	good := codexLayout
 	t.Cleanup(func() { codexLayout = good })
+	// Every mutant reads the same captures; decoding them once for all of
+	// them is the emulator's work done once instead of eight times.
+	frames := frameSet{}
 	for _, m := range []struct {
 		name   string
 		mutate func(*boxLayout)
@@ -137,7 +134,7 @@ func TestCodexReaderMutations(t *testing.T) {
 			m.mutate(&bad)
 			codexLayout = bad
 			defer func() { codexLayout = good }()
-			if err := codexScreensCheck(t); err != nil {
+			if err := codexScreensCheck(t, frames); err != nil {
 				t.Logf("red: screens (%v)", err)
 				return
 			}

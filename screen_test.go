@@ -24,6 +24,26 @@ func codexFrames(t *testing.T, name string) []*screen {
 	return captureFrames(t, codexCaptures.folder, name)
 }
 
+// frameSet holds the frames of the captures one test reads, so a record
+// several checks share is decoded once. It is a field of the test, not a
+// package cache: a run holds hundreds of frames of a 120x40 screen, and
+// keeping every capture's for the whole suite took the race run's peak
+// memory from 2.2 GB to 5.0 GB.
+// Frames are read-only to their holder, which clones one before restyling
+// it, and decoding is the emulator's work alone: no reader, and no layout
+// a mutant changes, is involved, so the mutation tests may share one set
+// across their mutants.
+type frameSet map[string][]*screen
+
+// get returns folder/name.rec's frames, decoding them the first time.
+func (f frameSet) get(t *testing.T, folder, name string) []*screen {
+	t.Helper()
+	if f[name] == nil {
+		f[name] = captureFrames(t, folder, name)
+	}
+	return f[name]
+}
+
 // captureFrames replays folder/name.rec's output through a shadow screen
 // and returns the screen after every complete frame.
 func captureFrames(t *testing.T, folder, name string) []*screen {
