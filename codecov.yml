@@ -1,7 +1,7 @@
 codecov:
   require_ci_to_pass: true
-  # CI uploads twice per commit, the race run and the fuzz run: report on
-  # their sum, never on one alone.
+  # CI uploads twice per commit, the cover run and the fuzz run: between
+  # them they run every test once. Report on their sum, never on one alone.
   notify:
     after_n_builds: 2
 

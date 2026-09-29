@@ -15,12 +15,24 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        # The race detector slows the stitcher's fuzz several times over, so
-        # the race run skips it and a run of its own holds the full fuzz.
-        # Each test runs once; the two coverage profiles add up to the
-        # whole suite. The two run as jobs of their own, side by side, so
-        # the run takes as long as the slower one, not both.
-        suite: [race, fuzz]
+        # Three suites, each a job of its own, so the run takes as long as
+        # the slowest one rather than the sum.
+        #
+        # race holds the whole suite but the stitcher's fuzz, which the race
+        # detector slows several times over; fuzz holds the fuzz alone.
+        # Neither measures coverage: a coverage counter is an atomic add,
+        # the race detector instruments every one of them, and the two
+        # together cost six times the CPU. On the Mac mini the race step
+        # takes 199 s on its own and 292 s with -coverprofile.
+        #
+        # So cover runs the same tests once more without the detector, only
+        # to measure them, and it is the profile Codecov gets. It is a Linux
+        # job alone, since only Linux uploads. Each test still runs under
+        # -race on both systems; cover adds no check of its own.
+        suite: [race, fuzz, cover]
+        exclude:
+          - os: macos-latest
+            suite: cover
     name: test (${{ matrix.os }}, ${{ matrix.suite }})
     runs-on: ${{ matrix.os }}
     steps:
@@ -29,21 +41,21 @@ jobs:
         with:
           go-version-file: go.mod
       # The shell tests run the hooks in a real zsh; the Linux runner has none.
-      - if: runner.os == 'Linux' && matrix.suite == 'race'
+      - if: runner.os == 'Linux' && matrix.suite != 'fuzz'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - if: matrix.suite == 'race'
         run: go vet ./...
-      # Only the Linux jobs upload coverage, so only they pay for measuring
-      # it, which slows the fuzz by about a third.
       - if: matrix.suite == 'race'
-        run: go test -race -count=1 -skip Fuzz ${{ matrix.os == 'ubuntu-latest' && '-coverprofile=coverage.out' || '' }} ./...
+        run: go test -race -count=1 -skip Fuzz ./...
       - if: matrix.suite == 'fuzz'
         run: go test -count=1 -run Fuzz ${{ matrix.os == 'ubuntu-latest' && '-coverprofile=coverage.out' || '' }} ./...
         env:
           UNSENT_FUZZ_SEEDS: "50"
+      - if: matrix.suite == 'cover'
+        run: go test -count=1 -skip Fuzz -coverprofile=coverage.out ./...
       # Codecov adds the two uploads up (codecov.yml waits for both).
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.suite != 'race'
         uses: codecov/codecov-action@v7
         with:
           files: coverage.out
