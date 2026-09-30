@@ -677,8 +677,10 @@ func (w fitWrap) wrapLine(line string, width int) [][2]int {
 		}
 		if gw > width {
 			// Wider than a row (a placeholder in a narrow window): it takes
-			// rows of its own, broken at the edge.
-			sub := w.wrapLine(g, width)
+			// rows of its own, broken at the edge. Broken here rather than
+			// through wrapLine again, which would read the placeholder back
+			// as one segment and call itself on the same bytes for ever.
+			sub := edgeRows(g, width)
 			for _, c := range sub[:len(sub)-1] {
 				chunks = append(chunks, [2]int{sg[0] + c[0], sg[0] + c[1]})
 			}
@@ -703,6 +705,31 @@ func (w fitWrap) wrapLine(line string, width int) [][2]int {
 		}
 	}
 	return append(chunks, [2]int{start, len(line)})
+}
+
+// edgeRows breaks s into the byte ranges of rows at most width columns
+// wide, cut at the edge and never inside a grapheme cluster: what is left
+// for what no wrap can fit on a row of its own, a paste placeholder in a
+// window narrower than it or a wide character in a one-column box. A
+// grapheme wider than the whole row gets a row to itself, so every row
+// holds something and the walk always ends.
+func edgeRows(s string, width int) [][2]int {
+	var rows [][2]int
+	start, cur, pos := 0, 0, 0
+	for pos < len(s) {
+		g, _, _, _ := uniseg.FirstGraphemeClusterInString(s[pos:], -1)
+		if g == "" {
+			g = s[pos : pos+1]
+		}
+		if gw := runewidth.StringWidth(g); cur > 0 && cur+gw > width {
+			rows = append(rows, [2]int{start, pos})
+			start, cur = pos, gw
+		} else {
+			cur += gw
+		}
+		pos += len(g)
+	}
+	return append(rows, [2]int{start, len(s)})
 }
 
 // segments splits a line into grapheme clusters, each paste placeholder
