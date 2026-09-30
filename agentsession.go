@@ -204,11 +204,17 @@ func (h *heldFiles) of(pid int, dir string, recheck time.Duration, idOf func(nam
 	return ids
 }
 
+// procFS is where Linux keeps a folder per running process. A test points
+// it somewhere of its own to read the way the other system reads: at a
+// folder that is not there, so a Linux box takes macOS's path through
+// lsof, and at a folder of made-up process files, so a Mac takes Linux's.
+var procFS = "/proc"
+
 // openFiles lists the paths of the files process pid holds open: from
 // /proc where there is one (Linux), else from lsof (macOS). Empty when
 // neither can tell, and never slower than a second.
 var openFiles = func(pid int) []string {
-	fds := filepath.Join("/proc", strconv.Itoa(pid), "fd")
+	fds := filepath.Join(procFS, strconv.Itoa(pid), "fd")
 	if entries, err := os.ReadDir(fds); err == nil {
 		var out []string
 		for _, e := range entries {
@@ -218,7 +224,7 @@ var openFiles = func(pid int) []string {
 		}
 		return out
 	}
-	if _, err := os.Stat("/proc/self/fd"); err == nil {
+	if _, err := os.Stat(filepath.Join(procFS, "self", "fd")); err == nil {
 		return nil // Linux, and the process is gone or not ours
 	}
 	out, _ := lsof("-n", "-P", "-w", "-Fn", "-p", strconv.Itoa(pid))
@@ -242,7 +248,7 @@ var openFiles = func(pid int) []string {
 // to drop on the floor. The same folder of 5,000 through +d takes 0.2 s.
 var holders = func(dir string, idOf func(name string) string) []int {
 	var pids []int
-	if procs, err := os.ReadDir("/proc"); err == nil {
+	if procs, err := os.ReadDir(procFS); err == nil {
 		for _, p := range procs {
 			pid, err := strconv.Atoi(p.Name())
 			if err != nil {

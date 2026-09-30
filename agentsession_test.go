@@ -752,3 +752,322 @@ func TestSentLogTrimAtAResumeLine(t *testing.T) {
 		t.Fatal("an unknown line was dropped")
 	}
 }
+
+// agyScratch points HOME at a scratch folder, makes agy's conversations
+// folder in it and returns it, with the cache of held files cleared before
+// and after: it is one variable for the whole process.
+func agyScratch(t *testing.T) string {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	dir := agyConversations()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	agyHeld = heldFiles{}
+	t.Cleanup(func() { agyHeld = heldFiles{} })
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return real
+}
+
+// touchFile writes an empty file and returns its path.
+func touchFile(t *testing.T, dir, name string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// holdOpen starts a process that holds the named files open, on file
+// descriptors of its own, until the test ends, and waits until it really
+// holds them. It returns its pid. The shell execs sleep, so the pid is
+// the one process that holds them.
+func holdOpen(t *testing.T, paths ...string) int {
+	t.Helper()
+	script := ""
+	for i := range paths {
+		script += fmt.Sprintf("exec %d<\"$%d\"; ", 3+i, i+1)
+	}
+	cmd := exec.Command("sh", append([]string{"-c", script + "exec sleep 120", "sh"}, paths...)...)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
+	pid := cmd.Process.Pid
+	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		open := openFiles(pid)
+		held := 0
+		for _, want := range paths {
+			for _, p := range open {
+				if filepath.Base(p) == filepath.Base(want) {
+					held++
+					break
+				}
+			}
+		}
+		if held == len(paths) {
+			return pid
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("pid %d never opened %q; it holds %q", pid, paths, open)
+		}
+	}
+}
+
+// agy names the conversation a process is in by the database it holds
+// open, so a real process holding conversations/<id>.db is in <id>. Its
+// -wal and -shm name the same conversation and must not read as three.
+// A process holding two databases, which is what /new leaves behind, is
+// in no known session: nothing on disk says which of them is current, and
+// guessing would file a message under the wrong conversation. A process
+// that holds none, and one that has gone, are in none either.
+func TestAgySessionIsTheConversationDatabaseHeldOpen(t *testing.T) {
+	dir := agyScratch(t)
+	a := touchFile(t, dir, "conv-a.db")
+	aWAL := touchFile(t, dir, "conv-a.db-wal")
+	b := touchFile(t, dir, "conv-b.db")
+	notes := touchFile(t, dir, "notes.txt")
+
+	pid := holdOpen(t, a, aWAL)
+	if id, found := agySession(pid, time.Time{}); !found || id != "conv-a" {
+		t.Fatalf("one conversation held: %q %v, want conv-a", id, found)
+	}
+	if pids := agySessionPids(); !slices.Equal(pids, []int{pid}) {
+		t.Fatalf("pids %v, want the one holder %d", pids, pid)
+	}
+
+	agyHeld = heldFiles{}
+	two := holdOpen(t, a, b)
+	if id, found := agySession(two, time.Time{}); !found || id != sessionUnsure {
+		t.Fatalf("two conversations held: %q %v, want %q", id, found, sessionUnsure)
+	}
+
+	agyHeld = heldFiles{}
+	none := holdOpen(t, notes)
+	if id, found := agySession(none, time.Time{}); found || id != "" {
+		t.Fatalf("no conversation held: %q %v", id, found)
+	}
+
+	// The process goes: nothing is held, whatever was read before.
+	gone := holdOpen(t, a)
+	agyHeld = heldFiles{}
+	if id, found := agySession(gone, time.Time{}); !found || id != "conv-a" {
+		t.Fatalf("before it went: %q %v", id, found)
+	}
+	p, _ := os.FindProcess(gone)
+	p.Kill()
+	p.Wait()
+	agyHeld = heldFiles{}
+	if id, found := agySession(gone, time.Time{}); found || id != "" {
+		t.Fatalf("the process is gone: %q %v", id, found)
+	}
+}
+
+// Where there are no process files, lsof answers instead. Forcing that
+// path runs it on Linux too, where /proc would otherwise hide it.
+func TestHeldFilesReadsLsofWithoutProcessFiles(t *testing.T) {
+	if _, err := exec.LookPath("lsof"); err != nil {
+		if _, err := os.Stat("/usr/sbin/lsof"); err != nil {
+			t.Skip("no lsof on this system")
+		}
+	}
+	dir := agyScratch(t)
+	db := touchFile(t, dir, "conv-lsof.db")
+	setProcFS(t, filepath.Join(t.TempDir(), "no-proc"))
+	pid := holdOpen(t, db)
+	if id, found := agySession(pid, time.Time{}); !found || id != "conv-lsof" {
+		t.Fatalf("through lsof: %q %v, want conv-lsof", id, found)
+	}
+	if pids := agySessionPids(); !slices.Equal(pids, []int{pid}) {
+		t.Fatalf("pids %v, want the one holder %d", pids, pid)
+	}
+}
+
+// setProcFS points procFS at path for the length of the test.
+func setProcFS(t *testing.T, path string) {
+	t.Helper()
+	old := procFS
+	procFS = path
+	agyHeld = heldFiles{}
+	t.Cleanup(func() { procFS = old; agyHeld = heldFiles{} })
+}
+
+// Where there are process files, they answer and lsof is never run, not
+// even for a process that has none (it is gone, or not ours). The
+// tree here is the shape Linux gives: a folder per pid holding a link per
+// descriptor. Forcing that path reads it on macOS too, which has no /proc
+// of its own.
+func TestHeldFilesReadsTheProcessFiles(t *testing.T) {
+	dir := agyScratch(t)
+	db := touchFile(t, dir, "conv-proc.db")
+	wal := touchFile(t, dir, "conv-proc.db-wal")
+	elsewhere := touchFile(t, t.TempDir(), "conv-elsewhere.db")
+
+	proc := t.TempDir()
+	setProcFS(t, proc)
+	// An lsof on PATH that names another conversation: any answer that
+	// went through it instead of the process files says so.
+	bin := t.TempDir()
+	lsofSays := "#!/bin/sh\necho p4242\necho p9999\necho n" + filepath.Join(dir, "conv-lsof.db") + "\n"
+	if err := os.WriteFile(filepath.Join(bin, "lsof"), []byte(lsofSays), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if err := os.MkdirAll(filepath.Join(proc, "self", "fd"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	fds := filepath.Join(proc, "4242", "fd")
+	if err := os.MkdirAll(fds, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for fd, target := range map[string]string{"3": db, "4": wal, "5": elsewhere} {
+		if err := os.Symlink(target, filepath.Join(fds, fd)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A process that holds a database of another folder only (another
+	// home's agy), a descriptor that is not a link to a file (a socket
+	// reads as one on Linux; here a plain file), and a folder that is not
+	// a process.
+	if err := os.MkdirAll(filepath.Join(proc, "5151", "fd"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, filepath.Join(proc, "5151", "fd", "3")); err != nil {
+		t.Fatal(err)
+	}
+	touchFile(t, fds, "6")
+	if err := os.MkdirAll(filepath.Join(proc, "9999"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(proc, "not-a-pid"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := openFiles(4242); !slices.Equal(got, []string{db, wal, elsewhere}) {
+		t.Fatalf("open files %q", got)
+	}
+	if got := openFiles(9999); got != nil {
+		t.Fatalf("a process with no descriptors of ours: %q", got)
+	}
+	if id, found := agySession(4242, time.Time{}); !found || id != "conv-proc" {
+		t.Fatalf("through the process files: %q %v", id, found)
+	}
+	if pids := agySessionPids(); !slices.Equal(pids, []int{4242}) {
+		t.Fatalf("pids %v, want just 4242", pids)
+	}
+}
+
+// A listing tool that fails, or that stalls, leaves the session unknown.
+// It must not hold the save loop: that loop is what writes the draft as
+// the window closes, so it is given a second and no more.
+func TestHeldFilesWhenTheListingToolFailsOrStalls(t *testing.T) {
+	dir := agyScratch(t)
+	touchFile(t, dir, "conv-a.db")
+	setProcFS(t, filepath.Join(t.TempDir(), "no-proc"))
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	fake := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(bin, "lsof"), []byte("#!/bin/sh\n"+body+"\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		agyHeld = heldFiles{}
+	}
+
+	fake("exit 1")
+	if id, found := agySession(os.Getpid(), time.Time{}); found || id != "" {
+		t.Fatalf("a tool that fails: %q %v", id, found)
+	}
+	if pids := agySessionPids(); len(pids) != 0 {
+		t.Fatalf("a tool that fails listed %v", pids)
+	}
+
+	fake("exec /bin/sleep 30") // PATH is the fake alone: sleep by its full path
+	start := time.Now()
+	if id, found := agySession(os.Getpid(), time.Time{}); found || id != "" {
+		t.Fatalf("a tool that stalls: %q %v", id, found)
+	}
+	if d := time.Since(start); d > 5*time.Second {
+		t.Fatalf("a stalled tool held the save loop for %s", d)
+	}
+	agyHeld = heldFiles{}
+	start = time.Now()
+	if pids := agySessionPids(); len(pids) != 0 {
+		t.Fatalf("a tool that stalls listed %v", pids)
+	}
+	if d := time.Since(start); d > 5*time.Second {
+		t.Fatalf("a stalled tool held the listing for %s", d)
+	}
+}
+
+// lsof is run from PATH, or from /usr/sbin, which is where macOS keeps it
+// and which a session started by launchd does not always have on PATH.
+func TestLsofPathFallsBackToUsrSbin(t *testing.T) {
+	empty := t.TempDir()
+	t.Setenv("PATH", empty)
+	if p := lsofPath(); p != "/usr/sbin/lsof" {
+		t.Fatalf("with no lsof on PATH: %q", p)
+	}
+	bin := t.TempDir()
+	own := filepath.Join(bin, "lsof")
+	if err := os.WriteFile(own, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if p := lsofPath(); p != own {
+		t.Fatalf("with one on PATH: %q, want %q", p, own)
+	}
+}
+
+// Asking which files a process holds open runs a process of its own, so
+// the answer is kept: it is asked again when the folder changed, a
+// conversation taken or let go, when another process is asked about, or
+// when the recheck has passed. A folder that is not there is no ids.
+func TestHeldFilesAsksAgainOnlyWhenItMust(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The same conversation on three descriptors, and one file in another
+	// folder: one id, and not that one.
+	held := []string{
+		filepath.Join(dir, "conv-a.db"),
+		filepath.Join(dir, "conv-a.db-wal"),
+		filepath.Join(dir, "conv-a.db"),
+		filepath.Join(other, "conv-elsewhere.db"),
+	}
+	calls := 0
+	old := openFiles
+	openFiles = func(int) []string { calls++; return held }
+	t.Cleanup(func() { openFiles = old })
+
+	var h heldFiles
+	want := []string{"conv-a"}
+	if ids := h.of(7, dir, time.Minute, agyConversationID); !slices.Equal(ids, want) || calls != 1 {
+		t.Fatalf("first ask: %q after %d", ids, calls)
+	}
+	if ids := h.of(7, dir, time.Minute, agyConversationID); !slices.Equal(ids, want) || calls != 1 {
+		t.Fatalf("asked again at once: %q after %d", ids, calls)
+	}
+	if ids := h.of(8, dir, time.Minute, agyConversationID); !slices.Equal(ids, want) || calls != 2 {
+		t.Fatalf("another process: %q after %d", ids, calls)
+	}
+	touchFile(t, dir, "conv-b.db")
+	if ids := h.of(8, dir, time.Minute, agyConversationID); !slices.Equal(ids, want) || calls != 3 {
+		t.Fatalf("the folder changed: %q after %d", ids, calls)
+	}
+	if ids := h.of(8, dir, 0, agyConversationID); !slices.Equal(ids, want) || calls != 4 {
+		t.Fatalf("the recheck passed: %q after %d", ids, calls)
+	}
+	if ids := h.of(8, filepath.Join(dir, "gone"), time.Minute, agyConversationID); ids != nil || calls != 4 {
+		t.Fatalf("a folder that is not there: %q after %d", ids, calls)
+	}
+}
