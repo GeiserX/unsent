@@ -40,18 +40,21 @@ unsent setup      # from the next shell, your agents run through unsent
 unsent restore    # after a crash: copy the newest draft to the clipboard
 ```
 
-Release binaries and the first run in detail: [Getting started](docs/getting-started.md).
+Release binaries and the first run in detail: [Getting started](https://geiserx.github.io/unsent/getting-started/).
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md): Homebrew, Go, release binaries, and the first run
-- [Supported agents](docs/supported-agents.md): which agent versions were checked, and how
-- [Using unsent](docs/usage.md): setup, recovering drafts, JSON output, the Claude Code hook, what differs in Codex and pi
-- [Sent messages](docs/sent-messages.md): the sent log and its JSON shape
-- [Your zsh command line](docs/zsh.md)
-- [How it works](docs/how-it-works.md): the mechanism, the one promise, and where drafts live
-- [Limits](docs/limits.md)
-- [Development](docs/development.md): tests, capturing fixtures, [releasing](docs/RELEASING.md), and the [spec](docs/SPEC.md)
+The full documentation is at [geiserx.github.io/unsent](https://geiserx.github.io/unsent/).
+
+- [Getting started](https://geiserx.github.io/unsent/getting-started/): Homebrew, Go, release binaries, and the first run
+- [Configuration](https://geiserx.github.io/unsent/configuration/): every environment variable, and how to turn `unsent` off for a while
+- [Using unsent](https://geiserx.github.io/unsent/usage/): setup, recovering drafts, JSON output, the Claude Code hook, what differs in Codex, agy and pi
+- [Sent messages](https://geiserx.github.io/unsent/sent-messages/): the sent log and its JSON shape
+- [Your zsh command line](https://geiserx.github.io/unsent/zsh/): the half-typed command line, and what is never saved
+- [Supported agents](https://geiserx.github.io/unsent/supported-agents/): which agent versions were checked, and how
+- [How it works](https://geiserx.github.io/unsent/how-it-works/): the mechanism, the one promise, and where drafts live
+- [Limits](https://geiserx.github.io/unsent/limits/): what the screen cannot carry, agent by agent
+- [Development](https://geiserx.github.io/unsent/development/): tests, capturing fixtures, releasing and the spec
 
 ## License
 
