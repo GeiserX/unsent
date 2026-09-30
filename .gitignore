@@ -10,3 +10,4 @@ coverage*.out
 .beads-credential-key
 .beads/proxieddb/
 .beads/
+/site/
