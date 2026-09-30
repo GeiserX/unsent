@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="unsent: AutoRecover for your AI agent prompts" width="900">
+  <img src="docs/images/banner.svg" alt="unsent" width="900">
 </p>
 
 <p align="center">
   <a href="https://github.com/GeiserX/unsent/releases"><img src="https://img.shields.io/github/v/release/GeiserX/unsent" alt="Release"></a>
   <a href="https://github.com/GeiserX/unsent/actions/workflows/ci.yml"><img src="https://github.com/GeiserX/unsent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License: GPL-3.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/GeiserX/unsent" alt="License"></a>
   <a href="https://codecov.io/gh/GeiserX/unsent"><img src="https://codecov.io/gh/GeiserX/unsent/branch/main/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -35,15 +35,17 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 ## Quick start
 
 ```sh
-brew tap GeiserX/unsent && brew install unsent   # or: go install github.com/GeiserX/unsent@latest
+brew tap GeiserX/unsent && brew trust --formula GeiserX/unsent/unsent && brew install unsent   # or: go install github.com/GeiserX/unsent@latest
 unsent setup      # from the next shell, your agents run through unsent
 unsent restore    # after a crash: copy the newest draft to the clipboard
 ```
 
+Release binaries and the first run in detail: [Getting started](docs/getting-started.md).
+
 ## Documentation
 
+- [Getting started](docs/getting-started.md): Homebrew, Go, release binaries, and the first run
 - [Supported agents](docs/supported-agents.md): which agent versions were checked, and how
-- [Installation](docs/installation.md): Homebrew, Go, release binaries
 - [Using unsent](docs/usage.md): setup, recovering drafts, JSON output, the Claude Code hook, what differs in Codex and pi
 - [Sent messages](docs/sent-messages.md): the sent log and its JSON shape
 - [Your zsh command line](docs/zsh.md)
@@ -53,4 +55,4 @@ unsent restore    # after a crash: copy the newest draft to the clipboard
 
 ## License
 
-[GPL-3.0](LICENSE)
+[GPL-3.0-or-later](LICENSE)
