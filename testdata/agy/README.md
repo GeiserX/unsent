@@ -110,6 +110,20 @@ to put a draft back; the tests drop it from the record and make it again.
 | `restore-c`, `restore-long` | `agy -c` reopening that conversation: unsent puts the draft back, the long one as `[Pasted text #1 +20 lines]`, and Ctrl+G says what agy holds |
 | `send` | two prompts sent in one conversation, for the sent log and agy's own `history.jsonl` |
 
+## The bash-mode run (2026-09-30)
+
+One more capture, made the same way on the same binary, for the one thing
+the profile had taken from Codex rather than measured. Is agy's `!` part
+of the draft? It is not. This one was driven by hand from
+`tmux send-keys` rather than by the rig, so
+[`bash-mode.keys.json`](1.2.13/bash-mode.keys.json) has the steps but no
+timing log. What it settled is in
+[docs/research/agy.md](../../docs/research/agy.md#bash-mode-measured-2026-09-30).
+
+| Record | What it holds |
+| --- | --- |
+| `bash-mode` | `!` then a command that wraps over two rows and then three, and 130 `x` in one token, with a Ctrl+G after each: agy hands the editor the command alone, and wraps it at the same `cols - 3` on every row, the first included |
+
 ## Adding one
 
 `unsent capture agy` records a new `.rec` with its editor copies, named

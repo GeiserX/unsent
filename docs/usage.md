@@ -70,10 +70,11 @@ It prints the JSON to add to `~/.claude/settings.json` (or `settings.json` in `$
 
 ## What differs in agy
 
-`unsent agy` works the way `unsent claude` does. Five things differ.
+`unsent agy` works the way `unsent claude` does. Six things differ.
 
 - **Reopening a conversation.** A draft goes back into the box of `agy -c` and `agy --conversation <id>`. A new chat is another conversation, and agy gives one an id only when you send its first message, so a new chat gets the notice and never a paste. agy draws inline on the main screen, where the row under the box belongs to whatever your terminal held before it, so the line saying a draft was put back comes after agy exits rather than under the box.
 - **New lines and sends.** Enter is the only key that sends. Ctrl+J, Alt+Enter, Shift+Enter, Esc then Enter and a backslash then Enter all make a new line. Ctrl+C and Esc keep your draft, and a second Ctrl+C quits. Ctrl+U is the only key that clears the box, one line at a time.
+- **Bash mode.** `!` at the start of an empty box turns it on, and the `!` is agy's own mark rather than part of what you typed. At Ctrl+G agy hands your editor the command alone, so that is what `unsent` saves and what comes back. Turn bash mode on again yourself before you run it.
 - **Long pastes.** agy shows a paste of more than 15 lines (or half the window's rows, if that is less) as `[Pasted text #1 +16 lines]`, and one with a line over 1,000 characters as `[Pasted text #2 1001 chars]`. `unsent` saves the pasted text in its place, with each tab as four spaces and a line break at the end dropped, as agy keeps it. A draft that goes back into the box shows as that placeholder too, while agy holds the whole text; Ctrl+G opens it in your editor. A draft with a tab, or one ending in a line break, goes to the clipboard instead, because agy would change it.
 - **Accents typed as two characters.** agy never draws a combining mark. `é` typed as `e` and U+0301 reaches agy whole, and stands on the screen as `e`, so the draft `unsent` saves from the screen has the bare letter. Accents typed as one character, the usual case and what a Spanish keyboard sends, are saved as they are. The [limits](limits.md) say what else the screen cannot carry.
 - **The sent log.** A conversation's log starts with its second message. agy creates the conversation with the first one, so nothing names it while that message is on its way, and it stays in the log of that run.

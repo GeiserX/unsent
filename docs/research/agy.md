@@ -88,7 +88,7 @@ Every screen fact below is **measured on 1.2.11** unless its line says otherwise
 
 - **Rules:** both rules are full-width U+2500. The banner above them has no full-width rule.
 - **Glyph:** an ASCII `>` followed by a normal space. This differs from Claude Code, which uses an NBSP.
-- **Bash mode:** typing `!` as the first character turns the glyph into a bold `!` in #8AB4F8. The `!` is not part of the text, and the footer reads `activated bash mode · esc to cancel`.
+- **Bash mode:** typing `!` as the first character turns the glyph into a bold `!` in #8AB4F8. The `!` is not part of the text, and the footer reads `activated bash mode · esc to cancel`. (Ctrl+G on 1.2.13 proves the first half. See [Bash mode, measured](#bash-mode-measured-2026-09-30).)
 - **Mode hint:** after Shift+Tab, a gray hint sits inside the box.
   - Raw bytes: `ESC[38;2;138;180;248m>ESC[39m ESC[38;2;154;160;166mAccept-edits mode: file edits auto-approved (shift+tab to cycle)ESC[39m`.
   - The other hint is `Plan mode: research & plan only (shift+tab to cycle)`.
@@ -534,7 +534,9 @@ Each of these is a frame a reader must not take for a draft [measured,
 - the mode hints inside the box after Shift+Tab
   (`Accept-edits mode: …`, `Plan mode: …`), which sit where the draft would be;
 - bash mode: the glyph becomes `!` and the footer reads
-  `activated bash mode · esc to cancel`;
+  `activated bash mode · esc to cancel`. The box itself is a draft, and
+  what it holds is the command without the glyph
+  ([Bash mode, measured](#bash-mode-measured-2026-09-30));
 - `/settings`, `/model`, `/context`, `/resume` and Ctrl+R (an `Artifacts`
   panel), all drawn under the bottom rule while the box stays empty;
 - the first-run colour-scheme picker, the terms screen and the trust dialog,
@@ -713,3 +715,33 @@ so it is not a chat start for restore, and neither is `-p`/`--print`/
 `--prompt`, a bare prompt argument, or any subcommand. The chat starts are
 the bare command, `-c`/`--continue` and `--conversation <id>` [source,
 `agy --help`; measured for `-c` and `--conversation`].
+
+## Bash mode, measured (2026-09-30)
+
+The same rig once more, on the same binary, for the one thing the profile
+had taken from Codex rather than measured. One capture,
+[`bash-mode`](../../testdata/agy/1.2.13/bash-mode.rec), with three Ctrl+G
+copies.
+
+- **The `!` is the glyph, not the text.** A bash-mode box holding
+  `echo alpha … zulu` hands the editor `echo alpha … zulu` at Ctrl+G, 169
+  bytes, with no `!` [measured,
+  [`bash-mode.editor-1.txt`](../../testdata/agy/1.2.13/bash-mode.editor-1.txt)].
+  agy differs from Codex here, whose `history.jsonl` keeps
+  `!echo do-nothing` whole.
+- **The command wraps at the same width as any other draft.** 130 `x`
+  typed after the `!` draw 117 on the first row and 13 on the second, with
+  the text from column 2 on both, so the glyph costs the first row
+  nothing [measured,
+  [`bash-mode.editor-3.txt`](../../testdata/agy/1.2.13/bash-mode.editor-3.txt)].
+  A reader that splices the `!` into the first row therefore models a row
+  one column narrower than agy draws. It re-wraps a bash draft one
+  character early and reads a typed space at that boundary as a line
+  break, which is what the first editor copy caught.
+- **Ctrl+U empties the box but stays in bash mode**, glyph and footer and
+  all, and **Esc is what leaves it** and puts `>` back. Ctrl+G does not
+  leave it either, and the command comes back into a bash-mode box
+  [measured, `bash-mode`].
+- **The binary still did not replace itself.** Its SHA-256 is
+  `ef3728208834483754b06fd99963b4b6320740bf237212768dfed5256ae24ddb`
+  before and after, the same as the two runs above.

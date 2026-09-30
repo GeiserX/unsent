@@ -231,8 +231,16 @@ var openFiles = func(pid int) []string {
 	return paths
 }
 
-// holders lists the processes that hold any of files open.
-var holders = func(files []string) []int {
+// holders lists the processes that hold open a file in dir whose name
+// idOf reads an id from. It asks about the folder, never about each file
+// in it: agy keeps one database per conversation for ever, so that list
+// has no bound, and lsof given every path answers "nobody holds anything"
+// long before the folder is big by any human measure. Measured on a Mac
+// mini (macOS 26.6, lsof 4.91), one call per path list: 1,000 paths
+// 0.14 s and right, 3,000 past the one-second timeout, 12,000 past the
+// kernel's argument limit, each of the last two an error this code used
+// to drop on the floor. The same folder of 5,000 through +d takes 0.2 s.
+var holders = func(dir string, idOf func(name string) string) []int {
 	var pids []int
 	if procs, err := os.ReadDir("/proc"); err == nil {
 		for _, p := range procs {
@@ -241,7 +249,7 @@ var holders = func(files []string) []int {
 				continue
 			}
 			for _, f := range openFiles(pid) {
-				if slices.Contains(files, f) {
+				if filepath.Dir(f) == dir && idOf(filepath.Base(f)) != "" {
 					pids = append(pids, pid)
 					break
 				}
@@ -249,10 +257,18 @@ var holders = func(files []string) []int {
 		}
 		return pids
 	}
-	out, _ := lsof(append([]string{"-n", "-P", "-w", "-t", "--"}, files...)...)
-	for f := range strings.FieldsSeq(out) {
-		if pid, err := strconv.Atoi(f); err == nil && !slices.Contains(pids, pid) {
-			pids = append(pids, pid)
+	// +d lists what is open in dir itself, one process set at a time:
+	// "p<pid>", then "f<fd>" and "n<path>" for each file it holds.
+	out, _ := lsof("-n", "-P", "-w", "+d", dir, "-Fpn")
+	pid := 0
+	for line := range strings.SplitSeq(out, "\n") {
+		switch {
+		case strings.HasPrefix(line, "p"):
+			pid, _ = strconv.Atoi(line[1:])
+		case strings.HasPrefix(line, "n") && pid > 0 && idOf(filepath.Base(line[1:])) != "":
+			if !slices.Contains(pids, pid) {
+				pids = append(pids, pid)
+			}
 		}
 	}
 	return pids

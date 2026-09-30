@@ -900,10 +900,6 @@ func (s *session) look(scr *screen) bool {
 	if v.empty {
 		sent = armed && !s.cleared
 		s.cleared = false
-		// Nothing is in the box, whatever keys came before this read: the
-		// next recall key brings an entry of the agent's own history, not
-		// a draft (agy, where Esc cancels a turn after a send).
-		s.edited = false
 	}
 	v.deleted, v.deletedAhead = s.deletes.recent()
 	if s.recalled && s.rec.Draft != "" && s.prof.keys.browses {

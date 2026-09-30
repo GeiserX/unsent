@@ -1,0 +1,110 @@
+{
+  "name": "bash-mode",
+  "size": [
+    120,
+    40
+  ],
+  "cmd": [
+    "/Volumes/Data/agy-bash.7YIN/path/unsent",
+    "capture",
+    "agy"
+  ],
+  "note": "driven by hand from tmux send-keys, so there is no timing log",
+  "steps": [
+    {
+      "until": "\\? for shortcuts",
+      "timeout": 120
+    },
+    {
+      "wait": 1.5
+    },
+    {
+      "type": "!"
+    },
+    {
+      "wait": 0.6
+    },
+    {
+      "type": "echo alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu"
+    },
+    {
+      "wait": 2.0
+    },
+    {
+      "keys": [
+        "C-g"
+      ]
+    },
+    {
+      "wait": 4.0
+    },
+    {
+      "type": " one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen"
+    },
+    {
+      "wait": 2.0
+    },
+    {
+      "keys": [
+        "C-g"
+      ]
+    },
+    {
+      "wait": 4.0
+    },
+    {
+      "keys": [
+        "C-u"
+      ]
+    },
+    {
+      "wait": 1.5
+    },
+    {
+      "type": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "wait": 2.0
+    },
+    {
+      "keys": [
+        "C-g"
+      ]
+    },
+    {
+      "wait": 4.0
+    },
+    {
+      "keys": [
+        "C-u"
+      ]
+    },
+    {
+      "wait": 1.0
+    },
+    {
+      "keys": [
+        "Escape"
+      ]
+    },
+    {
+      "wait": 1.5
+    },
+    {
+      "keys": [
+        "C-c"
+      ]
+    },
+    {
+      "wait": 1.5
+    },
+    {
+      "keys": [
+        "C-c"
+      ]
+    },
+    {
+      "wait": 4.0
+    }
+  ]
+}

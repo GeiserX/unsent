@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/charmbracelet/x/vt"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -30,17 +31,17 @@ var agyCaptures = captureSet{folder: filepath.Join("testdata", "agy", "1.2.13"),
 // holds the whole character (accents), so that much of such a draft is
 // beyond any reader of agy's screen; and the one line break byteExact
 // allows at a full row. Tolerated by agy's measured drawing, not by the
-// profile's model, so a wrong model cannot excuse itself.
+// profile's model, so a wrong model cannot excuse itself. Only the truth
+// is brought down to what the screen can show: a reader that invented a
+// combining mark or spaces at the end of a line must not pass, and none
+// of the 50 checks in the replays needs got trimmed.
 func agyShows(got, truth string) bool {
-	drawn := func(s string) string {
-		lines := strings.Split(s, "\n")
-		for i, l := range lines {
-			lines[i] = strings.TrimRight(agyDrawn(l), " ")
-		}
-		return strings.Join(lines, "\n")
+	lines := strings.Split(truth, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(agyDrawn(l), " ")
 	}
-	g, w := drawn(got), drawn(truth)
-	return got == truth || byteExact(g, w, 117, agy.unwrap) || byteExact(g, agyJoined(w, 117), 117, agy.unwrap)
+	w := strings.Join(lines, "\n")
+	return got == truth || byteExact(got, w, 117, agy.unwrap) || byteExact(got, agyJoined(w, 117), 117, agy.unwrap)
 }
 
 // agyJoined is text without the line breaks the screen hides altogether:
@@ -125,7 +126,7 @@ var agyReplays = []struct {
 	recalled []int
 }{{"typed", nil}, {"multiline", nil}, {"accents", nil}, {"tall", nil}, {"scroll-steps", nil},
 	{"deletes", nil}, {"edge-deletes", nil}, {"wrap", nil}, {"pastes", nil}, {"pastes2", nil},
-	{"early-paste", nil}, {"ctrlc-history", []int{1, 2}}, {"submit", nil},
+	{"early-paste", nil}, {"bash-mode", nil}, {"ctrlc-history", []int{1, 2}}, {"submit", nil},
 	{"resume-c", nil}, {"resume-conversation", nil}, {"restore-c", nil}, {"restore-long", nil},
 	{"suspend", nil}, {"suspend-legacy", nil}}
 
@@ -246,13 +247,15 @@ var agyMenus = []struct {
 	{"dialogs", []string{"/add-dir", "enter Select · tab Complete"}, "/"},
 	{"dialogs", []string{"/config (settings)", "enter Select · tab Complete"}, "/set"},
 	{"dialogs", []string{"Directory", "enter Select · tab Complete"}, "@"},
-	{"dialogs", []string{"activated bash mode", "! echo dummy"}, "!echo dummy"},
+	// agy's "!" is the box's glyph, not draft text: at Ctrl+G it hands the
+	// editor the command alone (bash-mode).
+	{"dialogs", []string{"activated bash mode", "! echo dummy"}, "echo dummy"},
 }
 
 // agyTyped is every draft each record shows in its box, in the order
 // typed: no other text may ever be read from its frames.
 var agyTyped = map[string][]string{
-	"dialogs":        {"?", "/", "/set", "@", "!echo dummy", "/settings", "/model", "/resume", "/context"},
+	"dialogs":        {"?", "/", "/set", "@", "echo dummy", "/settings", "/model", "/resume", "/context"},
 	"first-run":      nil,
 	"exit-ctrl-c":    {"a draft that the exit throws away"},
 	"exit-ctrl-d":    nil,
@@ -1054,4 +1057,191 @@ func agyUntilBox(t *testing.T, data []byte) []byte {
 	}
 	t.Fatal("the record never draws the box")
 	return nil
+}
+
+// agyPaintCheck replays every agy capture's output through a shadow
+// screen on the record's own clock, reads the box at each chunk boundary,
+// and reports how many reads prof's frame marks held back and the first
+// one they held back that the settled read after it contradicts.
+func agyPaintCheck(t *testing.T, prof *profile) (held int, torn string) {
+	t.Helper()
+	recs, err := filepath.Glob(filepath.Join(agyCaptures.folder, "*.rec"))
+	if err != nil || len(recs) == 0 {
+		t.Fatalf("no agy captures: %v", err)
+	}
+	read := func(s *session) (text string, box bool) {
+		v, ok := prof.read(snapshot(s.screen))
+		if !ok || v.empty {
+			return "", ok
+		}
+		return strings.Join(v.rows, "\n"), true
+	}
+	for _, path := range recs {
+		name := strings.TrimSuffix(filepath.Base(path), ".rec")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := &session{screen: vt.NewEmulator(120, 40), prof: prof}
+		done := drainScreen(t, s.screen)
+		var now time.Time
+		s.now = func() time.Time { return now }
+		var out []recChunk
+		eachChunk(t, data, func(at time.Time, dir byte, chunk []byte) {
+			if dir == 'o' {
+				out = append(out, recChunk{at, chunk})
+			}
+		})
+		// Every read the marks held back waits for the settled read after
+		// it, which says what agy was drawing.
+		type pending struct {
+			text string
+			box  bool
+		}
+		var waiting []pending
+		for i, c := range out {
+			now = c.at
+			for chunk := c.b; len(chunk) > 0; {
+				k := len(chunk)
+				if j := bytes.Index(chunk, frameEnd); j >= 0 {
+					k = j + len(frameEnd)
+				}
+				s.write(chunk[:k])
+				chunk = chunk[k:]
+			}
+			if i+1 < len(out) {
+				now = out[i+1].at
+			} else {
+				now = now.Add(time.Second)
+			}
+			text, box := read(s)
+			if s.drawing() {
+				held++
+				waiting = append(waiting, pending{text, box})
+				continue
+			}
+			for _, w := range waiting {
+				// A held-back read is safe when agy had not drawn the box
+				// yet (look keeps the draft it has), or when it shows what
+				// the settled read shows, whole or as far as it got.
+				if w.box && !strings.HasPrefix(text, w.text) && torn == "" {
+					torn = fmt.Sprintf("%s: a read held back mid-paint shows %q, the settled read after it %q",
+						name, w.text, text)
+				}
+			}
+			waiting = waiting[:0]
+		}
+		done()
+	}
+	return held, torn
+}
+
+// The paint marks and the quiet gap are the one piece of shared read-path
+// machinery agy's profile adds, so they get a check that can fail. agy
+// sends no synchronized-output marks; it brackets each paint with
+// ESC[?25l … ESC[?25h, and a read inside one lands on a screen it has not
+// finished drawing. Over every capture, the reads the marks hold back are
+// screens where agy has not drawn the box yet, never a torn draft.
+func TestAgyPaintMarksHoldBackHalfDrawnScreens(t *testing.T) {
+	held, torn := agyPaintCheck(t, &agy)
+	if torn != "" {
+		t.Fatal(torn)
+	}
+	if held == 0 {
+		t.Fatal("the paint marks and the quiet gap held back no read in any capture")
+	}
+	t.Logf("%d reads held back across the captures", held)
+}
+
+// Both ends of the gap go red. With no paint marks, or with no gap to
+// wait out, nothing is held back and every save reads the screen the
+// instant a chunk lands. With a gap of 2 s, agy's cursor stays hidden
+// while a dialog is on screen for longer than any pause in the record, so
+// the frames the negative screens need never settle.
+func TestAgyPaintMarkMutations(t *testing.T) {
+	for _, m := range []struct {
+		name   string
+		mutate func(*profile)
+	}{
+		{"no paint marks", func(p *profile) { p.hidesCursor = false }},
+		{"no quiet gap", func(p *profile) { p.quietGap = 0 }},
+	} {
+		t.Run(m.name, func(t *testing.T) {
+			t.Parallel()
+			p := agy
+			m.mutate(&p)
+			if held, _ := agyPaintCheck(t, &p); held != 0 {
+				t.Fatalf("with %s, %d reads were still held back", m.name, held)
+			}
+		})
+	}
+	t.Run("a quiet gap of 2 s", func(t *testing.T) {
+		t.Parallel()
+		shows := func(prof *profile, want string) bool {
+			for _, f := range captureFrames(t, prof, agyCaptures.folder, "dialogs") {
+				if strings.Contains(f.String(), want) {
+					return true
+				}
+			}
+			return false
+		}
+		const panel = "Keyboard Shortcuts"
+		if !shows(&agy, panel) {
+			t.Fatalf("no frame of dialogs shows %q at agy's own gap", panel)
+		}
+		p := agy
+		p.quietGap = 2 * time.Second
+		if shows(&p, panel) {
+			t.Fatalf("with a 2 s gap a frame of dialogs still shows %q", panel)
+		}
+	})
+}
+
+// The settle delay and the number of empty reads a restore waits for are
+// measured (docs/research/agy.md, "Restore", and docs/research/codex.md).
+// Both rigs set settle to 0 so their tests need no wall clock, so nothing
+// else keeps these two from being whittled away, and they are what stops
+// a paste landing in a box the user is already typing in.
+func TestAgyAndCodexSettleKeepTheirMargins(t *testing.T) {
+	for _, p := range []*profile{&agy, &codex} {
+		if p.restore.settle < time.Second || p.restore.empties < 3 {
+			t.Errorf("%s waits %v and %d empty reads", p.name, p.restore.settle, p.restore.empties)
+		}
+	}
+}
+
+// agy keeps one database per conversation for ever, so the folder has no
+// bound. Asking lsof about each file in it answered "nobody holds
+// anything" long before the folder was large: past this timeout from
+// about 3,000 conversations on a slow disk, and past the kernel's
+// argument limit from about 8,000 wherever they live. Either way a draft
+// got no agent_session under a launcher that does not exec agy, and
+// nothing said so.
+func TestAgySessionPidsAtManyConversations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("makes several thousand files")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".gemini", "antigravity-cli", "conversations")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const conversations = 8000
+	for i := range conversations {
+		name := fmt.Sprintf("019a%04d-4d7e-7c3a-9f1b-%012d.db", i, i)
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	held := fmt.Sprintf("019a%04d-4d7e-7c3a-9f1b-%012d.db", conversations/2, conversations/2)
+	f, err := os.Open(filepath.Join(dir, held))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	pid := os.Getpid()
+	if pids := agySessionPids(); !slices.Contains(pids, pid) {
+		t.Fatalf("with %d conversations, holders %v, want this process %d", conversations, pids, pid)
+	}
 }

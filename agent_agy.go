@@ -97,15 +97,21 @@ var agy = profile{
 	// on again as it resumes agy (session.resuming).
 	suspended: nil,
 	// agy sends no synchronized-output marks at all on 1.2.13, not one in
-	// 23 captures, though it still queries for them. It brackets each of
-	// its 1,235 paints with ESC[?25l … ESC[?25h instead, and closed every
-	// one, so those marks are what tells a complete frame; a plain
-	// quiet-gap read would tear the large panels, whose chunks can arrive
-	// up to 1.68 s apart inside one paint. The gap covers what agy writes
-	// outside a paint (its banner at start, its teardown at exit, and the
-	// input modes it re-asserts while idle): within one of those bursts
-	// chunks arrive in the same millisecond, and no chunk outside a paint
-	// followed another by less than 1.78 s.
+	// any of the 33 captures, though it still queries for them. It
+	// brackets each of its paints with ESC[?25l … ESC[?25h instead, and
+	// closed every one, so those marks are what says a paint is open.
+	// They cannot say on their own that the screen is half drawn, since
+	// agy keeps the cursor hidden for as long as a dialog is on screen, so
+	// the gap decides (session.drawing): while a paint is open the screen
+	// is read once the bytes have stopped coming for 50 ms, and output
+	// outside a paint is read as it lands. What that buys is the dense
+	// part of a paint, where the chunks arrive in the same millisecond:
+	// 57 reads across the captures fall inside one, every one of them on a
+	// screen agy has not drawn the box into yet
+	// (TestAgyPaintMarksHoldBackHalfDrawnScreens).
+	// It never holds a save for long: a paint whose next chunk is seconds
+	// away stops blocking after the gap, and take caps any wait at
+	// maxFrameWait whatever the profile says.
 	hidesCursor: true,
 	quietGap:    50 * time.Millisecond,
 	// The fixtures in testdata/agy; `agy --version` prints "1.2.13".
@@ -211,8 +217,12 @@ var (
 // "  ↓ N more lines" as its last, both in the colour agy draws its hints
 // in, and N counts wrapped screen rows. The empty box is the glyph alone,
 // or the glyph and one of agy's mode hints, which sits where the draft
-// would be. In bash mode the glyph is "!", and the draft is what it and
-// the text spell together. The transcript above the box has rules of its
+// would be. In bash mode the glyph is "!", and it is not draft text: agy
+// hands the editor the command alone at Ctrl+G, draws it from column 2 as
+// it draws every other draft, and wraps it at the same width, so the "!"
+// is read as the glyph it is (measured on 1.2.13, bash-mode). Ctrl+U in
+// bash mode leaves the glyph with an empty box, and Esc puts ">" back.
+// The transcript above the box has rules of its
 // own, half the window wide, and the slash menu, the file picker and
 // every panel agy opens are drawn under the bottom rule, some of them with
 // rows that start "> " too: the box is the one between the lowest two
@@ -348,10 +358,6 @@ func (b agyBoxLayout) read(s *screen) (view, bool) {
 		v.cursor = s.curY - first
 		v.cursorEnd = s.curX >= b.indent+runewidth.StringWidth(v.rows[v.cursor])
 	}
-	if rows[0].cells[0] == "!" {
-		// Bash mode: the glyph is the first character of the draft.
-		v.rows[0] = "!" + v.rows[0]
-	}
 	return v, true
 }
 
@@ -426,23 +432,14 @@ func agySession(pid int, _ time.Time) (string, bool) {
 }
 
 // agySessionPids lists the processes that hold a conversation's database
-// open.
+// open. The folder is asked about as a whole: it holds every conversation
+// this home has ever had, and there is no cap on how many that is.
 func agySessionPids() []int {
 	dir, err := filepath.EvalSymlinks(agyConversations())
 	if err != nil {
 		return nil
 	}
-	entries, _ := os.ReadDir(dir)
-	var dbs []string
-	for _, e := range entries {
-		if agyConversationID(e.Name()) != "" {
-			dbs = append(dbs, filepath.Join(dir, e.Name()))
-		}
-	}
-	if len(dbs) == 0 {
-		return nil
-	}
-	return holders(dbs)
+	return holders(dir, agyConversationID)
 }
 
 // agyConversationID is the conversation id a file name in the

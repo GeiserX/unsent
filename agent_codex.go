@@ -333,17 +333,7 @@ func codexSessionPids() []int {
 	if err != nil {
 		return nil
 	}
-	entries, _ := os.ReadDir(dir)
-	var locks []string
-	for _, e := range entries {
-		if codexLockID(e.Name()) != "" {
-			locks = append(locks, filepath.Join(dir, e.Name()))
-		}
-	}
-	if len(locks) == 0 {
-		return nil
-	}
-	return holders(locks)
+	return holders(dir, codexLockID)
 }
 
 // codexLockID is the thread id a lock file's name gives, or "".
