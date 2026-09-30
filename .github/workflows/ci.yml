@@ -36,7 +36,15 @@ jobs:
         # free, which is what cover is. It runs the same tests as race, adds
         # no check of its own, and is a Linux job alone since only Linux
         # uploads. Every test still runs under -race on both systems.
-        suite: [race, fuzz, cover]
+        #
+        # race and fuzz are each split in two, because four agent profiles
+        # made both pass five minutes on macOS. Each split is a partition:
+        # every test lands in exactly one half, by construction. race splits
+        # by name, the wrapper and shell end-to-end tests (race-a) against
+        # the rest (race-b), a split chosen from measured per-test times; fuzz splits by profile, claude and codex against the rest.
+        # A half named "rest" is written as a -skip of the other half, so a
+        # test added later can never fall between them.
+        suite: [race-a, race-b, fuzz-a, fuzz-b, cover]
         exclude:
           - os: macos-latest
             suite: cover
@@ -48,14 +56,20 @@ jobs:
         with:
           go-version-file: go.mod
       # The shell tests run the hooks in a real zsh; the Linux runner has none.
-      - if: runner.os == 'Linux' && matrix.suite != 'fuzz'
+      - if: runner.os == 'Linux' && !startsWith(matrix.suite, 'fuzz')
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
-      - if: matrix.suite == 'race'
+      - if: matrix.suite == 'race-b'
         run: go vet ./...
-      - if: matrix.suite == 'race'
-        run: go test -race -count=1 -skip Fuzz ./...
-      - if: matrix.suite == 'fuzz'
-        run: go test -count=1 -run Fuzz ./...
+      - if: matrix.suite == 'race-a'
+        run: go test -race -count=1 -run '^(TestWrap|TestZsh|TestShell|TestImport)' -skip Fuzz ./...
+      - if: matrix.suite == 'race-b'
+        run: go test -race -count=1 -skip 'Fuzz|^(TestWrap|TestZsh|TestShell|TestImport)' ./...
+      - if: matrix.suite == 'fuzz-a'
+        run: go test -count=1 -run 'Fuzz/(claude|codex)' ./...
+        env:
+          UNSENT_FUZZ_SEEDS: "50"
+      - if: matrix.suite == 'fuzz-b'
+        run: go test -count=1 -run Fuzz -skip 'Fuzz/(claude|codex)' ./...
         env:
           UNSENT_FUZZ_SEEDS: "50"
       - if: matrix.suite == 'cover'
