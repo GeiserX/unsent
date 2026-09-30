@@ -1,0 +1,76 @@
+{
+ "name": "new-chat",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "wait": 6.0
+  },
+  {
+   "screen": "new-chat"
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"/Volumes/Data/unsent-072.VIQD/home-profile\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"/Volumes/Data/unsent-072.VIQD/home-profile/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- history.jsonl\"; cat \"/Volumes/Data/unsent-072.VIQD/home-profile/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- unsent drafts\"; ls -la \"/Volumes/Data/unsent-072.VIQD/unsent-home2/drafts\" 2>/dev/null | tail -n +2;echo \"--- unsent records\"; for f in \"/Volumes/Data/unsent-072.VIQD/unsent-home2\"/drafts/*.json \"/Volumes/Data/unsent-072.VIQD/unsent-home2\"/history/*.json; do [ -e \"$f\" ] || continue; echo \"$f:\"; cat \"$f\"; echo; done | sed \"s|$RIG|RIG|g\";echo \"--- unsent sent logs\"; for f in \"/Volumes/Data/unsent-072.VIQD/unsent-home2\"/sent/*; do [ -e \"$f\" ] || continue; echo \"$f:\"; cat \"$f\"; done | sed \"s|$RIG|RIG|g\";",
+   "save": "0-new-chat"
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 7.68,
+   "step": "wait",
+   "detail": "6.0"
+  },
+  {
+   "t": 7.7,
+   "step": "screen",
+   "detail": "new-chat"
+  },
+  {
+   "t": 7.8,
+   "step": "sh",
+   "detail": "0-new-chat"
+  },
+  {
+   "t": 7.8,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 9.97,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

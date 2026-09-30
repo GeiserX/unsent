@@ -1,0 +1,433 @@
+{
+ "name": "multiline",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "line one ctrl j"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "line two"
+  },
+  {
+   "keys": [
+    "M-Enter"
+   ]
+  },
+  {
+   "type": "line three alt enter"
+  },
+  {
+   "keys": [
+    "S-Enter"
+   ]
+  },
+  {
+   "type": "line four shift enter"
+  },
+  {
+   "keys": [
+    "Escape",
+    "Enter"
+   ]
+  },
+  {
+   "type": "line five esc enter"
+  },
+  {
+   "type": "\\"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "type": "line six backslash enter"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "line eight after a blank one"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "multiline"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "screen": "after-editor"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "keys": [
+    "C-u"
+   ],
+   "gap": 0.08
+  },
+  {
+   "wait": 0.4
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.17,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.67,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.68,
+   "step": "type",
+   "detail": "line one ctrl j"
+  },
+  {
+   "t": 1.85,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.01,
+   "step": "type",
+   "detail": "line two"
+  },
+  {
+   "t": 2.17,
+   "step": "keys",
+   "detail": "M-Enter"
+  },
+  {
+   "t": 2.34,
+   "step": "type",
+   "detail": "line three alt enter"
+  },
+  {
+   "t": 2.5,
+   "step": "keys",
+   "detail": "S-Enter"
+  },
+  {
+   "t": 2.66,
+   "step": "type",
+   "detail": "line four shift enter"
+  },
+  {
+   "t": 2.82,
+   "step": "keys",
+   "detail": "Escape Enter"
+  },
+  {
+   "t": 2.99,
+   "step": "type",
+   "detail": "line five esc enter"
+  },
+  {
+   "t": 3.15,
+   "step": "type",
+   "detail": "\\"
+  },
+  {
+   "t": 3.31,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 3.47,
+   "step": "type",
+   "detail": "line six backslash enter"
+  },
+  {
+   "t": 3.63,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.8,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.96,
+   "step": "type",
+   "detail": "line eight after a blank one"
+  },
+  {
+   "t": 5.12,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 5.13,
+   "step": "screen",
+   "detail": "multiline"
+  },
+  {
+   "t": 5.14,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 8.3,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 8.31,
+   "step": "screen",
+   "detail": "after-editor"
+  },
+  {
+   "t": 8.32,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 8.49,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.58,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.68,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.78,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.87,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 8.96,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.06,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.15,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.25,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.34,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.43,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.52,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.62,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.71,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.81,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.9,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 9.99,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 10.49,
+   "step": "wait",
+   "detail": "0.4"
+  },
+  {
+   "t": 10.49,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 12.66,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

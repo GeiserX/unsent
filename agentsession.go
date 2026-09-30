@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -157,4 +160,142 @@ var processParents = func() map[int]int {
 		}
 	}
 	return parents
+}
+
+// heldFiles keeps the last answer to which of an agent's files a process
+// holds open, for the profiles whose agent names the session it is in by
+// the file it holds (Codex's thread lock, agy's conversation database).
+// Asking runs lsof on macOS, so it is asked again only when the folder
+// changed (a file taken or let go) or recheck has passed.
+type heldFiles struct {
+	mu  sync.Mutex
+	pid int
+	mod time.Time
+	at  time.Time
+	ids []string
+}
+
+// of lists the ids, by idOf of each file's name, of the files in dir that
+// process pid holds open.
+func (h *heldFiles) of(pid int, dir string, recheck time.Duration, idOf func(name string) string) []string {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return nil
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if pid == h.pid && fi.ModTime().Equal(h.mod) && time.Since(h.at) < recheck {
+		return h.ids
+	}
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil
+	}
+	var ids []string
+	for _, p := range openFiles(pid) {
+		if filepath.Dir(p) != real {
+			continue
+		}
+		if id := idOf(filepath.Base(p)); id != "" && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	h.pid, h.mod, h.at, h.ids = pid, fi.ModTime(), time.Now(), ids
+	return ids
+}
+
+// procFS is where Linux keeps a folder per running process. A test points
+// it somewhere of its own to read the way the other system reads: at a
+// folder that is not there, so a Linux box takes macOS's path through
+// lsof, and at a folder of made-up process files, so a Mac takes Linux's.
+var procFS = "/proc"
+
+// openFiles lists the paths of the files process pid holds open: from
+// /proc where there is one (Linux), else from lsof (macOS). Empty when
+// neither can tell, and never slower than a second.
+var openFiles = func(pid int) []string {
+	fds := filepath.Join(procFS, strconv.Itoa(pid), "fd")
+	if entries, err := os.ReadDir(fds); err == nil {
+		var out []string
+		for _, e := range entries {
+			if p, err := os.Readlink(filepath.Join(fds, e.Name())); err == nil {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	if _, err := os.Stat(filepath.Join(procFS, "self", "fd")); err == nil {
+		return nil // Linux, and the process is gone or not ours
+	}
+	out, _ := lsof("-n", "-P", "-w", "-Fn", "-p", strconv.Itoa(pid))
+	var paths []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if p, ok := strings.CutPrefix(line, "n"); ok && strings.HasPrefix(p, "/") {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
+// holders lists the processes that hold open a file in dir whose name
+// idOf reads an id from. It asks about the folder, never about each file
+// in it: agy keeps one database per conversation for ever, so that list
+// has no bound, and lsof given every path answers "nobody holds anything"
+// long before the folder is big by any human measure. Measured on a Mac
+// mini (macOS 26.6, lsof 4.91), one call per path list: 1,000 paths
+// 0.14 s and right, 3,000 past the one-second timeout, 12,000 past the
+// kernel's argument limit, each of the last two an error this code used
+// to drop on the floor. The same folder of 5,000 through +d takes 0.2 s.
+var holders = func(dir string, idOf func(name string) string) []int {
+	var pids []int
+	if procs, err := os.ReadDir(procFS); err == nil {
+		for _, p := range procs {
+			pid, err := strconv.Atoi(p.Name())
+			if err != nil {
+				continue
+			}
+			for _, f := range openFiles(pid) {
+				if filepath.Dir(f) == dir && idOf(filepath.Base(f)) != "" {
+					pids = append(pids, pid)
+					break
+				}
+			}
+		}
+		return pids
+	}
+	// +d lists what is open in dir itself, one process set at a time:
+	// "p<pid>", then "f<fd>" and "n<path>" for each file it holds.
+	out, _ := lsof("-n", "-P", "-w", "+d", dir, "-Fpn")
+	pid := 0
+	for line := range strings.SplitSeq(out, "\n") {
+		switch {
+		case strings.HasPrefix(line, "p"):
+			pid, _ = strconv.Atoi(line[1:])
+		case strings.HasPrefix(line, "n") && pid > 0 && idOf(filepath.Base(line[1:])) != "":
+			if !slices.Contains(pids, pid) {
+				pids = append(pids, pid)
+			}
+		}
+	}
+	return pids
+}
+
+// lsof runs lsof with args and returns what it printed. A stalled lsof
+// must not hold the save loop.
+func lsof(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, lsofPath(), args...)
+	cmd.WaitDelay = time.Second
+	out, err := cmd.Output()
+	return string(out), err
+}
+
+// lsofPath is lsof on PATH, or where macOS keeps it when PATH leaves
+// /usr/sbin out.
+func lsofPath() string {
+	if p, err := exec.LookPath("lsof"); err == nil {
+		return p
+	}
+	return "/usr/sbin/lsof"
 }

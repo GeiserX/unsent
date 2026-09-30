@@ -1,0 +1,100 @@
+{
+ "name": "killsession",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "kill session draft yankee"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "second row of it"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "before-kill"
+  },
+  {
+   "killsession": true
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "sh": "sleep 1; ps -o pid,stat,command -ax | grep -E 'bin/agy|bin/unsent' | grep -v grep; echo '--- the draft anywhere under the scratch home?'; grep -rl 'kill session draft yankee' \"$RIG/home\" \"$RIG/tmp\" 2>/dev/null | sed \"s|$RIG|RIG|\"; echo '(nothing above means it is in no file)'",
+   "save": "ks-after"
+  }
+ ],
+ "log": [
+  {
+   "t": 0.19,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.7,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.71,
+   "step": "type",
+   "detail": "kill session draft yankee"
+  },
+  {
+   "t": 1.88,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.04,
+   "step": "type",
+   "detail": "second row of it"
+  },
+  {
+   "t": 3.2,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 3.21,
+   "step": "screen",
+   "detail": "before-kill"
+  },
+  {
+   "t": 3.22,
+   "step": "killsession",
+   "detail": ""
+  },
+  {
+   "t": 5.37,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 6.55,
+   "step": "sh",
+   "detail": "ks-after"
+  }
+ ]
+}

@@ -1,0 +1,241 @@
+--- tmux
+alt=0 dead=0
+--- ps
+56688 56685 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+56700 56688 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+--- open under the scratch home
+txt RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+txt RIG/home-profile/.gemini/antigravity-cli/conversations/0d802dee-a87e-4457-9858-8cf445837576.db-shm
+1w RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001946.log
+2w RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001946.log
+8w RIG/home-profile/.gemini/antigravity-cli/crashes/crash_56700_15d5f570-bda7-498e-9e39-28e897a6c6ca.log
+12u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+13u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+14u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+15u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+16u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+20r RIG/home-profile/.gemini/antigravity-cli
+21r RIG/home-profile/.gemini/antigravity-cli/bin
+22r RIG/home-profile/.gemini/antigravity-cli/brain
+23r RIG/home-profile/.gemini/antigravity-cli/builtin
+24r RIG/home-profile/.gemini/antigravity-cli/cache
+25r RIG/home-profile/.gemini/antigravity-cli/log/cli-20260930_001946.log
+26r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+27r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-shm
+28r RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+29r RIG/home-profile/.gemini/antigravity-cli/conversations
+30r RIG/home-profile/.gemini/antigravity-cli/crashes
+31r RIG/home-profile/.gemini/antigravity-cli/history.jsonl
+32r RIG/home-profile/.gemini/antigravity-cli/implicit
+33r RIG/home-profile/.gemini/antigravity-cli/installation_id
+34r RIG/home-profile/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+35r RIG/home-profile/.gemini/antigravity-cli/jetski_state.pbtxt
+36r RIG/home-profile/.gemini/antigravity-cli/last_check.timestamp
+37r RIG/home-profile/.gemini/antigravity-cli/log
+38r RIG/home-profile/.gemini/antigravity-cli/presence
+39r RIG/home-profile/.gemini/antigravity-cli/settings.json
+40r RIG/home-profile/.gemini/antigravity-cli/updater
+44r RIG/home-profile/.gemini/config
+45r RIG/home-profile/.gemini/config/.migrated
+46r RIG/home-profile/.gemini/config/mcp_config.json
+47r RIG/home-profile/.gemini/config/projects
+51r RIG/home-profile/.gemini/config/projects
+52r RIG/home-profile/.gemini/config/projects/default-cli-project.json
+60u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+61u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+62u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db
+63u RIG/home-profile/.gemini/antigravity-cli/conversation_summaries.db-wal
+67r RIG/home-profile/.gemini/config
+68r RIG/home-profile/.gemini/config/.migrated
+69r RIG/home-profile/.gemini/config/mcp_config.json
+70r RIG/home-profile/.gemini/config/projects
+74u RIG/home-profile/.gemini/antigravity-cli/conversations/0d802dee-a87e-4457-9858-8cf445837576.db
+75u RIG/home-profile/.gemini/antigravity-cli/conversations/0d802dee-a87e-4457-9858-8cf445837576.db-wal
+76u RIG/home-profile/.gemini/antigravity-cli/conversations/0d802dee-a87e-4457-9858-8cf445837576.db-shm
+77r RIG/home-profile/.gemini/antigravity-cli/brain/0d802dee-a87e-4457-9858-8cf445837576
+78r RIG/home-profile/.gemini/antigravity-cli/brain/0d802dee-a87e-4457-9858-8cf445837576/.user_uploaded
+79r RIG/home-profile/.gemini/antigravity-cli/brain/0d802dee-a87e-4457-9858-8cf445837576/scratch
+80u RIG/home-profile/.gemini/antigravity-cli/conversations/0d802dee-a87e-4457-9858-8cf445837576.db
+81u RIG/home-profile/.gemini/antigravity-cli/conversations/0d802dee-a87e-4457-9858-8cf445837576.db-wal
+82u RIG/home-profile/.gemini/antigravity-cli/presence/0d802dee-a87e-4457-9858-8cf445837576.lock
+83r RIG/home-profile/.gemini/antigravity-cli/brain/0d802dee-a87e-4457-9858-8cf445837576/.system_generated
+--- conversations
+drwxr-xr-x   7 rig     staff     224 Sep 30 00:19 .
+drwxr-xr-x  22 rig     staff     704 Sep 30 00:19 ..
+-rw-------   1 rig     staff   49152 Sep 30 00:19 0d802dee-a87e-4457-9858-8cf445837576.db
+-rw-------   1 rig     staff   32768 Sep 30 00:19 0d802dee-a87e-4457-9858-8cf445837576.db-shm
+-rw-------   1 rig     staff  296672 Sep 30 00:19 0d802dee-a87e-4457-9858-8cf445837576.db-wal
+-rw-------   1 rig     staff  122880 Sep 30 00:16 31cd68fa-6ec5-4c28-8ea8-f4723962edf2.db
+-rw-------   1 rig     staff  122880 Sep 30 00:18 dbe6f9e6-5f73-4181-a85d-8ed9662f09dd.db
+--- history.jsonl
+{"display":"first prompt of the restore chain rig","timestamp":1790720183955,"workspace":"/Volumes/Data/unsent-072.VIQD/work"}
+{"display":"second prompt of the restore chain rig","timestamp":1790720315491,"workspace":"/Volumes/Data/unsent-072.VIQD/work"}
+{"display":"sent message one for the log rig","timestamp":1790720387831,"workspace":"/Volumes/Data/unsent-072.VIQD/work"}
+{"display":"sent message two for the log rig","timestamp":1790720393322,"workspace":"/Volumes/Data/unsent-072.VIQD/work","conversationId":"0d802dee-a87e-4457-9858-8cf445837576"}
+--- unsent drafts
+drwx------  4 rig     staff  128 Sep 30 00:19 .
+drwx------  5 rig     staff  160 Sep 30 00:11 ..
+-rw-------  1 rig     staff  332 Sep 30 00:19 20260930-001946-56688.json
+-rw-------  1 rig     staff    0 Sep 30 00:19 20260930-001946-56688.lock
+--- unsent records
+RIG/unsent-home2/drafts/20260930-001946-56688.json:
+{
+  "format": 1,
+  "id": "20260930-001946-56688",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "0d802dee-a87e-4457-9858-8cf445837576",
+  "cwd": "RIG/work",
+  "pid": 56688,
+  "started": "2026-09-30T00:19:46.03361+02:00",
+  "updated": "2026-09-30T00:19:53.663393+02:00",
+  "draft": ""
+}
+RIG/unsent-home2/history/20260930-001117.779464-71668.json:
+{
+  "format": 1,
+  "id": "20260930-001117.779464-71668",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 71668,
+  "started": "2026-09-30T00:11:10.971193+02:00",
+  "updated": "2026-09-30T00:11:13.380158+02:00",
+  "draft": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwafter a full row"
+}
+RIG/unsent-home2/history/20260930-001122.978955-71668.json:
+{
+  "format": 1,
+  "id": "20260930-001122.978955-71668",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 71668,
+  "started": "2026-09-30T00:11:10.971193+02:00",
+  "updated": "2026-09-30T00:11:18.577706+02:00",
+  "draft": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nbb cc"
+}
+RIG/unsent-home2/history/20260930-001648.146078-16103.json:
+{
+  "format": 1,
+  "id": "20260930-001648.146078-16103",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "31cd68fa-6ec5-4c28-8ea8-f4723962edf2",
+  "cwd": "RIG/work",
+  "pid": 16103,
+  "started": "2026-09-30T00:16:22.006553+02:00",
+  "updated": "2026-09-30T00:16:30.009035+02:00",
+  "ended": "2026-09-30T00:16:31.328696+02:00",
+  "draft": "orphan draft for the restore, ñandú\nsecond line of the orphan"
+}
+RIG/unsent-home2/history/20260930-001655.747182-21183.json:
+{
+  "format": 1,
+  "id": "20260930-001655.747182-21183",
+  "command": [
+    "agy",
+    "-c"
+  ],
+  "agent": "agy",
+  "agent_session": "31cd68fa-6ec5-4c28-8ea8-f4723962edf2",
+  "cwd": "RIG/work",
+  "pid": 21183,
+  "started": "2026-09-30T00:16:45.744721+02:00",
+  "updated": "2026-09-30T00:16:48.188891+02:00",
+  "draft": "orphan draft for the restore, ñandú\nsecond line of the orphan",
+  "pastes": [
+    "orphan draft for the restore, ñandú\nsecond line of the orphan"
+  ]
+}
+RIG/unsent-home2/history/20260930-001849.332164-43459.json:
+{
+  "format": 1,
+  "id": "20260930-001849.332164-43459",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "dbe6f9e6-5f73-4181-a85d-8ed9662f09dd",
+  "cwd": "RIG/work",
+  "pid": 43459,
+  "started": "2026-09-30T00:18:33.648501+02:00",
+  "updated": "2026-09-30T00:18:42.851885+02:00",
+  "ended": "2026-09-30T00:18:44.097839+02:00",
+  "draft": "long orphan row 01 of twenty\nlong orphan row 02 of twenty\nlong orphan row 03 of twenty\nlong orphan row 04 of twenty\nlong orphan row 05 of twenty\nlong orphan row 06 of twenty\nlong orphan row 07 of twenty\nlong orphan row 08 of twenty\nlong orphan row 09 of twenty\nlong orphan row 10 of twenty\nlong orphan row 11 of twenty\nlong orphan row 12 of twenty\nlong orphan row 13 of twenty\nlong orphan row 14 of twenty\nlong orphan row 15 of twenty\nlong orphan row 16 of twenty\nlong orphan row 17 of twenty\nlong orphan row 18 of twenty\nlong orphan row 19 of twenty\nlong orphan row 20 of twenty"
+}
+RIG/unsent-home2/history/20260930-001856.933662-46001.json:
+{
+  "format": 1,
+  "id": "20260930-001856.933662-46001",
+  "command": [
+    "agy",
+    "-c"
+  ],
+  "agent": "agy",
+  "agent_session": "dbe6f9e6-5f73-4181-a85d-8ed9662f09dd",
+  "cwd": "RIG/work",
+  "pid": 46001,
+  "started": "2026-09-30T00:18:46.93023+02:00",
+  "updated": "2026-09-30T00:18:49.399301+02:00",
+  "draft": "long orphan row 01 of twenty\nlong orphan row 02 of twenty\nlong orphan row 03 of twenty\nlong orphan row 04 of twenty\nlong orphan row 05 of twenty\nlong orphan row 06 of twenty\nlong orphan row 07 of twenty\nlong orphan row 08 of twenty\nlong orphan row 09 of twenty\nlong orphan row 10 of twenty\nlong orphan row 11 of twenty\nlong orphan row 12 of twenty\nlong orphan row 13 of twenty\nlong orphan row 14 of twenty\nlong orphan row 15 of twenty\nlong orphan row 16 of twenty\nlong orphan row 17 of twenty\nlong orphan row 18 of twenty\nlong orphan row 19 of twenty\nlong orphan row 20 of twenty",
+  "pastes": [
+    "long orphan row 01 of twenty\nlong orphan row 02 of twenty\nlong orphan row 03 of twenty\nlong orphan row 04 of twenty\nlong orphan row 05 of twenty\nlong orphan row 06 of twenty\nlong orphan row 07 of twenty\nlong orphan row 08 of twenty\nlong orphan row 09 of twenty\nlong orphan row 10 of twenty\nlong orphan row 11 of twenty\nlong orphan row 12 of twenty\nlong orphan row 13 of twenty\nlong orphan row 14 of twenty\nlong orphan row 15 of twenty\nlong orphan row 16 of twenty\nlong orphan row 17 of twenty\nlong orphan row 18 of twenty\nlong orphan row 19 of twenty\nlong orphan row 20 of twenty"
+  ]
+}
+RIG/unsent-home2/history/20260930-001908.996130-49024.json:
+{
+  "format": 1,
+  "id": "20260930-001908.996130-49024",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 49024,
+  "started": "2026-09-30T00:19:02.992663+02:00",
+  "updated": "2026-09-30T00:19:03.43623+02:00",
+  "draft": "early paste line one rig\nearly paste row 02\nearly paste row 03\nearly paste row 04\nearly paste row 05\nearly paste row 06\nearly paste row 07\nearly paste row 08\nearly paste row 09\nearly paste row 10\nearly paste row 11\nearly paste row 12\nearly paste row 13\nearly paste row 14\nearly paste row 15\nearly paste row 16\nearly paste row 17\nearly paste row 18\nearly paste row 19\nearly paste row 20",
+  "pastes": [
+    "early paste line one rig\nearly paste row 02\nearly paste row 03\nearly paste row 04\nearly paste row 05\nearly paste row 06\nearly paste row 07\nearly paste row 08\nearly paste row 09\nearly paste row 10\nearly paste row 11\nearly paste row 12\nearly paste row 13\nearly paste row 14\nearly paste row 15\nearly paste row 16\nearly paste row 17\nearly paste row 18\nearly paste row 19\nearly paste row 20"
+  ]
+}
+RIG/unsent-home2/history/20260930-001939.818442-51157.json:
+{
+  "format": 1,
+  "id": "20260930-001939.818442-51157",
+  "command": [
+    "agy"
+  ],
+  "agent": "agy",
+  "agent_session": "",
+  "cwd": "RIG/work",
+  "pid": 51157,
+  "started": "2026-09-30T00:19:15.01551+02:00",
+  "updated": "2026-09-30T00:19:35.842194+02:00",
+  "draft": "edge row 01 of the deletes draft\nedge row 02 of the deletes draft\nedge row 03 of the deletes draft\nedge row 04 of the deletes draft\nedge row 05 of the deletes draft\nedge row 06 of the deletes draft\nedge row 07 of the deletes draft\nedge row 08 of the deletes draft\nedge row 09 of the deletes draft\nedge row 10 of the deletes draft\nedge row 11 of the deletes draft\nedge row 12 of the deletes draft\nedge row 13 of the deletes draft\nedge row 14 of the deletes draft\nedge row 15 of the deletes draft\nedge row 16 of the deletes draft\nedge row 17 of the deletes draft\nedge row 18 of the deletes draft\nedge row 19 of the deletes draft\nedge row 20 of the deletes draft\nedge row 21 of the deletes draft\nedge row 22 of the deletes draft\nedge row 23 of the deletes draft\n row 24 of the deletes draft"
+}
+--- unsent sent logs
+RIG/unsent-home2/sent/20260930-001622-16103.jsonl:
+{"format":1,"session":"20260930-001622-16103","agent":"agy","agent_session":"","cwd":"RIG/work","started":"2026-09-30T00:16:22.006553+02:00"}
+{"time":"2026-09-30T00:16:24.062609+02:00","text":"first prompt of the restore chain rig"}
+RIG/unsent-home2/sent/20260930-001833-43459.jsonl:
+{"format":1,"session":"20260930-001833-43459","agent":"agy","agent_session":"","cwd":"RIG/work","started":"2026-09-30T00:18:33.648501+02:00"}
+{"time":"2026-09-30T00:18:35.6795+02:00","text":"second prompt of the restore chain rig"}
+RIG/unsent-home2/sent/20260930-001946-56688.jsonl:
+{"format":1,"session":"20260930-001946-56688","agent":"agy","agent_session":"","cwd":"RIG/work","started":"2026-09-30T00:19:46.03361+02:00"}
+{"time":"2026-09-30T00:19:48.085517+02:00","text":"sent message one for the log rig"}
+RIG/unsent-home2/sent/agy-0d802dee-a87e-4457-9858-8cf445837576.jsonl:
+{"format":1,"session":"20260930-001946-56688","agent":"agy","agent_session":"0d802dee-a87e-4457-9858-8cf445837576","cwd":"RIG/work","started":"2026-09-30T00:19:46.03361+02:00"}
+{"time":"2026-09-30T00:19:53.639736+02:00","text":"sent message two for the log rig"}

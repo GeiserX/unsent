@@ -1,0 +1,298 @@
+{
+ "name": "identity",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "bg": "$RIG/poll.sh identity 60"
+  },
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-0-start"
+  },
+  {
+   "type": "typed but never submitted, dummy"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-1-typed"
+  },
+  {
+   "keys": [
+    "C-c"
+   ]
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-2-ctrl-c"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 0.3
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-3-submit-0.3s"
+  },
+  {
+   "wait": 4
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-4-submit-4s"
+  },
+  {
+   "keys": [
+    "Escape"
+   ]
+  },
+  {
+   "wait": 2.5
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-5-after-escape"
+  },
+  {
+   "type": "second submit of the same conversation"
+  },
+  {
+   "keys": [
+    "Enter"
+   ]
+  },
+  {
+   "wait": 4
+  },
+  {
+   "keys": [
+    "Escape"
+   ]
+  },
+  {
+   "wait": 2.5
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-6-second-submit"
+  },
+  {
+   "screen": "identity-end"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "sh": "echo \"--- tmux\"; tmux -L unsent-072 display -p -t $SESS \"alt=#{alternate_on} dead=#{pane_dead}\";echo \"--- ps\"; ps -o pid,ppid,stat,command -ax | grep -E \"bin/agy|bin/unsent\" | grep -v grep;echo \"--- open under the scratch home\"; P=$(pgrep -f \"$RIG/bin/agy\" | head -1); lsof -p \"$P\" 2>/dev/null | grep -F \"$RIG/home\" | awk '{print $4, $NF}' | sed \"s|$RIG|RIG|\";echo \"--- agent folder\"; find \"$RIG/home/.gemini/antigravity-cli\" -maxdepth 1 -type f | while read f; do echo \"$(stat -f \"%z\" \"$f\") $f\"; done | sed \"s|$RIG|RIG|\";echo \"--- conversations\"; ls -la \"$RIG/home/.gemini/antigravity-cli/conversations\" 2>/dev/null | tail -n +2;echo \"--- last_conversations.json\"; cat \"$RIG/home/.gemini/antigravity-cli/cache/last_conversations.json\" 2>/dev/null;echo; echo \"--- history.jsonl\"; cat \"$RIG/home/.gemini/antigravity-cli/history.jsonl\" 2>/dev/null;echo \"--- update_status.json\"; cat \"$RIG/home/.gemini/antigravity-cli/updater/update_status.json\" 2>/dev/null; echo;echo \"--- agy binary\"; shasum -a 256 \"$RIG/agy/antigravity\";",
+   "save": "id-7-after-exit"
+  }
+ ],
+ "log": [
+  {
+   "t": 0.0,
+   "step": "bg",
+   "detail": "$RIG/poll.sh identity 60"
+  },
+  {
+   "t": 0.17,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 2.15,
+   "step": "sh",
+   "detail": "id-0-start"
+  },
+  {
+   "t": 2.16,
+   "step": "type",
+   "detail": "typed but never submitted, dummy"
+  },
+  {
+   "t": 3.32,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 3.82,
+   "step": "sh",
+   "detail": "id-1-typed"
+  },
+  {
+   "t": 3.82,
+   "step": "keys",
+   "detail": "C-c"
+  },
+  {
+   "t": 4.98,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 5.48,
+   "step": "sh",
+   "detail": "id-2-ctrl-c"
+  },
+  {
+   "t": 5.48,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 5.94,
+   "step": "wait",
+   "detail": "0.3"
+  },
+  {
+   "t": 6.45,
+   "step": "sh",
+   "detail": "id-3-submit-0.3s"
+  },
+  {
+   "t": 10.46,
+   "step": "wait",
+   "detail": "4"
+  },
+  {
+   "t": 10.99,
+   "step": "sh",
+   "detail": "id-4-submit-4s"
+  },
+  {
+   "t": 10.99,
+   "step": "keys",
+   "detail": "Escape"
+  },
+  {
+   "t": 13.65,
+   "step": "wait",
+   "detail": "2.5"
+  },
+  {
+   "t": 14.1,
+   "step": "sh",
+   "detail": "id-5-after-escape"
+  },
+  {
+   "t": 14.11,
+   "step": "type",
+   "detail": "second submit of the same conversation"
+  },
+  {
+   "t": 14.26,
+   "step": "keys",
+   "detail": "Enter"
+  },
+  {
+   "t": 18.42,
+   "step": "wait",
+   "detail": "4"
+  },
+  {
+   "t": 18.42,
+   "step": "keys",
+   "detail": "Escape"
+  },
+  {
+   "t": 21.08,
+   "step": "wait",
+   "detail": "2.5"
+  },
+  {
+   "t": 21.6,
+   "step": "sh",
+   "detail": "id-6-second-submit"
+  },
+  {
+   "t": 21.6,
+   "step": "screen",
+   "detail": "identity-end"
+  },
+  {
+   "t": 21.61,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 21.77,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 22.52,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 22.53,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 24.68,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 25.18,
+   "step": "sh",
+   "detail": "id-7-after-exit"
+  }
+ ]
+}

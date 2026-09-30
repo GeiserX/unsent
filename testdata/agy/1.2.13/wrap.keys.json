@@ -1,0 +1,227 @@
+{
+ "name": "wrap",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "after a full row"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "full-row"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bb cc"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "edge-word"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.57,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 2.07,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 2.08,
+   "step": "type",
+   "detail": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"
+  },
+  {
+   "t": 2.24,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.4,
+   "step": "type",
+   "detail": "after a full row"
+  },
+  {
+   "t": 3.56,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 3.57,
+   "step": "screen",
+   "detail": "full-row"
+  },
+  {
+   "t": 3.58,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 6.73,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 6.74,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 6.9,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 7.65,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 7.67,
+   "step": "type",
+   "detail": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "t": 8.83,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 8.84,
+   "step": "screen",
+   "detail": "edge-word"
+  },
+  {
+   "t": 8.84,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 12.0,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 12.01,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 12.17,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 12.94,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 12.95,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 15.11,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

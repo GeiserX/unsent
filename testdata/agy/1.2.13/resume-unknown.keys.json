@@ -1,0 +1,43 @@
+{
+ "name": "resume-unknown",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy",
+  "--conversation",
+  "00000000-0000-0000-0000-000000000000"
+ ],
+ "steps": [
+  {
+   "wait": 8
+  },
+  {
+   "screen": "unknown"
+  },
+  {
+   "sh": "tmux -L unsent-072 display -p -t $SESS 'dead=#{pane_dead} status=#{pane_dead_status}'",
+   "save": "exit-status"
+  }
+ ],
+ "log": [
+  {
+   "t": 8.0,
+   "step": "wait",
+   "detail": "8"
+  },
+  {
+   "t": 8.01,
+   "step": "screen",
+   "detail": "unknown"
+  },
+  {
+   "t": 8.02,
+   "step": "sh",
+   "detail": "exit-status"
+  }
+ ]
+}

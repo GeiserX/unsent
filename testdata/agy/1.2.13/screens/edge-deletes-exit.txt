@@ -1,0 +1,160 @@
+      [38;5;179m▄[38;5;208m[48;5;208m▀[38;5;203m[48;5;209m▀[49m▄[39m        [1m[94mAntigravity CLI 1.2.13[0m
+     [38;5;149m[48;5;113m▀[38;5;143m[48;5;107m▀[38;5;173m[48;5;173m▀[38;5;209m[48;5;209m▀[38;5;203m[48;5;167m▀▀[39m[49m       [90mGemini API key[39m
+    [38;5;107m[48;5;113m▀[38;5;71m[48;5;72m▀[38;5;72m[48;5;68m▀[38;5;67m[49m▀[38;5;103m▀[38;5;98m[48;5;68m▀[38;5;97m[48;5;62m▀[38;5;132m[48;5;97m▀[39m[49m      [90mGemini 3.1 Pro (Low)[39m
+   [38;5;78m▄[48;5;74m▀[38;5;73m▀[39m[49m    [38;5;68m[48;5;69m▀▀[49m▄[39m     [90m/Volumes/Data/unsent-072.VIQD/work[39m
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m [90m↑ 5 more lines[39m
+  edge row 06 of the deletes draft
+  edge row 07 of the deletes draft
+  edge row 08 of the deletes draft
+  edge row 09 of the deletes draft
+  edge row 10 of the deletes draft
+  edge row 11 of the deletes draft
+  edge row 12 of the deletes draft
+  edge row 13 of the deletes draft
+  edge row 14 of the deletes draft
+  edge row 15 of the deletes draft
+  edge row 16 of the deletes draft
+  edge row 17 of the deletes draft
+  edge row 18 of the deletes draft
+  edge row 19 of the deletes draft
+  edge row 20 of the deletes draft
+  edge row 21 of the deletes draft
+  edge row 22 of the deletes draft
+  edge row 23 of the deletes draft
+  edge row 24 of the deletes draft
+  edge row 25 of the de
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m      [38;5;179m▄[38;5;208m[48;5;208m▀[38;5;203m[48;5;209m▀[49m▄[39m        [1m[94mAntigravity CLI 1.2.13[0m
+     [38;5;149m[48;5;113m▀[38;5;143m[48;5;107m▀[38;5;173m[48;5;173m▀[38;5;209m[48;5;209m▀[38;5;203m[48;5;167m▀▀[39m[49m       [90mGemini API key[39m
+    [38;5;107m[48;5;113m▀[38;5;71m[48;5;72m▀[38;5;72m[48;5;68m▀[38;5;67m[49m▀[38;5;103m▀[38;5;98m[48;5;68m▀[38;5;97m[48;5;62m▀[38;5;132m[48;5;97m▀[39m[49m      [90mGemini 3.1 Pro (Low)[39m
+   [38;5;78m▄[48;5;74m▀[38;5;73m▀[39m[49m    [38;5;68m[48;5;69m▀▀[49m▄[39m     [90m/Volumes/Data/unsent-072.VIQD/work[39m
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m [90m↑ 5 more lines[39m
+  edge row 06 of the deletes draft
+  edge row 07 of the deletes draft
+  edge row 08 of the deletes draft
+  edge row 09 of the deletes draft
+  edge row 10 of the deletes draft
+  edge row 11 of the deletes draft
+  edge row 12 of the deletes draft
+  edge row 13 of the deletes draft
+  edge row 14 of the deletes draft
+  edge row 15 of the deletes draft
+  edge row 16 of the deletes draft
+  edge row 17 of the deletes draft
+  edge row 18 of the deletes draft
+  edge row 19 of the deletes draft
+  edge row 20 of the deletes draft
+  edge row 21 of the deletes draft
+  edge row 22 of the deletes draft
+  edge row 23 of the deletes draft
+  edge row 24 of the deletes draft
+  edge row 25 of the
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m      [38;5;179m▄[38;5;208m[48;5;208m▀[38;5;203m[48;5;209m▀[49m▄[39m        [1m[94mAntigravity CLI 1.2.13[0m
+     [38;5;149m[48;5;113m▀[38;5;143m[48;5;107m▀[38;5;173m[48;5;173m▀[38;5;209m[48;5;209m▀[38;5;203m[48;5;167m▀▀[39m[49m       [90mGemini API key[39m
+    [38;5;107m[48;5;113m▀[38;5;71m[48;5;72m▀[38;5;72m[48;5;68m▀[38;5;67m[49m▀[38;5;103m▀[38;5;98m[48;5;68m▀[38;5;97m[48;5;62m▀[38;5;132m[48;5;97m▀[39m[49m      [90mGemini 3.1 Pro (Low)[39m
+   [38;5;78m▄[48;5;74m▀[38;5;73m▀[39m[49m    [38;5;68m[48;5;69m▀▀[49m▄[39m     [90m/Volumes/Data/unsent-072.VIQD/work[39m
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m [90m↑ 5 more lines[39m
+  edge row 06 of the deletes draft
+  edge row 07 of the deletes draft
+  edge row 08 of the deletes draft
+  edge row 09 of the deletes draft
+  edge row 10 of the deletes draft
+  edge row 11 of the deletes draft
+  edge row 12 of the deletes draft
+  edge row 13 of the deletes draft
+  edge row 14 of the deletes draft
+  edge row 15 of the deletes draft
+  edge row 16 of the deletes draft
+  edge row 17 of the deletes draft
+  edge row 18 of the deletes draft
+  edge row 19 of the deletes draft
+  edge row 20 of the deletes draft
+  edge row 21 of the deletes draft
+  edge row 22 of the deletes draft
+  edge row 23 of the deletes draft
+  edge row 24 of the deletes draft
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m      [38;5;179m▄[38;5;208m[48;5;208m▀[38;5;203m[48;5;209m▀[49m▄[39m        [1m[94mAntigravity CLI 1.2.13[0m
+     [38;5;149m[48;5;113m▀[38;5;143m[48;5;107m▀[38;5;173m[48;5;173m▀[38;5;209m[48;5;209m▀[38;5;203m[48;5;167m▀▀[39m[49m       [90mGemini API key[39m
+    [38;5;107m[48;5;113m▀[38;5;71m[48;5;72m▀[38;5;72m[48;5;68m▀[38;5;67m[49m▀[38;5;103m▀[38;5;98m[48;5;68m▀[38;5;97m[48;5;62m▀[38;5;132m[48;5;97m▀[39m[49m      [90mGemini 3.1 Pro (Low)[39m
+   [38;5;78m▄[48;5;74m▀[38;5;73m▀[39m[49m    [38;5;68m[48;5;69m▀▀[49m▄[39m     [90m/Volumes/Data/unsent-072.VIQD/work[39m
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m [90m↑ 4 more lines[39m
+  edge row 05 of the deletes draft
+  edge row 06 of the deletes draft
+  edge row 07 of the deletes draft
+  edge row 08 of the deletes draft
+  edge row 09 of the deletes draft
+  edge row 10 of the deletes draft
+  edge row 11 of the deletes draft
+  edge row 12 of the deletes draft
+  edge row 13 of the deletes draft
+  edge row 14 of the deletes draft
+  edge row 15 of the deletes draft
+  edge row 16 of the deletes draft
+  edge row 17 of the deletes draft
+  edge row 18 of the deletes draft
+  edge row 19 of the deletes draft
+  edge row 20 of the deletes draft
+  edge row 21 of the deletes draft
+  edge row 22 of the deletes draft
+  edge row 23 of the deletes draft
+   row 24 of the deletes draft
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[39m      [38;5;179m▄[38;5;208m[48;5;208m▀[38;5;203m[48;5;209m▀[49m▄[39m        [1m[94mAntigravity CLI 1.2.13[0m
+     [38;5;149m[48;5;113m▀[38;5;143m[48;5;107m▀[38;5;173m[48;5;173m▀[38;5;209m[48;5;209m▀[38;5;203m[48;5;167m▀▀[39m[49m       [90mGemini API key[39m
+    [38;5;107m[48;5;113m▀[38;5;71m[48;5;72m▀[38;5;72m[48;5;68m▀[38;5;67m[49m▀[38;5;103m▀[38;5;98m[48;5;68m▀[38;5;97m[48;5;62m▀[38;5;132m[48;5;97m▀[39m[49m      [90mGemini 3.1 Pro (Low)[39m
+   [38;5;78m▄[48;5;74m▀[38;5;73m▀[39m[49m    [38;5;68m[48;5;69m▀▀[49m▄[39m     [90m/Volumes/Data/unsent-072.VIQD/work[39m
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39munsent: captured agy 1.2.13 in /Volumes/Data/unsent-072.VIQD/work/testdata/agy/1.2.13/capture-20260930-001915.rec (keys
+and output), /Volumes/Data/unsent-072.VIQD/work/testdata/agy/1.2.13/capture-20260930-001915.json (window sizes) and 5 ed
+itor copies. Check every file for real prompt text, names, paths and keys before committing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 0, Wed Sep 30 00:19:41 2026)

@@ -1,0 +1,65 @@
+--- tmux
+alt=0 dead=0
+--- ps
+32712 56574 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+32728 32712 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+68774 56574 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+68790 68774 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+--- open under the scratch home
+1w RIG/home/.gemini/antigravity-cli/log/cli-20260929_225609.log
+2w RIG/home/.gemini/antigravity-cli/log/cli-20260929_225609.log
+4r RIG/home/.gemini/antigravity-cli/log/cli-20260929_225753.log
+8r RIG/home/.gemini/antigravity-cli/history.jsonl
+11r RIG/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+19r RIG/home/.gemini/antigravity-cli
+20r RIG/home/.gemini/antigravity-cli/bin
+21r RIG/home/.gemini/antigravity-cli/brain
+22r RIG/home/.gemini/antigravity-cli/builtin
+23r RIG/home/.gemini/antigravity-cli/cache
+24r RIG/home/.gemini/antigravity-cli/log/cli-20260929_225609.log
+25r RIG/home/.gemini/antigravity-cli/conversation_summaries.db
+28r RIG/home/.gemini/antigravity-cli/conversations
+29r RIG/home/.gemini/antigravity-cli/crashes
+30r RIG/home/.gemini/antigravity-cli/implicit
+31r RIG/home/.gemini/antigravity-cli/installation_id
+33r RIG/home/.gemini/antigravity-cli/jetski_state.pbtxt
+34r RIG/home/.gemini/antigravity-cli/last_check.timestamp
+35r RIG/home/.gemini/antigravity-cli/log
+36r RIG/home/.gemini/antigravity-cli/presence
+37r RIG/home/.gemini/antigravity-cli/settings.json
+38r RIG/home/.gemini/antigravity-cli/updater
+42r RIG/home/.gemini/config
+43r RIG/home/.gemini/config/.migrated
+44r RIG/home/.gemini/config/mcp_config.json
+45r RIG/home/.gemini/config/projects
+49r RIG/home/.gemini/config/projects
+50r RIG/home/.gemini/config/projects/default-cli-project.json
+66r RIG/home/.gemini/config
+67r RIG/home/.gemini/config/.migrated
+68r RIG/home/.gemini/config/mcp_config.json
+69r RIG/home/.gemini/config/projects
+--- agent folder
+20480 RIG/home/.gemini/antigravity-cli/conversation_summaries.db
+503 RIG/home/.gemini/antigravity-cli/jetski_state.pbtxt
+0 RIG/home/.gemini/antigravity-cli/last_check.timestamp
+36 RIG/home/.gemini/antigravity-cli/installation_id
+103 RIG/home/.gemini/antigravity-cli/settings.json
+755 RIG/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+650 RIG/home/.gemini/antigravity-cli/history.jsonl
+--- conversations
+drwxr-xr-x   3 rig     staff     96 Sep 29 22:58 .
+drwxr-xr-x  20 rig     staff    640 Sep 29 22:59 ..
+-rw-------   1 rig     staff  49152 Sep 29 22:58 fac6d0e4-7fbe-44bf-8000-b7a67d9e708d.db
+--- last_conversations.json
+{
+  "/Volumes/Data/unsent-072.VIQD/work": "fac6d0e4-7fbe-44bf-8000-b7a67d9e708d"
+}
+--- history.jsonl
+{"display":"/settings","timestamp":1790715493879,"workspace":"/Volumes/Data/unsent-072.VIQD/work","type":"slash_command"}
+{"display":"/model","timestamp":1790715499850,"workspace":"/Volumes/Data/unsent-072.VIQD/work","conversationId":"fac6d0e4-7fbe-44bf-8000-b7a67d9e708d","type":"slash_command"}
+{"display":"/resume","timestamp":1790715505797,"workspace":"/Volumes/Data/unsent-072.VIQD/work","conversationId":"fac6d0e4-7fbe-44bf-8000-b7a67d9e708d","type":"slash_command"}
+{"display":"/context","timestamp":1790715511768,"workspace":"/Volumes/Data/unsent-072.VIQD/work","conversationId":"fac6d0e4-7fbe-44bf-8000-b7a67d9e708d","type":"slash_command"}
+--- update_status.json
+{"success":false,"message":"Update failed, please install from website"}
+--- agy binary
+ef3728208834483754b06fd99963b4b6320740bf237212768dfed5256ae24ddb  /Volumes/Data/unsent-072.VIQD/agy/antigravity

@@ -1,0 +1,899 @@
+{
+ "name": "edge-deletes",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "edge row 01 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 02 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 03 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 04 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 05 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 06 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 07 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 08 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 09 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 10 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 11 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 12 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 13 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 14 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 15 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 16 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 17 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 18 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 19 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 20 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 21 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 22 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 23 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 24 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "keys": [
+    "C-j"
+   ],
+   "gap": 0.04
+  },
+  {
+   "type": "edge row 25 of the deletes draft",
+   "gap": 0.04
+  },
+  {
+   "wait": 1.2
+  },
+  {
+   "screen": "before"
+  },
+  {
+   "keys": [
+    "C-w"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "after-ctrl-w"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace",
+    "BSpace"
+   ],
+   "gap": 0.05
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "after-backspace"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "M-BSpace"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "after-alt-backspace"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "after-ctrl-u"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "Home"
+   ]
+  },
+  {
+   "keys": [
+    "Delete",
+    "Delete",
+    "Delete",
+    "Delete"
+   ],
+   "gap": 0.05
+  },
+  {
+   "wait": 0.5
+  },
+  {
+   "screen": "after-delete"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.5
+  }
+ ],
+ "log": [
+  {
+   "t": 0.17,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.7,
+   "step": "type",
+   "detail": "edge row 01 of the deletes draft"
+  },
+  {
+   "t": 1.74,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 1.8,
+   "step": "type",
+   "detail": "edge row 02 of the deletes draft"
+  },
+  {
+   "t": 1.84,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 1.89,
+   "step": "type",
+   "detail": "edge row 03 of the deletes draft"
+  },
+  {
+   "t": 1.93,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 1.98,
+   "step": "type",
+   "detail": "edge row 04 of the deletes draft"
+  },
+  {
+   "t": 2.03,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.08,
+   "step": "type",
+   "detail": "edge row 05 of the deletes draft"
+  },
+  {
+   "t": 2.12,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.17,
+   "step": "type",
+   "detail": "edge row 06 of the deletes draft"
+  },
+  {
+   "t": 2.22,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.27,
+   "step": "type",
+   "detail": "edge row 07 of the deletes draft"
+  },
+  {
+   "t": 2.31,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.36,
+   "step": "type",
+   "detail": "edge row 08 of the deletes draft"
+  },
+  {
+   "t": 2.4,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.45,
+   "step": "type",
+   "detail": "edge row 09 of the deletes draft"
+  },
+  {
+   "t": 2.51,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.56,
+   "step": "type",
+   "detail": "edge row 10 of the deletes draft"
+  },
+  {
+   "t": 2.6,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.65,
+   "step": "type",
+   "detail": "edge row 11 of the deletes draft"
+  },
+  {
+   "t": 2.7,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.75,
+   "step": "type",
+   "detail": "edge row 12 of the deletes draft"
+  },
+  {
+   "t": 2.8,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.85,
+   "step": "type",
+   "detail": "edge row 13 of the deletes draft"
+  },
+  {
+   "t": 2.9,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.95,
+   "step": "type",
+   "detail": "edge row 14 of the deletes draft"
+  },
+  {
+   "t": 3.0,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.04,
+   "step": "type",
+   "detail": "edge row 15 of the deletes draft"
+  },
+  {
+   "t": 3.09,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.14,
+   "step": "type",
+   "detail": "edge row 16 of the deletes draft"
+  },
+  {
+   "t": 3.19,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.25,
+   "step": "type",
+   "detail": "edge row 17 of the deletes draft"
+  },
+  {
+   "t": 3.29,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.34,
+   "step": "type",
+   "detail": "edge row 18 of the deletes draft"
+  },
+  {
+   "t": 3.39,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.43,
+   "step": "type",
+   "detail": "edge row 19 of the deletes draft"
+  },
+  {
+   "t": 3.48,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.52,
+   "step": "type",
+   "detail": "edge row 20 of the deletes draft"
+  },
+  {
+   "t": 3.57,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.62,
+   "step": "type",
+   "detail": "edge row 21 of the deletes draft"
+  },
+  {
+   "t": 3.67,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.72,
+   "step": "type",
+   "detail": "edge row 22 of the deletes draft"
+  },
+  {
+   "t": 3.77,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.82,
+   "step": "type",
+   "detail": "edge row 23 of the deletes draft"
+  },
+  {
+   "t": 3.87,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 3.91,
+   "step": "type",
+   "detail": "edge row 24 of the deletes draft"
+  },
+  {
+   "t": 3.96,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 4.01,
+   "step": "type",
+   "detail": "edge row 25 of the deletes draft"
+  },
+  {
+   "t": 5.25,
+   "step": "wait",
+   "detail": "1.2"
+  },
+  {
+   "t": 5.26,
+   "step": "screen",
+   "detail": "before"
+  },
+  {
+   "t": 5.27,
+   "step": "keys",
+   "detail": "C-w"
+  },
+  {
+   "t": 5.93,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 5.94,
+   "step": "screen",
+   "detail": "after-ctrl-w"
+  },
+  {
+   "t": 5.95,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 9.11,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 9.13,
+   "step": "keys",
+   "detail": "BSpace BSpace BSpace BSpace BSpace BSpace"
+  },
+  {
+   "t": 9.69,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 9.7,
+   "step": "screen",
+   "detail": "after-backspace"
+  },
+  {
+   "t": 9.71,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 12.88,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 12.89,
+   "step": "keys",
+   "detail": "M-BSpace"
+  },
+  {
+   "t": 13.55,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 13.57,
+   "step": "screen",
+   "detail": "after-alt-backspace"
+  },
+  {
+   "t": 13.58,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 16.74,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 16.74,
+   "step": "keys",
+   "detail": "C-u"
+  },
+  {
+   "t": 17.41,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 17.42,
+   "step": "screen",
+   "detail": "after-ctrl-u"
+  },
+  {
+   "t": 17.43,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 20.59,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 20.6,
+   "step": "keys",
+   "detail": "Home"
+  },
+  {
+   "t": 20.77,
+   "step": "keys",
+   "detail": "Delete Delete Delete Delete"
+  },
+  {
+   "t": 21.32,
+   "step": "wait",
+   "detail": "0.5"
+  },
+  {
+   "t": 21.33,
+   "step": "screen",
+   "detail": "after-delete"
+  },
+  {
+   "t": 21.34,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 24.5,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 24.51,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 24.68,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 25.44,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 25.45,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 26.61,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 26.62,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 29.28,
+   "step": "wait",
+   "detail": "2.5"
+  }
+ ]
+}

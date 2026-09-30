@@ -1,0 +1,602 @@
+{
+ "name": "pastes2",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "screen": "empty"
+  },
+  {
+   "paste": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "chars-1000"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "cleared-1"
+  },
+  {
+   "paste": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "chars-1001"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "after-backspace"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "cleared-2"
+  },
+  {
+   "paste": "sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "chars-1001-again"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 1\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 2\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 3\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 4\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 5\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 6\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 7\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 8\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 9\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 10\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 11\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 12\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 13\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 14\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 15\npppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp 16"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "lines-16"
+  },
+  {
+   "keys": [
+    "Home"
+   ]
+  },
+  {
+   "keys": [
+    "Right"
+   ]
+  },
+  {
+   "keys": [
+    "BSpace"
+   ]
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "lines-16-after-backspace"
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "screen": "cleared-3"
+  },
+  {
+   "paste": "line 1 of a paste with a tab\there\nline 2 of a paste with a tab\there\nline 3 of a paste with a tab\there"
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "tab-paste"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "paste": "one\ntwo",
+   "raw": false
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "paste-cr"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.0
+  }
+ ],
+ "log": [
+  {
+   "t": 0.48,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.98,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.99,
+   "step": "screen",
+   "detail": "empty"
+  },
+  {
+   "t": 2.01,
+   "step": "paste",
+   "detail": "1000 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 3.16,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 3.17,
+   "step": "screen",
+   "detail": "chars-1000"
+  },
+  {
+   "t": 3.18,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 6.34,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 6.35,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 6.51,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u"
+  },
+  {
+   "t": 7.27,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 7.28,
+   "step": "screen",
+   "detail": "cleared-1"
+  },
+  {
+   "t": 7.29,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 8.45,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 8.46,
+   "step": "screen",
+   "detail": "chars-1001"
+  },
+  {
+   "t": 8.47,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 8.63,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 9.59,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 9.6,
+   "step": "screen",
+   "detail": "after-backspace"
+  },
+  {
+   "t": 9.6,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 9.78,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u"
+  },
+  {
+   "t": 10.53,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 10.54,
+   "step": "screen",
+   "detail": "cleared-2"
+  },
+  {
+   "t": 10.55,
+   "step": "paste",
+   "detail": "1001 chars, 0 breaks, raw=False"
+  },
+  {
+   "t": 11.71,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 11.71,
+   "step": "screen",
+   "detail": "chars-1001-again"
+  },
+  {
+   "t": 11.72,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 11.89,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u"
+  },
+  {
+   "t": 12.65,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 12.67,
+   "step": "paste",
+   "detail": "1014 chars, 15 breaks, raw=False"
+  },
+  {
+   "t": 13.84,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 13.85,
+   "step": "screen",
+   "detail": "lines-16"
+  },
+  {
+   "t": 13.86,
+   "step": "keys",
+   "detail": "Home"
+  },
+  {
+   "t": 14.02,
+   "step": "keys",
+   "detail": "Right"
+  },
+  {
+   "t": 14.18,
+   "step": "keys",
+   "detail": "BSpace"
+  },
+  {
+   "t": 15.13,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 15.14,
+   "step": "screen",
+   "detail": "lines-16-after-backspace"
+  },
+  {
+   "t": 15.14,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 15.31,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 16.08,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 16.08,
+   "step": "screen",
+   "detail": "cleared-3"
+  },
+  {
+   "t": 16.1,
+   "step": "paste",
+   "detail": "101 chars, 2 breaks, raw=False"
+  },
+  {
+   "t": 17.05,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 17.06,
+   "step": "screen",
+   "detail": "tab-paste"
+  },
+  {
+   "t": 17.07,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 20.24,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 20.25,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 20.42,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 21.17,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 21.19,
+   "step": "paste",
+   "detail": "7 chars, 1 breaks, raw=False"
+  },
+  {
+   "t": 22.14,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 22.15,
+   "step": "screen",
+   "detail": "paste-cr"
+  },
+  {
+   "t": 22.16,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 25.31,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 25.33,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 25.49,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 26.25,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 26.26,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 28.42,
+   "step": "wait",
+   "detail": "2.0"
+  }
+ ]
+}

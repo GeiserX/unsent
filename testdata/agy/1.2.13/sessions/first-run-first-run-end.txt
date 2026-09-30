@@ -1,0 +1,70 @@
+--- tmux
+alt=0 dead=0
+--- ps
+13654 56574 Ss+  /Volumes/Data/unsent-072.VIQD/bin/unsent capture agy
+13708 13654 Ss+  /Volumes/Data/unsent-072.VIQD/bin/agy
+--- open under the scratch home
+txt RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-shm
+1w RIG/home-fresh/.gemini/antigravity-cli/log/cli-20260929_230848.log
+2w RIG/home-fresh/.gemini/antigravity-cli/log/cli-20260929_230848.log
+4r RIG/home-fresh/.gemini/config/projects
+8w RIG/home-fresh/.gemini/antigravity-cli/crashes/crash_13708_dba4280a-55a2-4318-8c1c-bab944d29c8b.log
+12u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db
+13u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db
+14u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-wal
+15u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-shm
+16u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-wal
+20r RIG/home-fresh/.gemini/antigravity-cli
+21r RIG/home-fresh/.gemini/antigravity-cli/log/cli-20260929_230848.log
+22r RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db
+23r RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-shm
+24r RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-wal
+25r RIG/home-fresh/.gemini/antigravity-cli/crashes
+26r RIG/home-fresh/.gemini/antigravity-cli/installation_id
+27r RIG/home-fresh/.gemini/antigravity-cli/log
+28r RIG/home-fresh/.gemini/antigravity-cli/settings.json
+32r RIG/home-fresh/.gemini/config
+37r RIG/home-fresh/.gemini/antigravity-cli/brain
+38r RIG/home-fresh/.gemini/config/projects
+39r RIG/home-fresh/.gemini/config/mcp_config.json
+44r RIG/home-fresh/.gemini/antigravity-cli/conversations
+47r RIG/home-fresh/.gemini/antigravity-cli/builtin
+48r RIG/home-fresh/.gemini/config/.migrated
+50r RIG/home-fresh/.gemini/antigravity-cli/jetski_state.pbtxt
+51r RIG/home-fresh/.gemini/antigravity-cli/last_check.timestamp
+52u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db
+53u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-wal
+54r RIG/home-fresh/.gemini/antigravity-cli/updater
+55u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db
+56u RIG/home-fresh/.gemini/antigravity-cli/conversation_summaries.db-wal
+57r RIG/home-fresh/.gemini/antigravity-cli/cache
+59r RIG/home-fresh/.gemini/config/projects/default-cli-project.json
+62r RIG/home-fresh/.gemini/config
+63r RIG/home-fresh/.gemini/config/.migrated
+64r RIG/home-fresh/.gemini/config/mcp_config.json
+65r RIG/home-fresh/.gemini/config/projects
+69r RIG/home-fresh/.gemini/antigravity-cli/implicit
+70r RIG/home-fresh/.gemini/antigravity-cli/bin
+--- agent folder
+20480 RIG/home/.gemini/antigravity-cli/conversation_summaries.db
+503 RIG/home/.gemini/antigravity-cli/jetski_state.pbtxt
+0 RIG/home/.gemini/antigravity-cli/last_check.timestamp
+36 RIG/home/.gemini/antigravity-cli/installation_id
+103 RIG/home/.gemini/antigravity-cli/settings.json
+819 RIG/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb
+306 RIG/home/.gemini/antigravity-cli/history.jsonl
+--- conversations
+drwxr-xr-x   3 rig     staff      96 Sep 29 23:06 .
+drwxr-xr-x  20 rig     staff     640 Sep 29 23:07 ..
+-rw-------   1 rig     staff  147456 Sep 29 23:04 bdf5e6ed-5ad6-4c78-90d0-5643c376ca46.db
+--- last_conversations.json
+{
+  "/Volumes/Data/unsent-072.VIQD/work": "bdf5e6ed-5ad6-4c78-90d0-5643c376ca46"
+}
+--- history.jsonl
+{"display":"typed but never submitted, dummy","timestamp":1790715846216,"workspace":"/Volumes/Data/unsent-072.VIQD/work"}
+{"display":"second submit of the same conversation","timestamp":1790715854999,"workspace":"/Volumes/Data/unsent-072.VIQD/work","conversationId":"bdf5e6ed-5ad6-4c78-90d0-5643c376ca46"}
+--- update_status.json
+{"success":false,"message":"Update failed, please install from website"}
+--- agy binary
+ef3728208834483754b06fd99963b4b6320740bf237212768dfed5256ae24ddb  /Volumes/Data/unsent-072.VIQD/agy/antigravity

@@ -1,0 +1,178 @@
+{
+ "name": "early-paste",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "paste": "early paste line one rig\nearly paste row 02\nearly paste row 03\nearly paste row 04\nearly paste row 05\nearly paste row 06\nearly paste row 07\nearly paste row 08\nearly paste row 09\nearly paste row 10\nearly paste row 11\nearly paste row 12\nearly paste row 13\nearly paste row 14\nearly paste row 15\nearly paste row 16\nearly paste row 17\nearly paste row 18\nearly paste row 19\nearly paste row 20"
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "screen": "pasted"
+  },
+  {
+   "keys": [
+    "C-g"
+   ]
+  },
+  {
+   "wait": 3.0
+  },
+  {
+   "keys": [
+    "End"
+   ]
+  },
+  {
+   "keys": [
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u",
+    "C-u"
+   ]
+  },
+  {
+   "wait": 0.6
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "keys": [
+    "C-d"
+   ]
+  },
+  {
+   "wait": 2.5
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 0.18,
+   "step": "paste",
+   "detail": "385 chars, 19 breaks, raw=False"
+  },
+  {
+   "t": 2.35,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 2.37,
+   "step": "screen",
+   "detail": "pasted"
+  },
+  {
+   "t": 2.38,
+   "step": "keys",
+   "detail": "C-g"
+  },
+  {
+   "t": 5.54,
+   "step": "wait",
+   "detail": "3.0"
+  },
+  {
+   "t": 5.55,
+   "step": "keys",
+   "detail": "End"
+  },
+  {
+   "t": 5.71,
+   "step": "keys",
+   "detail": "C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u C-u"
+  },
+  {
+   "t": 6.48,
+   "step": "wait",
+   "detail": "0.6"
+  },
+  {
+   "t": 6.49,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 7.64,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 7.65,
+   "step": "keys",
+   "detail": "C-d"
+  },
+  {
+   "t": 10.31,
+   "step": "wait",
+   "detail": "2.5"
+  }
+ ]
+}

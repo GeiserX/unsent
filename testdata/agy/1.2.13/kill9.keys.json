@@ -1,0 +1,108 @@
+{
+ "name": "kill9",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "kill nine draft zebra"
+  },
+  {
+   "keys": [
+    "C-j"
+   ]
+  },
+  {
+   "type": "second row of it"
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "before-kill"
+  },
+  {
+   "kill": "pkill -9 -f \"/Volumes/Data/unsent-072.VIQD/bin/agy\""
+  },
+  {
+   "wait": 2.0
+  },
+  {
+   "screen": "after-kill"
+  },
+  {
+   "sh": "sleep 1; ps -o pid,stat,command -ax | grep -E 'bin/agy|bin/unsent' | grep -v grep; echo '--- the draft anywhere under the scratch home?'; grep -rl 'kill nine draft zebra' \"$RIG/home\" \"$RIG/tmp\" 2>/dev/null | sed \"s|$RIG|RIG|\"; echo '(nothing above means it is in no file)'",
+   "save": "k9-after"
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.69,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.7,
+   "step": "type",
+   "detail": "kill nine draft zebra"
+  },
+  {
+   "t": 1.86,
+   "step": "keys",
+   "detail": "C-j"
+  },
+  {
+   "t": 2.02,
+   "step": "type",
+   "detail": "second row of it"
+  },
+  {
+   "t": 3.18,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 3.19,
+   "step": "screen",
+   "detail": "before-kill"
+  },
+  {
+   "t": 3.21,
+   "step": "kill",
+   "detail": "pkill -9 -f \"/Volumes/Data/unsent-072.VIQD/bin/agy\" -> "
+  },
+  {
+   "t": 5.37,
+   "step": "wait",
+   "detail": "2.0"
+  },
+  {
+   "t": 5.37,
+   "step": "screen",
+   "detail": "after-kill"
+  },
+  {
+   "t": 6.55,
+   "step": "sh",
+   "detail": "k9-after"
+  }
+ ]
+}

@@ -451,12 +451,16 @@ func fuzzSeeds() int64 {
 // line breaks: at 150 seeds 62% of its saves are identical, against 56%
 // for Claude Code, but only 56% at 4 seeds. pi's box scrolls a row at a
 // time too, with no end row; with repeated words 50% of its saves are
-// identical at 4 seeds, against 59% at 50 and 150.
+// identical at 4 seeds, against 59% at 50 and 150. agy's box scrolls a
+// row at a time and wraps as pi's does, but it is half the window high,
+// so fewer rows are out of sight at once: 90.4% of its saves are
+// byte-exact at 4 seeds, 90.2% at 50 and 88.7% at 150, so its floor is
+// the same 0.88 as the others'.
 //
 // Every one of these runs is independent: its own simulator, its own
 // stitcher, its own seeds, and nothing shared but the profile it reads.
 // So they run in parallel, both tests at once, and the fuzz costs the
-// busiest core rather than the sum of all twelve.
+// busiest core rather than the sum of all sixteen.
 
 // fuzzFloors are the floors each mode's rates must stay above.
 type fuzzFloors struct {
@@ -473,6 +477,7 @@ func TestStitchFuzzUniqueWords(t *testing.T) {
 		{&claude, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.95, 0.86, 0.55}}},
 		{&codex, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.96, 0.87, 0.56}}},
 		{&pi, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.97, 0.87, 0.56}}},
+		{&agy, []fuzzFloors{{"exact", 0.995, 0.88, 0.56}, {"window", 0.99, 0.88, 0.56}, {"unlimited", 0.96, 0.86, 0.56}}},
 	} {
 		for _, m := range c.floors {
 			t.Run(c.prof.name+"/"+m.mode, func(t *testing.T) {
@@ -496,6 +501,7 @@ func TestStitchFuzzRepeatedWords(t *testing.T) {
 		{&claude, fuzzFloors{"window", 0.95, 0.84, 0.56}},
 		{&codex, fuzzFloors{"window", 0.94, 0.84, 0.63}},
 		{&pi, fuzzFloors{"window", 0.95, 0.85, 0.50}},
+		{&agy, fuzzFloors{"window", 0.95, 0.84, 0.50}},
 	} {
 		t.Run(c.prof.name, func(t *testing.T) {
 			t.Parallel()
@@ -846,5 +852,83 @@ func TestStitchEmptyTopRowReplacesTheSameBreak(t *testing.T) {
 	got := st.update(view{rows: []string{"", "three four five"}, width: 40, capped: true, cursor: 1, cursorEnd: true}, claude.unwrap)
 	if want := "one two\n\nthree four five"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// A paste placeholder is one segment to fitWrap, so it cannot move down
+// whole when the window is narrower than it is: it takes rows of its own,
+// broken at the edge. Reading it back through wrapLine instead would find
+// the same placeholder again and recurse until the stack went, which is
+// unsent losing the draft it exists to keep.
+func TestFitWrapPlaceholderWiderThanARow(t *testing.T) {
+	w := fitWrap{agyPastePlaceholder}
+	line := "ab [Pasted text #1 +16 lines] cd"
+	rows, starts := w.wrap(line, 12)
+	wantRows := []string{"ab", "[Pasted text", " #1 +16 line", "s] cd"}
+	wantStarts := []int{0, 3, 15, 27}
+	if !slices.Equal(rows, wantRows) || !slices.Equal(starts, wantStarts) {
+		t.Fatalf("rows %q at %v, want %q at %v", rows, starts, wantRows, wantStarts)
+	}
+	for i, r := range rows {
+		if line[starts[i]:starts[i]+len(r)] != r {
+			t.Errorf("row %d %q does not sit at %d", i, r, starts[i])
+		}
+		if runewidth.StringWidth(r) > 12 {
+			t.Errorf("row %d %q is %d columns wide", i, r, runewidth.StringWidth(r))
+		}
+	}
+	// A wide character is never split, so a one-column box gives it a row
+	// of its own rather than no row at all.
+	rows, starts = w.wrap("a漢b", 1)
+	if want := []string{"a", "漢", "b"}; !slices.Equal(rows, want) || !slices.Equal(starts, []int{0, 1, 4}) {
+		t.Fatalf("one column: %q at %v", rows, starts)
+	}
+}
+
+// An empty box unwraps to an empty draft, not to a panic on rows[0].
+func TestFitWrapUnwrapNoRows(t *testing.T) {
+	w := fitWrap{agyPastePlaceholder}
+	if got := w.unwrap(nil, 20); got != "" {
+		t.Fatalf("no rows: %q", got)
+	}
+	if got := w.unwrap([]string{"one row"}, 20); got != "one row" {
+		t.Fatalf("one row: %q", got)
+	}
+}
+
+// A view scrolled past the middle of a word longer than a row starts
+// mid-word: the stretch it lines up with is that word and what follows,
+// not a new word typed above the next one. Taking it as new would keep
+// the whole long word above the view and show its visible part again,
+// doubling those characters in the draft.
+func TestAlignScrolledIntoALongWord(t *testing.T) {
+	const width, shown = 16, 16
+	long := strings.Repeat("x", 64)
+	text := "aaa " + long + " bbb ccc ddd eee"
+	old := words(text)
+	seen := words(strings.Repeat("x", shown) + " bbb ccc ddd eee")
+	// The last view began where this one does, three rows into the word.
+	shownA := old[1].end - shown
+	if p, q, shared := align(old, seen, shownA, len(text), width, 0); p != 1 || q != 6 || shared != 4 {
+		t.Fatalf("p=%d q=%d shared=%d, want the long word and what follows (1, 6, 4)", p, q, shared)
+	}
+}
+
+// The same case through the stitcher, with the rows agy would draw: the
+// view is scrolled three rows into the long word and nothing changed, so
+// the draft must come back exactly as it was.
+func TestStitchScrolledIntoALongWordDoesNotDouble(t *testing.T) {
+	const width = 16
+	long := strings.Repeat("x", 64)
+	text := "aaa " + long + " bbb ccc ddd eee"
+	rows, starts := agy.unwrap.wrap(text, width)
+	top := len(rows) - 2
+	if half := len("aaa ") + len(long)/2; starts[top] <= half || starts[top] >= len("aaa ")+len(long) {
+		t.Fatalf("row %d starts at %d, not past the middle of the long word (%d)", top, starts[top], half)
+	}
+	st := stitcher{text: text, a: starts[top], b: len(text)}
+	got := st.update(view{rows: rows[top:], width: width, capped: true, cursor: 1}, agy.unwrap)
+	if got != text {
+		t.Fatalf("got %q,\nwant %q", got, text)
 	}
 }

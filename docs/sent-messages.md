@@ -1,6 +1,6 @@
 # Sent messages
 
-Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. For Claude Code and Codex the log belongs to the conversation (pi's is one per run): resume it (`claude --resume`, `claude -c`, the resume picker or `/resume`; `codex resume <id>`, `codex resume --last` or its picker) and new messages join the same log, after a line saying when it was resumed. `unsent log <id>` also takes the agent's own id for the conversation: Claude Code's session id, or Codex's thread id. After you start a new session, the old one's messages are one command away:
+Every message you send goes to that session's sent log, in order, with its time and with pastes expanded. For Claude Code, Codex and agy the log belongs to the conversation (pi's is one per run): resume it (`claude --resume`, `claude -c`, the resume picker or `/resume`; `codex resume <id>`, `codex resume --last` or its picker; `agy -c` or `agy --conversation <id>`) and new messages join the same log, after a line saying when it was resumed. `unsent log <id>` also takes the agent's own id for the conversation: Claude Code's session id, Codex's thread id, or agy's conversation id. An agy conversation is created by its own first message, so that message is in the log of the run that sent it and the conversation's log starts with the second. After you start a new session, the old one's messages are one command away:
 
 ```sh
 unsent log                 # sessions with sent messages, newest first
@@ -30,4 +30,4 @@ unsent forget --log 20260927-101500-4242   # delete one session's sent log, by t
 
 A send and a clear both empty the box, and the key you pressed tells them apart. A draft counts as sent only when Enter was the last key before the box emptied, with no Ctrl+C or Esc Esc next to it, and the box was on screen when you pressed it. Typing the next message into the emptied box doesn't change that. When `unsent` can't be sure, it treats the draft as cleared and keeps it in history. A missed send costs one history entry, never text.
 
-To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_CLAUDE=delete` does the same for Claude Code alone, `UNSENT_ON_SEND_CODEX=delete` for Codex alone and `UNSENT_ON_SEND_PI=delete` for pi alone; each wins over `UNSENT_ON_SEND`. Turning it off doesn't delete existing logs; `unsent forget --log` does.
+To keep nothing of what you send, set `UNSENT_ON_SEND=delete`. `UNSENT_ON_SEND_CLAUDE=delete` does the same for Claude Code alone, `UNSENT_ON_SEND_CODEX=delete` for Codex, `UNSENT_ON_SEND_PI=delete` for pi and `UNSENT_ON_SEND_AGY=delete` for agy; each wins over `UNSENT_ON_SEND`. Turning it off doesn't delete existing logs; `unsent forget --log` does.

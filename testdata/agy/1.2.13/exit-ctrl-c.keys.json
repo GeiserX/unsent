@@ -1,0 +1,119 @@
+{
+ "name": "exit-ctrl-c",
+ "size": [
+  120,
+  40
+ ],
+ "cmd": [
+  "/Volumes/Data/unsent-072.VIQD/bin/unsent",
+  "capture",
+  "agy"
+ ],
+ "steps": [
+  {
+   "until": "\\? for shortcuts",
+   "timeout": 120
+  },
+  {
+   "wait": 1.5
+  },
+  {
+   "type": "a draft that the exit throws away"
+  },
+  {
+   "wait": 0.8
+  },
+  {
+   "screen": "draft"
+  },
+  {
+   "keys": [
+    "C-c"
+   ]
+  },
+  {
+   "wait": 1.0
+  },
+  {
+   "screen": "one-ctrl-c"
+  },
+  {
+   "keys": [
+    "C-c"
+   ]
+  },
+  {
+   "wait": 2.5
+  },
+  {
+   "screen": "after-exit",
+   "scroll": 60
+  },
+  {
+   "sh": "tmux -L unsent-072 display -p -t $SESS 'dead=#{pane_dead} status=#{pane_dead_status}'; pgrep -fl \"$RIG/bin/agy\" || echo 'no agy left'; echo '--- the draft anywhere under the scratch home?'; grep -rl 'a draft that the exit throws away' \"$RIG/home\" \"$RIG/tmp\" 2>/dev/null | sed \"s|$RIG|RIG|\"; echo '(nothing above means it is in no file)'",
+   "save": "exit"
+  }
+ ],
+ "log": [
+  {
+   "t": 0.18,
+   "step": "until",
+   "detail": "\\? for shortcuts"
+  },
+  {
+   "t": 1.68,
+   "step": "wait",
+   "detail": "1.5"
+  },
+  {
+   "t": 1.69,
+   "step": "type",
+   "detail": "a draft that the exit throws away"
+  },
+  {
+   "t": 2.64,
+   "step": "wait",
+   "detail": "0.8"
+  },
+  {
+   "t": 2.65,
+   "step": "screen",
+   "detail": "draft"
+  },
+  {
+   "t": 2.66,
+   "step": "keys",
+   "detail": "C-c"
+  },
+  {
+   "t": 3.82,
+   "step": "wait",
+   "detail": "1.0"
+  },
+  {
+   "t": 3.83,
+   "step": "screen",
+   "detail": "one-ctrl-c"
+  },
+  {
+   "t": 3.83,
+   "step": "keys",
+   "detail": "C-c"
+  },
+  {
+   "t": 6.49,
+   "step": "wait",
+   "detail": "2.5"
+  },
+  {
+   "t": 6.5,
+   "step": "screen",
+   "detail": "after-exit"
+  },
+  {
+   "t": 6.66,
+   "step": "sh",
+   "detail": "exit"
+  }
+ ]
+}

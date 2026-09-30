@@ -1,0 +1,40 @@
+   [38;5;78m▄[48;5;74m▀[38;5;73m▀[39m[49m    [38;5;68m[48;5;69m▀▀[49m▄[39m     [90m/Volumes/Data/unsent-072.VIQD/work[39m
+  [38;5;75m▄[38;5;79m[48;5;75m▀[38;5;75m[49m▀[39m      [38;5;69m▀[48;5;69m▀[49m▄[39m
+
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[94m>[39m
+[90m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;69mAntigravity CLI[39m   [90mgeneral[39m    [1;4m[94mcommands[0m    [90mshortcuts[39m [90m  (←/→ or tab to cycle)[39m
+[1m[37mAvailable Commands[0m
+
+[94m> /add-dir[39m                        [2mAdd a directory to the workspace[0m
+  /agents                         [2mList available custom agents[0m
+  /artifact                       [2mView and review artifacts[0m
+  /btw                            [2mAsk a side question without interrupting the current task[0m
+  /changelog                      [2mShow release notes and changes[0m
+  /clear (new)                    [2mClear conversation and start a new one[0m
+  /codesearch (cs, search)        [2mSearch code in the workspace (usage: /codesearch <query>)[0m
+  /config (settings)              [2mOpen settings panel[0m
+  /context                        [2mVisualize current context usage[0m
+  /copy                           [2mCopy the last planner response to the clipboard, the n-th with '/copy n', or the /...[0m
+  /credits                        [2mShow remaining G1 credits and purchase link[0m
+  /diff                           [2mView uncommitted changes and per-turn diffs[0m
+  /effort                         [2mSet the reasoning effort[0m
+  /exit (quit)                    [2mExit the CLI[0m
+  /feedback                       [2mSubmit qualitative feedback to improve the agent[0m
+  /fork (branch)                  [2mCreate a branch of the current conversation at this point, optionally specifying a...[0m
+  /help                           [2mShow available commands and keybindings[0m
+  /hooks                          [2mManage hook configurations for tool events[0m
+  /keybindings                    [2mSet custom keybindings[0m
+  /logout                         [2mLog out[0m
+  /mcp                            [2mManage MCP servers[0m
+  /model                          [2mSet a model, or run a single prompt on another model[0m
+  /open                           [2mOpen a file or view opened/edited files[0m
+  /permissions                    [2mManage tool permissions[0m
+  /remote-control                 [2mTurn on remote control for this session (off to disable)[0m
+  /rename                         [2mRename the current conversation[0m
+[90m  [1-26 of 44 items][39m
+
+[1mKeyboard: [0m[94m↑/↓[39m [90mNavigate[39m  [94m←/→[39m [90mSwitch View[39m  [94mesc[39m [90mClose[39m
+
+                                                                                                    [2mGemini 3.1 Pro · low
