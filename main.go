@@ -768,7 +768,16 @@ func cmdForget(args []string, stdout, stderr io.Writer) int {
 	if l == nil {
 		return 2
 	}
-	if err := os.Remove(l.path); err != nil {
+	// Under the log's lock: a context pass between its read and its write
+	// would put the whole log back.
+	unlock, err := lockSent(l.path)
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
+	}
+	err = os.Remove(l.path)
+	unlock()
+	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 1
 	}

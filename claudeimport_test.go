@@ -344,6 +344,46 @@ func TestContextKeepsAConcurrentSend(t *testing.T) {
 	}
 }
 
+// forget --log takes the log's lock: run while a context pass rewrites the
+// log, it waits for the rewrite and the log stays gone. Without the lock the
+// rewrite's rename puts the whole log back after forget said it was
+// deleted.
+func TestForgetLogWaitsForAContextPass(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-b", "claude", "/w", t0)
+	r.AgentSession, r.Draft = ctxConv, "forget me"
+	if err := st.logSentAt(r, t0); err != nil {
+		t.Fatal(err)
+	}
+	writeTurns(t, cfg, "-w", ctxConv,
+		claudeTurn{UUID: "f-1", Kind: "typed", Time: t0, Text: "forget me", SessionID: ctxConv},
+		claudeTurn{UUID: "f-2", Kind: "answer", Time: t0.Add(time.Minute), Text: "Q → A", SessionID: ctxConv})
+	done := make(chan int, 1)
+	mergeHook = func(string) {
+		go func() {
+			code, _, _ := runCLI("forget", "--log", ctxConv)
+			done <- code
+		}()
+		select {
+		case code := <-done:
+			done <- code // forget did not wait
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	t.Cleanup(func() { mergeHook = nil })
+	if code, out, errOut := runCLI("context", "--config-dir", cfg); code != 0 {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
+	}
+	if code := <-done; code != 0 {
+		t.Fatalf("forget: exit %d", code)
+	}
+	if exists(st.claudeLogPath(ctxConv)) {
+		t.Fatal("the forgotten log came back")
+	}
+}
+
 // import makes a log for a transcript that has none, with the header a live
 // run would write, from the turns inside sentMaxAge only, and never reads
 // the folders beside a transcript.
