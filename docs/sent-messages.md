@@ -18,7 +18,7 @@ unsent forget --log 20260927-101500-4242   # delete one session's sent log, by t
 | --- | --- |
 | `format` | the version of this shape, now `1` |
 | `n` | the number `unsent log` takes |
-| `id` | unsent's id for the run that started the log |
+| `id` | unsent's id for the run that started the log, or `claude-<session id>` for a log that `unsent import claude` made |
 | `agent`, `agent_session` | the agent, and its own id of the conversation, `""` when unknown |
 | `folder` | the folder the session ran in, as a real path |
 | `started`, `updated` | when the session started and when its last message was sent, RFC 3339 times with the offset |
@@ -32,7 +32,7 @@ A message of a Claude Code conversation can also carry its [context](context.md)
 | --- | --- |
 | `uuid` | the id of the turn in Claude Code's transcript |
 | `kind` | `typed`, `queued`, `absorbed`, `answer` or `slash`; `""` for a message read off the box live |
-| `asked` | the agent's text right before the message, cut to 1,000 characters |
+| `asked` | the agent's text right before the message, its last 1,000 characters |
 | `reply_to` | `true` when the message answers the agent |
 | `gloss` | one line on what was asked and what was chosen, set by `unsent context add` |
 | `source` | `""` when read off the box, `transcript` or `history` when backfilled |

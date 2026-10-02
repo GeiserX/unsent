@@ -10,7 +10,7 @@ Each message in a sent log can carry these fields. A message with none of them i
 
 | Field | What it holds |
 | --- | --- |
-| `asked` | the agent's text right before your message: every text block of its last reply, cut to 1,000 characters. `""` when your message followed another of yours with no reply between them. |
+| `asked` | the agent's text right before your message: every text block of its last reply, keeping the last 1,000 characters, since a question comes at the end. For an `answer`, the questions it answers. `""` when your message followed another of yours with no reply between them. |
 | `reply_to` | `true` when the message answers the agent: an answer to one of its questions, or `asked` ends with a line that ends in `?` |
 | `kind` | how the message reached the agent, below. `""` for a message `unsent` read off the box live. |
 | `uuid` | the id of the turn in Claude Code's transcript. `unsent` uses it so a turn is never added twice. |
@@ -41,14 +41,23 @@ Messages that Claude Code or another program sends on your behalf are not your t
 
 ```sh
 unsent context                       # add context to every Claude Code sent log that exists
-unsent context --session <id>        # one conversation, by Claude Code's session id
+unsent context --session <session>   # one conversation: a number from unsent log, its id or Claude Code's session id
 unsent context --transcript <path>   # one transcript file
 unsent import claude                 # also create logs for conversations unsent never saw
 unsent import claude --history       # and for conversations only history.jsonl remembers
 unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to drop it"
 ```
 
-`unsent context` matches each logged message to its turn in the transcript by its text, with spaces collapsed, and fills in `uuid`, `kind`, `asked` and `reply_to`. Turns that are not in the log, usually answers and absorbed prompts, are added with `source` `transcript`. A gloss already written is kept. It prints one line, such as `3 logs updated, 12 messages added, 87 matched`; `--json` prints `{"logs":3,"added":12,"matched":87,"skipped":0}` instead.
+`unsent context` matches each logged message to its turn in the transcript by its text, with spaces collapsed, and fills in `uuid`, `kind`, `asked` and `reply_to`. Turns that are not in the log, usually answers and absorbed prompts, are added with `source` `transcript`. A gloss already written is kept. It prints one line, such as `3 logs updated, 12 messages added, 87 matched`. `--json` prints the same counts as an object, with `skipped` added: turns older than 365 days or with no uuid, and transcripts it could not read.
+
+```json
+{
+  "logs": 3,
+  "added": 12,
+  "matched": 87,
+  "skipped": 0
+}
+```
 
 `--config-dir DIR` adds a Claude Code config folder to read, and can be given more than once. Without it, `unsent` reads `$CLAUDE_CONFIG_DIR` when it is set, and `~/.claude`. Two config folders that share one `projects` folder through a symlink are read once.
 
@@ -69,13 +78,13 @@ the second one, and keep the tests
   ↳ why: Asked whether to split the parser out; chose its own package, tests kept
 ```
 
-The `answering` line shows the first line of `asked`, cut to 200 characters, and only when `reply_to` is true. The `why` line shows the gloss. `unsent log <n> --json` carries all six fields on each message, each left out when empty. [Sent messages](sent-messages.md) has the rest of the shape.
+The `answering` line shows the last line of `asked` that has text, where the question is, cut to 200 characters, and only when `reply_to` is true. The `why` line shows the gloss. `unsent log <n> --json` carries all six fields on each message, each left out when empty. [Sent messages](sent-messages.md) has the rest of the shape.
 
 ## The Stop hook
 
 `unsent hook claude` prints a Stop hook next to the SessionStart hook described in [Using unsent](usage.md#a-note-for-claude-code-when-you-reopen-a-conversation). Add both to `settings.json`; `unsent` never edits that file.
 
-Claude Code runs the Stop hook each time it finishes a reply. The hook reads the transcript path Claude Code hands it, checks that it is a `.jsonl` file in a `projects` folder, starts `unsent context --transcript <path>` in the background and exits at once. Claude Code never waits for it. When on send is `delete` for Claude Code, the hook does nothing.
+Claude Code runs the Stop hook each time it finishes a reply. The hook reads the transcript path Claude Code hands it, checks that it is a `.jsonl` file in a `projects` folder, starts `unsent context --transcript <path>` in the background and exits at once. Claude Code never waits for it. A pass the hook starts is skipped when the last pass over that transcript ran less than 10 minutes ago, so run `unsent context` yourself when you want the newest turns at once. When on send is `delete` for Claude Code, the hook does nothing.
 
 Without the hook, run `unsent context` yourself, or let the skill run it.
 

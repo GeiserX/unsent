@@ -28,7 +28,7 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 - Recovers long drafts that scroll inside the box, and big pastes shown as placeholders.
 - Keeps a log of the messages you sent, and a history of drafts you cleared or replaced.
 - Adds context to Claude Code messages: what the agent had just said or asked when you answered, read from its transcript.
-- Imports every message you ever sent to Claude Code into the sent log, once, with `unsent import claude`.
+- Imports the messages you sent to Claude Code in the last year into the sent log, once, with `unsent import claude`.
 - Saves your half-typed zsh command line too.
 - `list --json`, `show --json` and `log --json` for scripts and agents.
 - Works in any terminal app, tmux and SSH. Drafts stay on your machine; `unsent` makes no network connections.
