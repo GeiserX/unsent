@@ -130,13 +130,6 @@ func joinSentLog(head []byte, lines []*sentLine) []byte {
 	return out
 }
 
-// normText is the text compared when a message is matched to a turn:
-// whitespace collapsed and trimmed (a tab counts as four spaces, which then
-// collapse with the rest).
-func normText(s string) string {
-	return strings.Join(strings.Fields(strings.ReplaceAll(s, "\t", "    ")), " ")
-}
-
 // mergeHook runs between a merge's read and its write; a test appends
 // there, as a send would, to check the lock keeps it.
 var mergeHook func(path string)
@@ -228,11 +221,11 @@ func mergeSent(path string, head *sentHeader, msgs []sentMessage) (contextResult
 // nearestMatch is the message of lines with no uuid whose normalised text
 // equals m's, nearest to m in time; nil when there is none.
 func nearestMatch(lines []*sentLine, m sentMessage) *sentLine {
-	want := normText(m.Text)
+	want := normaliseSent(m.Text)
 	var best *sentLine
 	var gap time.Duration
 	for _, l := range lines {
-		if l.kind != sentLineMessage || l.msg.UUID != "" || normText(l.msg.Text) != want {
+		if l.kind != sentLineMessage || l.msg.UUID != "" || normaliseSent(l.msg.Text) != want {
 			continue
 		}
 		d := l.msg.Time.Sub(m.Time).Abs()
@@ -483,6 +476,7 @@ type contextOptions struct {
 	transcript string
 	history    bool
 	json       bool
+	fromHook   bool // the Stop hook started the pass (contextDebounced)
 }
 
 func parseContextOptions(args []string, allowed ...string) (contextOptions, error) {
@@ -509,6 +503,8 @@ func parseContextOptions(args []string, allowed ...string) (contextOptions, erro
 			o.json = true
 		case "--history":
 			o.history = true
+		case "--from-hook":
+			o.fromHook = true
 		case "--config-dir":
 			var d string
 			d, err = value()
@@ -524,6 +520,9 @@ func parseContextOptions(args []string, allowed ...string) (contextOptions, erro
 	}
 	if o.session != "" && o.transcript != "" {
 		return o, errors.New("--session and --transcript do not go together")
+	}
+	if o.fromHook && o.transcript == "" {
+		return o, errors.New("--from-hook needs --transcript")
 	}
 	return o, nil
 }
@@ -543,7 +542,7 @@ func cmdContext(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "add" {
 		return cmdContextAdd(args[1:], stdin, stdout, stderr)
 	}
-	o, err := parseContextOptions(args, "--config-dir", "--session", "--transcript", "--json")
+	o, err := parseContextOptions(args, "--config-dir", "--session", "--transcript", "--json", "--from-hook")
 	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 2
@@ -568,6 +567,9 @@ func cmdContext(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		files = []transcriptFile{{o.transcript, strings.TrimSuffix(filepath.Base(o.transcript), ".jsonl")}}
+		if o.fromHook && st.contextDebounced(o.transcript, time.Now()) {
+			return printContextResult(o, contextResult{}, stdout, stderr)
+		}
 	default:
 		all := claudeTranscripts(claudeConfigDirs(o.configDirs))
 		if o.session != "" {
@@ -602,7 +604,45 @@ func cmdContext(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 1
 	}
+	if o.transcript != "" {
+		st.markContextPass(o.transcript, time.Now())
+	}
 	return printContextResult(o, res, stdout, stderr)
+}
+
+// contextDebounce is how long after a pass over a transcript a pass the
+// Stop hook starts on it is skipped: a busy conversation ends a turn every
+// few seconds, and each pass reads the whole transcript.
+const contextDebounce = 10 * time.Minute
+
+// contextStatePath is the file that records the last pass over transcript:
+// sent/.context-<its name without .jsonl>.state.
+func (s *store) contextStatePath(transcript string) string {
+	return filepath.Join(s.dir, "sent", ".context-"+strings.TrimSuffix(filepath.Base(transcript), ".jsonl")+".state")
+}
+
+// contextDebounced reports whether a pass over transcript ran less than
+// contextDebounce before now. A state file that does not parse, or a time
+// after now (a clock step back), never skips.
+func (s *store) contextDebounced(transcript string, now time.Time) bool {
+	b, err := os.ReadFile(s.contextStatePath(transcript))
+	if err != nil {
+		return false
+	}
+	last, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(b)))
+	if err != nil {
+		return false
+	}
+	age := now.Sub(last)
+	return age >= 0 && age < contextDebounce
+}
+
+// markContextPass records a pass over transcript at now.
+func (s *store) markContextPass(transcript string, now time.Time) {
+	p := s.contextStatePath(transcript)
+	if os.MkdirAll(filepath.Dir(p), 0o700) == nil {
+		writeFileDurable(p, []byte(now.UTC().Format(time.RFC3339Nano)+"\n"))
+	}
 }
 
 // cmdImport is `unsent import claude`: the one-off backfill of every

@@ -310,7 +310,7 @@ func TestHookClaudeStopStartsTheContextPass(t *testing.T) {
 	if out := runHook(t, stopJSON(hookConv, good, work)); out != "" {
 		t.Fatalf("the Stop hook printed %q", out)
 	}
-	want := [][]string{{"/usr/local/bin/unsent", "context", "--transcript", good}}
+	want := [][]string{{"/usr/local/bin/unsent", "context", "--transcript", good, "--from-hook"}}
 	if !reflect.DeepEqual(*got, want) {
 		t.Fatalf("spawned %q, want %q", *got, want)
 	}

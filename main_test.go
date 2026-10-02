@@ -633,7 +633,7 @@ func seedSentJSON(t *testing.T) *store {
 	// and a gloss; the log's time stays now, so the seed never ages out.
 	if _, err := mergeSent(path, nil, []sentMessage{{
 		Time: at(41), Text: "carry on", UUID: "seed-uuid-3", Kind: "typed",
-		Asked: "\nShall I go on with the parser?\nOr stop here?", ReplyTo: true, Source: "transcript",
+		Asked: "I split the lexer out.\n\nShall I go on with the parser?\n  \n", ReplyTo: true, Source: "transcript",
 	}}); err != nil {
 		t.Fatal(err)
 	}

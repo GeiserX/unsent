@@ -408,6 +408,23 @@ func TestContextAdd(t *testing.T) {
 	}
 }
 
+// The answering line is the last line of asked with text, cut to 200
+// characters, never inside one.
+func TestAnsweringLine(t *testing.T) {
+	long := strings.Repeat("é", answeringMax+20)
+	for _, c := range []struct{ asked, want string }{
+		{"First.\nSecond?", "Second?"},
+		{"Which one?\n\n \t\n", "Which one?"},
+		{"  only line  ", "only line"},
+		{"\n\n", ""},
+		{"head\n" + long, strings.Repeat("é", answeringMax)},
+	} {
+		if got := answeringLine(c.asked); got != c.want {
+			t.Errorf("answeringLine(%q) = %q, want %q", c.asked, got, c.want)
+		}
+	}
+}
+
 // unsent log shows the line a message answered and its gloss under it, and
 // log --json carries the context fields.
 func TestCLILogShowsContext(t *testing.T) {
@@ -429,5 +446,134 @@ func TestCLILogShowsContext(t *testing.T) {
 	m := one.Messages[len(one.Messages)-1].sentMessageJSON
 	if m.UUID != "seed-uuid-3" || m.Kind != "typed" || !m.ReplyTo || m.Gloss == "" || !strings.Contains(m.Asked, "Shall I go on") || m.Source != "" {
 		t.Fatalf("message %+v", m)
+	}
+}
+
+// A pass the Stop hook starts (--from-hook) is skipped while the last pass
+// over that transcript is under 10 minutes old, and writes the record after
+// it runs; an explicit run never skips; a record 10 minutes old, from the
+// future or unreadable skips nothing, and pruneSent drops the stale ones.
+func TestContextFromHookIsDebounced(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-9", "claude", "/w", t0)
+	r.AgentSession, r.Draft = ctxConv, "hello"
+	st.logSentAt(r, t0)
+	one := claudeTurn{UUID: "h-1", Kind: "typed", Time: t0.Add(time.Second), Text: "hello", SessionID: ctxConv}
+	two := claudeTurn{UUID: "h-2", Kind: "queued", Time: t0.Add(time.Minute), Text: "and this", SessionID: ctxConv}
+	three := claudeTurn{UUID: "h-3", Kind: "queued", Time: t0.Add(2 * time.Minute), Text: "and that", SessionID: ctxConv}
+	four := claudeTurn{UUID: "h-4", Kind: "queued", Time: t0.Add(3 * time.Minute), Text: "and more", SessionID: ctxConv}
+	p := writeTurns(t, cfg, "-w", ctxConv, one)
+	state := st.contextStatePath(p)
+	if exists(state) {
+		t.Fatal("a record before any pass")
+	}
+	pass := func(args ...string) string {
+		t.Helper()
+		code, out, errOut := runCLI(append([]string{"context", "--transcript", p}, args...)...)
+		if code != 0 {
+			t.Fatalf("%q: exit %d, %q", args, code, errOut)
+		}
+		return out
+	}
+	if out := pass("--from-hook"); out != "1 logs updated, 0 messages added, 1 matched\n" || !exists(state) {
+		t.Fatalf("first hook pass: %q, record %v", out, exists(state))
+	}
+	writeTurns(t, cfg, "-w", ctxConv, one, two)
+	if out := pass("--from-hook"); out != "0 logs updated, 0 messages added, 0 matched\n" {
+		t.Fatalf("a hook pass inside 10 minutes ran: %q", out)
+	}
+	if out := pass(); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("an explicit pass skipped: %q", out)
+	}
+	for name, at := range map[string]time.Time{
+		"10 minutes old":  time.Now().Add(-contextDebounce),
+		"from the future": time.Now().Add(time.Hour),
+	} {
+		os.WriteFile(state, []byte(at.UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+		if st.contextDebounced(p, time.Now()) {
+			t.Errorf("a record %s skips", name)
+		}
+	}
+	os.WriteFile(state, []byte("not a time\n"), 0o600)
+	writeTurns(t, cfg, "-w", ctxConv, one, two, three)
+	if out := pass("--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("an unreadable record skipped: %q", out)
+	}
+	os.WriteFile(state, []byte(time.Now().Add(-11*time.Minute).UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+	writeTurns(t, cfg, "-w", ctxConv, one, two, three, four)
+	if out := pass("--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("a hook pass after 11 minutes skipped: %q", out)
+	}
+	if code, _, _ := runCLI("context", "--from-hook"); code != 2 {
+		t.Fatalf("--from-hook with no transcript: exit %d", code)
+	}
+	stale := st.contextStatePath("/x/projects/-w/" + ctxOther + ".jsonl")
+	os.WriteFile(stale, []byte("x\n"), 0o600)
+	old := time.Now().Add(-contextDebounce - time.Minute)
+	os.Chtimes(stale, old, old)
+	st.pruneSent()
+	if exists(stale) || !exists(state) {
+		t.Fatalf("after pruning: stale record kept %v, fresh record kept %v", exists(stale), exists(state))
+	}
+}
+
+// import claude end to end through the real transcript reader: the fixture
+// session, its dates moved inside sentMaxAge, becomes a log holding every
+// turn with its kind and what it answered; a live message with the same
+// text is matched, not doubled; a second pass changes nothing.
+func TestImportClaudeReadsARealTranscript(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	st := testStore(t)
+	const conv = "00000000-0000-4000-8000-0000000000aa"
+	data, err := os.ReadFile(filepath.Join("testdata", "claude", "transcripts", "session.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	day := time.Now().Add(-48 * time.Hour).UTC().Format("2006-01-02")
+	data = bytes.ReplaceAll(data, []byte("2026-03-01T"), []byte(day+"T"))
+	dir := filepath.Join(cfg, "projects", claudeSlug("/work/demo"))
+	os.MkdirAll(dir, 0o700)
+	if err := os.WriteFile(filepath.Join(dir, conv+".jsonl"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sent, _ := time.Parse(time.RFC3339, day+"T10:00:02Z")
+	r := testRecord("20261001-100000-5", "claude", "/work/demo", sent.Add(-time.Minute))
+	r.AgentSession, r.Draft = conv, "List the files in the demo folder"
+	if err := st.logSentAt(r, sent); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errOut := runCLI("import", "claude", "--config-dir", cfg); code != 0 || out != "1 logs updated, 4 messages added, 1 matched\n" {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
+	}
+	l, err := readSent(st.claudeLogPath(conv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.AgentSession != conv || len(l.messages) != 5 || l.messages[0].Source != "" {
+		t.Fatalf("header %+v, messages %+v", l.sentHeader, l.messages)
+	}
+	var kinds []string
+	for i, m := range l.messages {
+		kinds = append(kinds, m.Kind)
+		if m.UUID == "" || (i > 0 && m.Source != "transcript") {
+			t.Fatalf("message %+v", m)
+		}
+	}
+	if !slices.Equal(kinds, []string{"typed", "typed", "absorbed", "answer", "slash"}) {
+		t.Fatalf("kinds %q", kinds)
+	}
+	if m := l.messages[1]; m.Asked != "There are three files. Want me to open the biggest?" || !m.ReplyTo {
+		t.Fatalf("second message %+v", m)
+	}
+	_, text, _ := runCLI("log", conv)
+	if !strings.Contains(text, "yes, the big one\n  ↳ answering: There are three files. Want me to open the biggest?\n") {
+		t.Fatalf("unsent log:\n%s", text)
+	}
+	if code, out, _ := runCLI("context", "--config-dir", cfg); code != 0 || out != "0 logs updated, 0 messages added, 0 matched\n" {
+		t.Fatalf("second pass: exit %d, %q", code, out)
 	}
 }

@@ -42,14 +42,15 @@ type claudeTurn struct {
 	Kind      string    // "typed" | "queued" | "absorbed" | "answer" | "slash"
 	Time      time.Time // the record's timestamp, UTC
 	Text      string
-	Asked     string // joined assistant text, cut to claudeAskedMax runes, "" if none
+	Asked     string // joined assistant text, its last claudeAskedMax runes, "" if none
 	ReplyTo   bool
 	Cwd       string
 	SessionID string
 	Version   string
 }
 
-// claudeAskedMax is how many runes of the agent's text a turn keeps.
+// claudeAskedMax is how many runes of the agent's text a turn keeps: the
+// last ones, since a question comes at the end.
 const claudeAskedMax = 1000
 
 // claudeTypedSince is the first Claude Code version that marks typed
@@ -295,7 +296,7 @@ func readClaudeTranscript(r io.Reader) ([]claudeTurn, error) {
 		if t.Kind != "answer" {
 			full = strings.TrimSpace(texts[walkAsked(nodes, c.start, c.fallback)])
 		}
-		t.Asked = cutRunes(full, claudeAskedMax)
+		t.Asked = lastRunes(full, claudeAskedMax)
 		t.ReplyTo = t.Kind == "answer" || endsInQuestion(full)
 		turns = append(turns, t)
 	}
@@ -370,22 +371,27 @@ func classify(r *ctRecord) (ctNode, *ctCandidate) {
 			(r.Origin != nil && r.Origin.Kind != "human") {
 			return n, nil
 		}
+		text := c.text()
+		// A slash command record is a turn on every version, marked or
+		// not: 2.1.287 writes /revive with neither origin nor
+		// promptSource.
+		if t := strings.TrimLeft(text, " \t\r\n"); strings.HasPrefix(t, "<command-message>") {
+			n.role = ctHuman
+			return n, turn("slash", slashText(t))
+		}
 		typed := r.Origin != nil || r.PromptSource == "typed" || r.PromptSource == "queued"
 		if !typed && !claudeVersionBefore(r.Version, claudeTypedSince) {
 			return n, nil
 		}
-		text := c.text()
 		if text == "" && !c.has("image") {
+			return n, nil
+		}
+		if harnessText(text) {
 			return n, nil
 		}
 		kind := "typed"
 		if r.PromptSource == "queued" {
 			kind = "queued"
-		}
-		if t := strings.TrimLeft(text, " \t\r\n"); strings.HasPrefix(t, "<command-message>") {
-			kind, text = "slash", slashText(t)
-		} else if harnessText(text) {
-			return n, nil
 		}
 		n.role = ctHuman
 		return n, turn(kind, text)
@@ -560,6 +566,16 @@ func cutRunes(s string, n int) string {
 		i += size
 	}
 	return s[:i]
+}
+
+// lastRunes keeps the last n runes of s.
+func lastRunes(s string, n int) string {
+	i := len(s)
+	for count := 0; i > 0 && count < n; count++ {
+		_, size := utf8.DecodeLastRuneInString(s[:i])
+		i -= size
+	}
+	return s[i:]
 }
 
 // endsInQuestion reports whether the last non-empty line of s ends with

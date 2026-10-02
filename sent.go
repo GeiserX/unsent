@@ -299,8 +299,8 @@ type sentMessage struct {
 	// "typed", "queued", "absorbed" (typed while the agent worked and taken
 	// in mid-turn), "answer" (to the agent's question) or "slash".
 	Kind string `json:"kind,omitempty"`
-	// Asked is the agent's text just before the message, cut to 1000
-	// characters.
+	// Asked is the agent's text just before the message, its last 1000
+	// characters (a question comes at the end).
 	Asked string `json:"asked,omitempty"`
 	// ReplyTo says the message answers Asked: an answer, or text that
 	// ended in a question.
@@ -557,7 +557,9 @@ func sentKind(line []byte) sentLineKind {
 }
 
 // pruneSent deletes sent logs not written for sentMaxAge, then the oldest
-// beyond sentLimit, then the lock files of logs that are gone.
+// beyond sentLimit, then the lock files of logs that are gone and the
+// context pass records (contextStatePath) older than contextDebounce,
+// which no longer skip anything.
 func (s *store) pruneSent() {
 	pattern := filepath.Join(s.dir, "sent", "*.jsonl")
 	names, _ := filepath.Glob(pattern)
@@ -585,6 +587,12 @@ func (s *store) pruneSent() {
 			}
 		}
 		f.Close()
+	}
+	states, _ := filepath.Glob(filepath.Join(s.dir, "sent", ".context-*.state"))
+	for _, p := range states {
+		if fi, err := os.Stat(p); err == nil && time.Since(fi.ModTime()) > contextDebounce {
+			os.Remove(p)
+		}
 	}
 }
 

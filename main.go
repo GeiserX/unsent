@@ -618,7 +618,7 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 	l.walk(func(n int, m sentMessage) {
 		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", n, when(m.Time), m.Text)
 		if m.ReplyTo && m.Asked != "" {
-			fmt.Fprintf(stdout, "  ↳ answering: %s\n", cutRunes(firstRawLine(m.Asked), answeringMax))
+			fmt.Fprintf(stdout, "  ↳ answering: %s\n", answeringLine(m.Asked))
 		}
 		if m.Gloss != "" {
 			fmt.Fprintf(stdout, "  ↳ why: %s\n", m.Gloss)
@@ -680,22 +680,17 @@ type sentMessageJSON struct {
 // characters.
 const answeringMax = 200
 
-// firstRawLine is s's first line with text, trimmed.
-func firstRawLine(s string) string {
-	for l := range strings.SplitSeq(s, "\n") {
-		if l = strings.TrimSpace(l); l != "" {
-			return l
+// answeringLine is the line unsent log quotes above a reply: the last line
+// of asked with text, where the agent's question is, trimmed and cut to
+// answeringMax characters.
+func answeringLine(asked string) string {
+	lines := strings.Split(asked, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if l := strings.TrimSpace(lines[i]); l != "" {
+			return cutRunes(l, answeringMax)
 		}
 	}
 	return ""
-}
-
-// cutRunes cuts s to n characters.
-func cutRunes(s string, n int) string {
-	if r := []rune(s); len(r) > n {
-		return string(r[:n])
-	}
-	return s
 }
 
 // sentResumeJSON marks where a later run reopened the conversation.

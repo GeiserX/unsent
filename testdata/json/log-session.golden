@@ -34,7 +34,7 @@
       "pastes": [],
       "uuid": "seed-uuid-3",
       "kind": "typed",
-      "asked": "\nShall I go on with the parser?\nOr stop here?",
+      "asked": "I split the lexer out.\n\nShall I go on with the parser?\n  \n",
       "reply_to": true,
       "gloss": "finish the refactor before the release"
     }

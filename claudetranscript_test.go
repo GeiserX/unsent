@@ -202,21 +202,26 @@ func TestClaudeTranscriptBlocksAndImages(t *testing.T) {
 	)
 }
 
-// A slash command the human typed reads back as "/name args"; a record led
-// by <command-name> is the harness's echo of a local command.
+// A slash command the human typed reads back as "/name args", on every
+// version and with no marks at all (2.1.287 writes /revive with neither
+// origin nor promptSource); a record led by <command-name> is the
+// harness's echo of a local command.
 func TestClaudeTranscriptSlashCommands(t *testing.T) {
 	ctExpect(t, ctBuild(
 		ctTyped("u1", "", "<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>the open PR</command-args>"),
 		ctWith(ctTyped("u2", "u1", "<command-message>revive</command-message>\n<command-name>/revive</command-name>"), "promptSource", nil),
 		ctPlain("u3", "u2", ctOld, "<command-message>notes</command-message>\n<command-name>/notes</command-name>\n<command-args></command-args>"),
-		ctPlain("u4", "u3", ctNew, "<command-message>by-the-model</command-message>\n<command-name>/by-the-model</command-name>"),
+		ctPlain("u4", "u3", ctNew, "<command-message>plan</command-message>\n<command-name>/plan</command-name>"),
 		ctPlain("u5", "u4", ctNew, "<command-name>/model</command-name>\n            <command-message>model</command-message>\n            <command-args></command-args>"),
 		ctPlain("u6", "u5", ctOld, "<local-command-stdout>Set model to x</local-command-stdout>"),
 		ctWith(ctTyped("u7", "u6", "<command-message>skill</command-message>\n<command-name>skill</command-name>"), "isMeta", true),
+		ctPlain("u8", "u7", "2.1.287", "<command-message>revive</command-message>\n<command-name>/revive</command-name>\n<command-args>where we were</command-args>"),
 	),
 		ctBrief{"u1", "slash", "/review the open PR", "", false},
 		ctBrief{"u2", "slash", "/revive", "", false},
 		ctBrief{"u3", "slash", "/notes", "", false},
+		ctBrief{"u4", "slash", "/plan", "", false},
+		ctBrief{"u8", "slash", "/revive where we were", "", false},
 	)
 }
 
@@ -507,10 +512,11 @@ func TestClaudeTranscriptLongLines(t *testing.T) {
 	}
 }
 
-// What was asked is cut at 1000 runes, never inside one; reply_to reads
-// the whole text's last non-empty line.
+// What was asked keeps its last 1000 runes, where the question is, and is
+// never cut inside one; reply_to reads the whole text's last non-empty
+// line.
 func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
-	long := strings.Repeat("a", 999) + "éé and more"
+	long := "the head goes éé" + strings.Repeat("a", 998) + "?"
 	turns := ctRead(t, ctBuild(
 		ctTyped("u0", "", "start"),
 		ctSays("a1", "u0", "m1", ctText(long)),
@@ -522,14 +528,14 @@ func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
 		ctSays("a4", "u3", "m4", ctText("Why?\nBecause.")),
 		ctTyped("u4", "a4", "four"),
 	))
-	if got := turns[1].Asked; got != strings.Repeat("a", 999)+"é" {
-		t.Fatalf("cut: %d bytes, ends %q", len(got), got[len(got)-4:])
+	if got := turns[1].Asked; got != "é"+strings.Repeat("a", 998)+"?" {
+		t.Fatalf("cut: %d bytes, starts %q", len(got), got[:4])
 	}
 	var reply []bool
 	for _, tr := range turns {
 		reply = append(reply, tr.ReplyTo)
 	}
-	if want := []bool{false, false, true, false, false}; !reflect.DeepEqual(reply, want) {
+	if want := []bool{false, true, true, false, false}; !reflect.DeepEqual(reply, want) {
 		t.Fatalf("reply_to %v, want %v", reply, want)
 	}
 	if turns[2].Asked != "Is it?" {

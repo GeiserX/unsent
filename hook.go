@@ -158,8 +158,10 @@ func runClaudeHook(stdin io.Reader, stdout io.Writer) {
 	enc.Encode(hookOutput(claudeNote(r)))
 }
 
-// stopHook starts `unsent context --transcript PATH` for the conversation
-// whose turn ended, detached, and returns without waiting for it. PATH is
+// stopHook starts `unsent context --transcript PATH --from-hook` for the
+// conversation whose turn ended, detached, and returns without waiting for
+// it; --from-hook skips the pass when one ran in the last 10 minutes
+// (contextDebounce). PATH is
 // the hook's transcript_path, or the one Claude Code would name for the
 // session in that folder, and must be a regular .jsonl file right in a
 // project folder of a projects folder. Nothing starts under on-send delete
@@ -182,7 +184,7 @@ func stopHook(in hookInput) {
 	if err != nil {
 		return
 	}
-	hookSpawn([]string{exe, "context", "--transcript", filepath.Clean(path)})
+	hookSpawn([]string{exe, "context", "--transcript", filepath.Clean(path), "--from-hook"})
 }
 
 // transcriptPath reports whether path names a Claude Code transcript:
