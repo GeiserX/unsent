@@ -53,12 +53,16 @@ Skip messages with an empty `asked` and entries that are `{"resumed": ...}` line
 ## 5. Save each gloss
 
 ```sh
-unsent context add <agent_session> <uuid> --gloss "Asked whether to keep the v1 flag or drop it; chose to drop it." --reply
+unsent context add <agent_session> <uuid> --gloss - --reply <<'UNSENT_GLOSS'
+Asked whether to keep the v1 flag or drop it; chose to drop it.
+UNSENT_GLOSS
 ```
+
+Always pass the gloss on standard input through a quoted here-document, as above, never as a shell argument: the gloss comes from message text, and a `$(...)` or a backtick in it would run as a command inside a double-quoted argument. Keep the delimiter quoted and never let it appear in the gloss.
 
 `--reply` sets the message's `reply_to` to true, so `unsent log` shows what it answered. Pass it for every reply; it is harmless when `reply_to` is already true.
 
-`<uuid>` is the message's `uuid` from the `--json` output you just read. Use it whenever the message has one: a context pass can add an earlier message while you work, which moves every `n` after it. Only for a message with no `uuid`, pass its `n` instead, and read the conversation again right before, since numbers also shift when old messages are dropped. For text with quotes, pass `--gloss -` and the line on standard input.
+`<uuid>` is the message's `uuid` from the `--json` output you just read. Use it whenever the message has one: a context pass can add an earlier message while you work, which moves every `n` after it. Only for a message with no `uuid`, pass its `n` instead, and read the conversation again right before, since numbers also shift when old messages are dropped.
 
 ## 6. Finish
 
