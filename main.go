@@ -45,6 +45,20 @@ Usage:
                              print a session's sent messages (session: a number
                              from unsent log, its id, or the agent's own session
                              id); --copy N copies message N to the clipboard
+  unsent context [--config-dir DIR]... [--session ID | --transcript PATH] [--json]
+                             give the messages of each Claude Code conversation's
+                             sent log their context from Claude Code's transcript:
+                             what the agent had just said, and the answers and
+                             messages typed while it worked, which the screen
+                             never showed as sent
+  unsent context add <session> <n|uuid> --gloss TEXT
+                             set a one-line note on message n of a sent log
+                             (TEXT - reads stdin); unsent log shows it
+  unsent import claude [--config-dir DIR]... [--history] [--json]
+                             the same over every Claude Code transcript, making
+                             the sent logs that are missing (the last 365 days);
+                             --history adds conversations whose transcript is
+                             gone from history.jsonl
   unsent forget --log <id>
                              delete one session's sent log (id: the session id
                              unsent log shows, never a number, which can move)
@@ -58,10 +72,11 @@ Usage:
                              you type it, for an rc file you keep by hand:
                              eval "$(unsent init zsh)"; unsent setup zsh
                              already writes them
-  unsent hook claude         print a Claude Code SessionStart hook for your
-                             settings.json: reopening a conversation that left
-                             a draft then tells Claude about it, to ask you
-                             before it goes on; unsent never edits the file
+  unsent hook claude         print Claude Code hooks for your settings.json:
+                             reopening a conversation that left a draft then
+                             tells Claude about it, to ask you before it goes
+                             on, and the end of each turn runs unsent context
+                             for that conversation; unsent never edits the file
   unsent status [zsh|bash]   which agents this shell runs through unsent,
                              which profile each gets, what skips the wrapper,
                              whether the command line is saved, and the
@@ -92,7 +107,7 @@ there, for debugging; the files hold everything typed.
 
 Run "unsent setup" once to never think about it again; "command claude"
 skips the wrapper for one run. Use "unsent -- list" to run a program called
-list.
+list; the same goes for import (ImageMagick ships one) and context.
 `
 
 func main() {
@@ -121,6 +136,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdLog(args[1:], stdout, stderr)
 	case "forget":
 		return cmdForget(args[1:], stdout, stderr)
+	case "context":
+		return cmdContext(args[1:], os.Stdin, stdout, stderr)
+	case "import":
+		return cmdImport(args[1:], stdout, stderr)
 	case "capture":
 		return cmdCapture(args[1:], stderr)
 	case "setup":
@@ -579,7 +598,10 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 			if pastes == nil {
 				pastes = []string{}
 			}
-			msgs = append(msgs, sentMessageJSON{N: n, Sent: rfc3339(m.Time), Text: m.Text, Pastes: pastes})
+			msgs = append(msgs, sentMessageJSON{
+				N: n, Sent: rfc3339(m.Time), Text: m.Text, Pastes: pastes,
+				UUID: m.UUID, Kind: m.Kind, Asked: m.Asked, ReplyTo: m.ReplyTo, Gloss: m.Gloss, Source: m.Source,
+			})
 		}, func(r sentResume) {
 			msgs = append(msgs, sentResumeJSON{Resumed: rfc3339(r.Resumed)})
 		})
@@ -595,6 +617,12 @@ func cmdLog(args []string, stdout, stderr io.Writer) int {
 	}
 	l.walk(func(n int, m sentMessage) {
 		fmt.Fprintf(stdout, "\n%d  %s\n%s\n", n, when(m.Time), m.Text)
+		if m.ReplyTo && m.Asked != "" {
+			fmt.Fprintf(stdout, "  ↳ answering: %s\n", answeringLine(m.Asked))
+		}
+		if m.Gloss != "" {
+			fmt.Fprintf(stdout, "  ↳ why: %s\n", m.Gloss)
+		}
 		for _, p := range m.Pastes {
 			fmt.Fprintf(stdout, "--- a paste that could not be placed in the message ---\n%s\n", p)
 		}
@@ -633,11 +661,36 @@ type sentShowJSON struct {
 
 // sentMessageJSON is one sent message: n is the number --copy takes, text
 // has its pastes expanded, and pastes holds the ones it could not place.
+// The rest is the context unsent context adds, each field left out when
+// empty (sentMessage says what they hold).
 type sentMessageJSON struct {
-	N      int      `json:"n"`
-	Sent   string   `json:"sent"`
-	Text   string   `json:"text"`
-	Pastes []string `json:"pastes"`
+	N       int      `json:"n"`
+	Sent    string   `json:"sent"`
+	Text    string   `json:"text"`
+	Pastes  []string `json:"pastes"`
+	UUID    string   `json:"uuid,omitempty"`
+	Kind    string   `json:"kind,omitempty"`
+	Asked   string   `json:"asked,omitempty"`
+	ReplyTo bool     `json:"reply_to,omitempty"`
+	Gloss   string   `json:"gloss,omitempty"`
+	Source  string   `json:"source,omitempty"`
+}
+
+// answeringMax caps the agent's line unsent log quotes above a reply, in
+// characters.
+const answeringMax = 200
+
+// answeringLine is the line unsent log quotes above a reply: the last line
+// of asked with text, where the agent's question is, trimmed and cut to
+// answeringMax characters.
+func answeringLine(asked string) string {
+	lines := strings.Split(asked, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if l := strings.TrimSpace(lines[i]); l != "" {
+			return cutRunes(l, answeringMax)
+		}
+	}
+	return ""
 }
 
 // sentResumeJSON marks where a later run reopened the conversation.
@@ -715,7 +768,16 @@ func cmdForget(args []string, stdout, stderr io.Writer) int {
 	if l == nil {
 		return 2
 	}
-	if err := os.Remove(l.path); err != nil {
+	// Under the log's lock: a context pass between its read and its write
+	// would put the whole log back.
+	unlock, err := lockSent(l.path)
+	if err != nil {
+		fmt.Fprintf(stderr, "unsent: %v\n", err)
+		return 1
+	}
+	err = os.Remove(l.path)
+	unlock()
+	if err != nil {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 1
 	}

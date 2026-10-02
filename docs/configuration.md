@@ -23,7 +23,7 @@ The `UNSENT_ON_SEND` variables take `log` or `delete`, in any case; any other va
 
 | Variable | Unset means | What `unsent` reads there |
 | --- | --- | --- |
-| `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude Code's `sessions/<pid>.json`, which names the open conversation. `unsent hook claude` prints the hook for `settings.json` in the same folder. |
+| `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude Code's `sessions/<pid>.json`, which names the open conversation. `unsent hook claude` prints the hooks for `settings.json` in the same folder. `unsent context`, `unsent import claude` and the Stop hook also read the transcripts in `projects/<slug>/<session>.jsonl` and the prompt history in `history.jsonl`, for [context](context.md); nothing else does. |
 | `CODEX_HOME` | `~/.codex` | The lock files in `thread-writer-locks/` that a running Codex holds open. |
 
 ## Your shell's rc file

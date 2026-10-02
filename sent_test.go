@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -629,15 +630,17 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// Logs not written for 90 days go, however few there are.
+// Logs not written for 365 days go, however few there are. The ages are
+// written out, not taken from sentMaxAge, so a cap of 364 days fails.
 func TestSentLogRetentionAge(t *testing.T) {
 	st := testStore(t)
 	dir := filepath.Join(st.dir, "sent")
-	old := ageLog(t, dir, "old", sentMaxAge+24*time.Hour)
-	young := ageLog(t, dir, "young", sentMaxAge-24*time.Hour)
+	day := 24 * time.Hour
+	old := ageLog(t, dir, "old", 365*day+12*time.Hour)
+	young := ageLog(t, dir, "young", 364*day+12*time.Hour)
 	st.pruneSent()
 	if exists(old) || !exists(young) {
-		t.Fatalf("after pruning: 91 days old kept %v, 89 days old kept %v", exists(old), exists(young))
+		t.Fatalf("after pruning: 365.5 days old kept %v, 364.5 days old kept %v", exists(old), exists(young))
 	}
 }
 
@@ -656,6 +659,30 @@ func TestSentLogRetentionCap(t *testing.T) {
 		if got := exists(filepath.Join(dir, fmt.Sprintf("n%04d.jsonl", i))); got != want {
 			t.Errorf("log %d kept %v, want %v", i, got, want)
 		}
+	}
+}
+
+// The cap is per agent: an import that brings more than sentLimit Claude
+// Code conversations, all newer than every other log, drops only the oldest
+// Claude Code logs, never a run's log or another agent's.
+func TestSentLogCapIsPerAgent(t *testing.T) {
+	st := testStore(t)
+	dir := filepath.Join(st.dir, "sent")
+	run := ageLog(t, dir, "20260101-120000-123", 48*time.Hour)
+	codex := ageLog(t, dir, "codex-0b1c2d3e-0000-4000-8000-000000000001", 47*time.Hour)
+	oldest := ageLog(t, dir, "claude-00000000-0000-4000-8000-999999999999", 46*time.Hour)
+	for i := range sentLimit {
+		ageLog(t, dir, fmt.Sprintf("claude-10000000-0000-4000-8000-%012d", i), time.Duration(sentLimit-i)*time.Minute)
+	}
+	st.pruneSent()
+	if !exists(run) || !exists(codex) {
+		t.Fatalf("the Claude Code import pushed out other logs: run kept %v, codex kept %v", exists(run), exists(codex))
+	}
+	if exists(oldest) {
+		t.Fatal("the oldest Claude Code log beyond the cap was kept")
+	}
+	if names, _ := filepath.Glob(filepath.Join(dir, "claude-*.jsonl")); len(names) != sentLimit {
+		t.Fatalf("%d Claude Code logs kept, want %d", len(names), sentLimit)
 	}
 }
 
@@ -805,4 +832,44 @@ func TestSessionTruncatedMiddle(t *testing.T) {
 		}
 		s.expect(nil, c.history)
 	}
+}
+
+// A send whose sent log another process holds locked (a context pass
+// stopped with Ctrl+Z) gives up after sentLockWait instead of holding up the
+// wrap's loop, and the draft goes to history; once the lock is free the
+// next send is logged.
+func TestSendGivesUpOnAHeldLock(t *testing.T) {
+	old := sentLockWait
+	sentLockWait = 200 * time.Millisecond
+	t.Cleanup(func() { sentLockWait = old })
+	s := newSendSession(t, &claude)
+	path := s.store.sentPath(s.rec.ID)
+	os.MkdirAll(filepath.Dir(path), 0o700)
+	f, err := os.OpenFile(sentLockPath(path), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	s.rec.Draft = "sent while the log was held"
+	done := make(chan error, 1)
+	go func() { done <- s.sendOff() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		f.Close()
+		<-done
+		t.Fatal("the send waited for the lock")
+	}
+	s.expect(nil, []string{"sent while the log was held"})
+	f.Close()
+	s.rec.Draft = "sent after"
+	if err := s.sendOff(); err != nil {
+		t.Fatal(err)
+	}
+	s.expect([]string{"sent after"}, []string{"sent while the log was held"})
 }

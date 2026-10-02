@@ -62,7 +62,7 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 
 - The agent's input box as you type, including a long draft that scrolls inside the box and a big paste the agent shows as a placeholder such as `[Pasted text #1 +39 lines]`.
 - Drafts you cleared or replaced, in a history that `unsent list --all` shows.
-- Every message you send, in a [sent log](sent-messages.md) per conversation (per run in pi), so an older session's messages are one command away.
+- Every message you send, in a [sent log](sent-messages.md) per conversation (per run in pi), so an older session's messages are one command away. For Claude Code, each message can also carry its [context](context.md): the question it answered.
 - Your half-typed [zsh command line](zsh.md), when a window closes or Ctrl+C clears it.
 
 ## How it runs
@@ -92,7 +92,7 @@ flowchart LR
 
 ## Privacy
 
-Drafts and sent logs are plain JSON under `~/.local/state/unsent/`, in a folder only you can read (`0700`, files `0600`). `unsent` makes no network connections. The optional Claude Code hook passes Claude the first line of a kept draft, cut to 100 characters, and nothing more. [Configuration](configuration.md) says how to move the folder or keep nothing of what you send.
+Drafts and sent logs are plain JSON under `~/.local/state/unsent/`, in a folder only you can read (`0700`, files `0600`). `unsent` makes no network connections. The optional Claude Code hook passes Claude the first line of a kept draft, cut to 100 characters, and nothing more. To add [context](context.md) to sent messages, `unsent` reads Claude Code's transcripts, but only your own turns and the agent's text right before each one, and writes only to its own folder. [Configuration](configuration.md) says how to move the folder or keep nothing of what you send.
 
 ## Getting help
 
