@@ -12,7 +12,7 @@ Each message in a sent log can carry these fields. A message with none of them i
 | --- | --- |
 | `asked` | the agent's text right before your message: every text block of its last reply, keeping the last 1,000 characters, since a question comes at the end. For an `answer`, the questions it answers. `""` when your message followed another of yours with no reply between them. |
 | `reply_to` | `true` when the message answers the agent: an answer to one of its questions, or `asked` ends with a line that ends in `?` |
-| `kind` | how the message reached the agent, below. `""` for a message `unsent` read off the box live. |
+| `kind` | how the message reached the agent, below. `""` for a message `unsent` read off the box live until a pass matches it to its turn; `source` `""` is what marks a message `unsent` saw in the box. |
 | `uuid` | the id of the turn in Claude Code's transcript. `unsent` uses it so a turn is never added twice. |
 | `gloss` | one line saying what was asked and what you chose, written later by the [skill](#the-skill) through `unsent context add` |
 | `source` | `""` when `unsent` saw the message in the box, `transcript` when it came from the transcript, `history` when it came from Claude Code's `history.jsonl` |
@@ -96,7 +96,7 @@ A sent log is kept for 365 days after its last message. A log that `unsent conte
 
 ## What it does not do
 
-- Compactions are not recorded. A compaction summary repeats your earlier messages, so it is never read as a turn.
+- Compactions are not recorded. A compaction summary repeats your earlier messages, so it is never read as a turn. A `/compact` you type never gets context either: the transcript keeps it only as a bare `/compact` record, without what you typed after it, and that record is not read as a turn.
 - Only Claude Code's transcripts are read. Messages sent to Codex, pi and agy have no context yet.
 - A message sent while on send was `delete` is never imported later. The setting means keep nothing, and it holds for the transcript too.
 - A conversation that is not in the transcript or in `history.jsonl` cannot be backfilled.

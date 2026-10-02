@@ -31,7 +31,7 @@ A message of a Claude Code conversation can also carry its [context](context.md)
 | Field | What it holds |
 | --- | --- |
 | `uuid` | the id of the turn in Claude Code's transcript |
-| `kind` | `typed`, `queued`, `absorbed`, `answer` or `slash`; `""` for a message read off the box live |
+| `kind` | `typed`, `queued`, `absorbed`, `answer` or `slash`; `""` for a message read off the box live until `unsent context` matches it to its turn (`source` `""` marks a message read off the box) |
 | `asked` | the agent's text right before the message, its last 1,000 characters |
 | `reply_to` | `true` when the message answers the agent |
 | `gloss` | one line on what was asked and what was chosen, set by `unsent context add` |

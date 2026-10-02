@@ -296,7 +296,8 @@ type sentMessage struct {
 	// UUID is the transcript record of the human turn, the key a second
 	// pass dedupes on.
 	UUID string `json:"uuid,omitempty"`
-	// Kind is how the turn was sent: "" (typed in the box, seen live),
+	// Kind is how the turn was sent: "" (seen live in the box and not yet
+	// matched to its turn; Source "" is what marks a message from the box),
 	// "typed", "queued", "absorbed" (typed while the agent worked and taken
 	// in mid-turn), "answer" (to the agent's question) or "slash".
 	Kind string `json:"kind,omitempty"`
