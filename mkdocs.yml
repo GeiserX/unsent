@@ -135,6 +135,7 @@ nav:
       - Configuration: configuration.md
       - Using unsent: usage.md
       - Sent messages: sent-messages.md
+      - Context: context.md
       - Your half-typed zsh command line: zsh.md
   - Reference:
       - Supported agents: supported-agents.md

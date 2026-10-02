@@ -22,9 +22,20 @@ unsent forget --log 20260927-101500-4242   # delete one session's sent log, by t
 | `agent`, `agent_session` | the agent, and its own id of the conversation, `""` when unknown |
 | `folder` | the folder the session ran in, as a real path |
 | `started`, `updated` | when the session started and when its last message was sent, RFC 3339 times with the offset |
-| `messages` | in the list, how many messages the session sent. For one session, its messages in order, each with `n` (the number `--copy` takes), `sent` (the time), `text` (pastes expanded) and `pastes` (the raw text of each paste that could not be placed). An entry `{"resumed": <time>}` marks where the conversation was reopened. |
+| `messages` | in the list, how many messages the session sent. For one session, its messages in order, each with `n` (the number `--copy` takes), `sent` (the time), `text` (pastes expanded) and `pastes` (the raw text of each paste that could not be placed), plus the context fields below when they are set. An entry `{"resumed": <time>}` marks where the conversation was reopened. |
 | `first_line` | the last message's first line with text, cut to 100 characters |
 | `dropped` | how many of the oldest messages were removed to keep the log under 5 MB, `0` when none. The kept messages are numbered from 1. |
+
+A message of a Claude Code conversation can also carry its [context](context.md), each field left out when empty:
+
+| Field | What it holds |
+| --- | --- |
+| `uuid` | the id of the turn in Claude Code's transcript |
+| `kind` | `typed`, `queued`, `absorbed`, `answer` or `slash`; `""` for a message read off the box live |
+| `asked` | the agent's text right before the message, cut to 1,000 characters |
+| `reply_to` | `true` when the message answers the agent |
+| `gloss` | one line on what was asked and what was chosen, set by `unsent context add` |
+| `source` | `""` when read off the box, `transcript` or `history` when backfilled |
 
 `unsent forget --log` takes the session id, not the number: the numbers move when another session sends its first message.
 

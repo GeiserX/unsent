@@ -55,10 +55,12 @@ Fields are only ever added. A renamed or retyped field bumps `format`.
 ## A note for Claude Code when you reopen a conversation
 
 ```sh
-unsent hook claude    # prints a SessionStart hook for Claude Code's settings.json
+unsent hook claude    # prints a SessionStart hook and a Stop hook for Claude Code's settings.json
 ```
 
 It prints the JSON to add to `~/.claude/settings.json` (or `settings.json` in `$CLAUDE_CONFIG_DIR`), next to any hooks you already have. `unsent` never edits that file. When you reopen a conversation that left a draft, the hook gives Claude one line to read with your next message: `unsent` kept a draft for this conversation, from when, how many lines, and its first line, and Claude should ask you whether to continue with it, not act on it. That first line, cut to 100 characters, goes to Claude with whatever you send next; the rest of the draft never does. Nothing is drawn on screen and nothing is sent for you. A new chat, `/clear`, a compact, a fork or a conversation with no draft gets no note. `UNSENT_NOTICE=0` leaves the note on, since installing the hook is how you asked for it. The hook names `unsent` by its full path, so run `unsent hook claude` again if `unsent` moves.
+
+The Stop hook adds [context](context.md) to the sent log after each reply: what the agent had just said or asked when you sent a message. It starts in the background and Claude Code never waits for it.
 
 ## What differs in Codex
 
