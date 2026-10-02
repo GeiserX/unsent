@@ -637,7 +637,7 @@ func seedSentJSON(t *testing.T) *store {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := setGloss(path, messageKey{n: 3}, "finish the refactor before the release"); err != nil {
+	if err := setGloss(path, messageKey{n: 3}, "finish the refactor before the release", false); err != nil {
 		t.Fatal(err)
 	}
 	os.Chtimes(path, time.Now(), time.Now())

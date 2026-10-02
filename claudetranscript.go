@@ -255,8 +255,8 @@ func readClaudeTranscript(r io.Reader) ([]claudeTurn, error) {
 							if prev := texts[n.msg]; prev != "" {
 								t = prev + "\n" + t
 							}
-							// Only the tail is ever read (asked, and whether
-							// it ends in a question); a margin covers the
+							// Only the tail is ever read (asked, and whether its
+							// last paragraph asks something); a margin covers the
 							// trailing space trimmed before the cut.
 							texts[n.msg] = lastRunes(t, 2*claudeAskedMax)
 							lastText = n.msg
@@ -301,7 +301,7 @@ func readClaudeTranscript(r io.Reader) ([]claudeTurn, error) {
 			full = strings.TrimSpace(texts[walkAsked(nodes, c.start, c.fallback)])
 		}
 		t.Asked = lastRunes(full, claudeAskedMax)
-		t.ReplyTo = t.Kind == "answer" || endsInQuestion(full)
+		t.ReplyTo = t.Kind == "answer" || asksSomething(full)
 		turns = append(turns, t)
 	}
 	return turns, nil
@@ -582,10 +582,22 @@ func lastRunes(s string, n int) string {
 	return s[i:]
 }
 
-// endsInQuestion reports whether the last non-empty line of s ends with
-// a question mark.
-func endsInQuestion(s string) bool {
-	return strings.HasSuffix(strings.TrimRight(s, " \t\r\n"), "?")
+// asksSomething reports whether the last paragraph of s, the text after
+// its last blank line, holds a question mark anywhere. An agent often puts
+// its question mid paragraph and ends on a default ("Delete them? My
+// default is to keep them."), and a question in an earlier paragraph is
+// usually answered by the paragraphs after it.
+func asksSomething(s string) bool {
+	lines := strings.Split(strings.TrimRight(s, " \t\r\n"), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) == "" {
+			break
+		}
+		if strings.Contains(lines[i], "?") {
+			return true
+		}
+	}
+	return false
 }
 
 // pastedContentRE is the tag Claude Code wraps a pasted part of a message

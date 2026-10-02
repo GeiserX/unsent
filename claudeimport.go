@@ -148,7 +148,9 @@ const contextMatchWindow = time.Hour
 // uuid and the same text (sameSent) within contextMatchWindow, the
 // nearest pairs first across the whole log, so an old turn never takes the
 // live message of a later one; a paired message gets the turn's uuid, kind,
-// asked and reply_to, and the turns left over are added. Messages from
+// asked and reply_to, and the turns left over are added. A message the
+// log holds by uuid whose turn now reads as a reply gets reply_to true,
+// counted as matched; nothing else of it changes. Messages from
 // history carry no uuid and are only written into a log this makes. When
 // the log is missing, head is its header, or with head nil nothing is
 // done. The lines end sorted by time and the file's time is its last
@@ -179,9 +181,11 @@ func mergeSent(path string, head *sentHeader, msgs []sentMessage) (contextResult
 		mergeHook(path)
 	}
 	have := map[string]bool{}
+	known := map[string]*sentLine{}
 	for _, l := range lines {
 		if l.kind == sentLineMessage && l.msg.UUID != "" {
 			have[l.msg.UUID] = true
+			known[l.msg.UUID] = l
 		}
 	}
 	var turns, plain []sentMessage
@@ -194,6 +198,13 @@ func mergeSent(path string, head *sentHeader, msgs []sentMessage) (contextResult
 		case !have[m.UUID]:
 			have[m.UUID] = true
 			turns = append(turns, m)
+		case m.ReplyTo:
+			// A later build reads more turns as replies: turn the flag
+			// on, never off, and leave the rest of the line alone.
+			if l := known[m.UUID]; l != nil && !l.msg.ReplyTo {
+				l.msg.ReplyTo, l.dirty = true, true
+				res.Matched++
+			}
 		}
 	}
 	paired := pairTurns(lines, turns)
@@ -860,15 +871,19 @@ func cmdImport(args []string, stdout, stderr io.Writer) int {
 	return printContextResult(o, res, stdout, stderr)
 }
 
-// cmdContextAdd is `unsent context add <session> <n|uuid> --gloss TEXT`:
-// it sets the gloss of one message, one line, TEXT - read from stdin, and
-// keeps the log's time. The message is named by its uuid, which stays put,
+// cmdContextAdd is `unsent context add <session> <n|uuid> --gloss TEXT
+// [--reply]`: it sets the gloss of one message, one line, TEXT - read from
+// stdin, with --reply sets its reply_to too, and keeps the log's time. The message is named by its uuid, which stays put,
 // or by n, its place in the log as it is now, which a pass that adds an
 // earlier turn moves.
 func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var rest []string
-	gloss, set := "", false
+	gloss, set, reply := "", false, false
 	for i := 0; i < len(args); i++ {
+		if args[i] == "--reply" {
+			reply = true
+			continue
+		}
 		if args[i] == "--gloss" && i+1 < len(args) {
 			gloss, set = args[i+1], true
 			i++
@@ -885,7 +900,7 @@ func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 		}
 	}
 	if !set || len(rest) != 2 || key.uuid == "" && key.n < 1 {
-		fmt.Fprintln(stderr, "unsent: usage: unsent context add <session> <n|uuid> --gloss TEXT (TEXT - reads stdin)")
+		fmt.Fprintln(stderr, "unsent: usage: unsent context add <session> <n|uuid> --gloss TEXT [--reply] (TEXT - reads stdin)")
 		return 2
 	}
 	if gloss == "-" {
@@ -906,7 +921,7 @@ func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 	if l == nil {
 		return 2
 	}
-	switch err := setGloss(l.path, key, gloss); {
+	switch err := setGloss(l.path, key, gloss, reply); {
 	case errors.Is(err, errNoMessage):
 		fmt.Fprintf(stderr, "unsent: that session has no message %s\n", rest[1])
 		return 2
@@ -927,8 +942,9 @@ type messageKey struct {
 }
 
 // setGloss sets the gloss of the message key names in the sent log at
-// path, under its lock, and keeps the file's time.
-func setGloss(path string, key messageKey, gloss string) error {
+// path, and with reply its reply_to too (never back to false), under the
+// log's lock, and keeps the file's time.
+func setGloss(path string, key messageKey, gloss string, reply bool) error {
 	unlock, err := lockSent(path)
 	if err != nil {
 		return err
@@ -955,10 +971,10 @@ func setGloss(path string, key messageKey, gloss string) error {
 		if key.uuid != "" && l.msg.UUID != key.uuid || key.uuid == "" && k != key.n {
 			continue
 		}
-		if l.msg.Gloss == gloss {
+		if l.msg.Gloss == gloss && (l.msg.ReplyTo || !reply) {
 			return nil
 		}
-		l.msg.Gloss, l.dirty = gloss, true
+		l.msg.Gloss, l.msg.ReplyTo, l.dirty = gloss, l.msg.ReplyTo || reply, true
 		if err := writeFileDurable(path, joinSentLog(head, lines)); err != nil {
 			return err
 		}

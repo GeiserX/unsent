@@ -98,7 +98,7 @@ func TestContextMatchesLiveMessages(t *testing.T) {
 		}
 	}
 	path := st.claudeLogPath(ctxConv)
-	if err := setGloss(path, messageKey{n: 1}, "the parser bug from yesterday"); err != nil {
+	if err := setGloss(path, messageKey{n: 1}, "the parser bug from yesterday", false); err != nil {
 		t.Fatal(err)
 	}
 	// A later build's field on the third message.
@@ -156,6 +156,108 @@ func TestContextMatchesLiveMessages(t *testing.T) {
 	var res contextResult
 	if code != 0 || json.Unmarshal([]byte(out), &res) != nil || res != (contextResult{}) {
 		t.Fatalf("--session 1 --json: exit %d, %q", code, out)
+	}
+}
+
+// A message the log already holds by uuid gets reply_to true when its turn
+// now reads as a reply, as after a build that reads more turns as replies,
+// and keeps its gloss and every other field; a second pass changes nothing,
+// and a turn that no longer reads as a reply never turns the flag off.
+func TestContextRefreshesReplyTo(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-r", "claude", "/w", t0)
+	r.AgentSession = ctxConv
+	for i, text := range []string{"Delete which copies exactly?", "and the docs"} {
+		r.Draft = text
+		st.logSentAt(r, t0.Add(time.Duration(i)*time.Minute))
+	}
+	asked := "Done. Shall I delete the copies, or keep them on disk? My default is to keep them."
+	writeTurns(t, cfg, "-w", ctxConv,
+		claudeTurn{UUID: "r-1", Kind: "typed", Time: t0, Text: "Delete which copies exactly?", Asked: asked, SessionID: ctxConv},
+		claudeTurn{UUID: "r-2", Kind: "typed", Time: t0.Add(time.Minute), Text: "and the docs", Asked: "Is that all?", ReplyTo: true, SessionID: ctxConv},
+	)
+	if code, out, errOut := runCLI("context", "--config-dir", cfg); code != 0 || out != "1 logs updated, 0 messages added, 2 matched\n" {
+		t.Fatalf("first pass: exit %d, %q, %q", code, out, errOut)
+	}
+	path := st.claudeLogPath(ctxConv)
+	if err := setGloss(path, messageKey{uuid: "r-1"}, "Asked whether to delete the copies; asked which ones", false); err != nil {
+		t.Fatal(err)
+	}
+	if ms := readMessages(t, path); ms[0].ReplyTo || !ms[1].ReplyTo {
+		t.Fatalf("before the refresh %+v", ms)
+	}
+
+	// The same turns, now read as replies by a later build; r-2's turn no
+	// longer is one.
+	writeTurns(t, cfg, "-w", ctxConv,
+		claudeTurn{UUID: "r-1", Kind: "typed", Time: t0, Text: "Delete which copies exactly?", Asked: asked, ReplyTo: true, SessionID: ctxConv},
+		claudeTurn{UUID: "r-2", Kind: "typed", Time: t0.Add(time.Minute), Text: "and the docs", Asked: "Is that all?", SessionID: ctxConv},
+	)
+	if code, out, errOut := runCLI("context", "--config-dir", cfg); code != 0 || out != "1 logs updated, 0 messages added, 1 matched\n" {
+		t.Fatalf("refresh: exit %d, %q, %q", code, out, errOut)
+	}
+	ms := readMessages(t, path)
+	if m := ms[0]; !m.ReplyTo || m.Gloss != "Asked whether to delete the copies; asked which ones" || m.Asked != asked || m.Kind != "typed" || m.Text != "Delete which copies exactly?" || m.Source != "" {
+		t.Fatalf("refreshed message %+v", m)
+	}
+	if !ms[1].ReplyTo {
+		t.Fatalf("reply_to went back to false: %+v", ms[1])
+	}
+	after, _ := os.ReadFile(path)
+	code, out, _ := runCLI("context", "--config-dir", cfg)
+	if again, _ := os.ReadFile(path); code != 0 || out != "0 logs updated, 0 messages added, 0 matched\n" || !bytes.Equal(again, after) {
+		t.Fatalf("second pass: exit %d, %q, file changed %v", code, out, !bytes.Equal(again, after))
+	}
+}
+
+// context add --reply sets reply_to with the gloss; without it reply_to is
+// left as it is; the same gloss again, with or without --reply once the
+// flag is set, writes nothing.
+func TestContextAddReply(t *testing.T) {
+	claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-p", "claude", "/w", t0)
+	r.AgentSession = ctxConv
+	for i, text := range []string{"one", "two"} {
+		r.Draft = text
+		st.logSentAt(r, t0.Add(time.Duration(i)*time.Minute))
+	}
+	path := st.claudeLogPath(ctxConv)
+	if code, _, errOut := runCLI("context", "add", ctxConv, "1", "--reply", "--gloss", "chose one"); code != 0 {
+		t.Fatalf("--reply: exit %d, %q", code, errOut)
+	}
+	if code, _, errOut := runCLI("context", "add", ctxConv, "2", "--gloss", "a note"); code != 0 {
+		t.Fatalf("no --reply: exit %d, %q", code, errOut)
+	}
+	ms := readMessages(t, path)
+	if !ms[0].ReplyTo || ms[0].Gloss != "chose one" || ms[1].ReplyTo || ms[1].Gloss != "a note" {
+		t.Fatalf("messages %+v", ms)
+	}
+	// Without --reply a set flag stays set.
+	if code, _, _ := runCLI("context", "add", ctxConv, "1", "--gloss", "chose one, again"); code != 0 {
+		t.Fatal("re-gloss failed")
+	}
+	if ms := readMessages(t, path); !ms[0].ReplyTo || ms[0].Gloss != "chose one, again" {
+		t.Fatalf("after a gloss without --reply %+v", ms[0])
+	}
+	stamp := t0.Add(-time.Hour)
+	os.Chtimes(path, stamp, stamp)
+	before, _ := os.ReadFile(path)
+	for _, args := range [][]string{
+		{"context", "add", ctxConv, "1", "--gloss", "chose one, again", "--reply"},
+		{"context", "add", ctxConv, "1", "--gloss", "chose one, again"},
+		{"context", "add", ctxConv, "2", "--gloss", "a note"},
+	} {
+		if code, _, errOut := runCLI(args...); code != 0 {
+			t.Fatalf("%q: exit %d, %q", args, code, errOut)
+		}
+	}
+	after, _ := os.ReadFile(path)
+	if fi, _ := os.Stat(path); !bytes.Equal(before, after) || fi.ModTime().Unix() != stamp.Unix() {
+		t.Fatalf("a no-op rewrote the log:\n%s", after)
 	}
 }
 
