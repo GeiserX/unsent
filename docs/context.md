@@ -86,7 +86,7 @@ The `answering` line shows the last line of `asked` that has text, where the que
 
 `unsent hook claude` prints a Stop hook next to the SessionStart hook described in [Using unsent](usage.md#a-note-for-claude-code-when-you-reopen-a-conversation). Add both to `settings.json`; `unsent` never edits that file.
 
-Claude Code runs the Stop hook each time it finishes a reply. The hook reads the transcript path Claude Code hands it, checks that it is a `.jsonl` file in a `projects` folder, starts `unsent context --transcript <path>` in the background and exits at once. Claude Code never waits for it. A pass the hook starts is skipped when the last pass over that transcript ran less than 10 minutes ago, so run `unsent context` yourself when you want the newest turns at once. When on send is `delete` for Claude Code, the hook does nothing.
+Claude Code runs the Stop hook each time it finishes a reply. The hook reads the transcript path Claude Code hands it, checks that it is a `.jsonl` file in a `projects` folder, starts `unsent context --transcript <path>` in the background and exits at once. Claude Code never waits for it. Passes the hook starts on one transcript run at least 10 minutes apart: a reply that ends sooner after the last pass starts one that waits until the 10 minutes are up, and replies that end while it waits leave their turns to it. So the newest turns reach the log at most 10 minutes after the reply, even when the conversation ends in the meantime. Run `unsent context` yourself when you want them at once. When on send is `delete` for Claude Code, the hook does nothing.
 
 Without the hook, run `unsent context` yourself, or let the skill run it.
 

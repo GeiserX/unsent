@@ -580,9 +580,9 @@ func sentKind(line []byte) sentLineKind {
 }
 
 // pruneSent deletes sent logs not written for sentMaxAge, then the oldest
-// beyond sentLimit, then the lock files of logs that are gone and the
-// context pass records (contextStatePath) older than contextDebounce,
-// which no longer skip anything.
+// beyond sentLimit, then the lock files of logs that are gone, the context
+// pass records (contextStatePath) older than contextDebounce, which no
+// longer hold a pass back, and the context locks of records that are gone.
 func (s *store) pruneSent() {
 	pattern := filepath.Join(s.dir, "sent", "*.jsonl")
 	names, _ := filepath.Glob(pattern)
@@ -615,6 +615,20 @@ func (s *store) pruneSent() {
 	for _, p := range states {
 		if fi, err := os.Stat(p); err == nil && time.Since(fi.ModTime()) > contextDebounce {
 			os.Remove(p)
+		}
+	}
+	// A context lock (contextWait) goes with its record, and only while
+	// nobody holds it.
+	clocks, _ := filepath.Glob(filepath.Join(s.dir, "sent", ".context-*.lock"))
+	for _, lp := range clocks {
+		if _, err := os.Stat(strings.TrimSuffix(lp, ".lock") + ".state"); err == nil {
+			continue
+		}
+		if f, err := os.Open(lp); err == nil {
+			if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) == nil {
+				os.Remove(lp)
+			}
+			f.Close()
 		}
 	}
 }

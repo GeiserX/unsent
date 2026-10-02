@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -597,10 +599,14 @@ func TestCLILogShowsContext(t *testing.T) {
 	}
 }
 
-// A pass the Stop hook starts (--from-hook) is skipped while the last pass
-// over that transcript is under 10 minutes old, and writes the record after
-// it runs; an explicit run never skips; a record 10 minutes old, from the
-// future or unreadable skips nothing, and pruneSent drops the stale ones.
+// A pass the Stop hook starts (--from-hook) while the last pass over that
+// transcript is under 10 minutes old waits until the 10 minutes are up and
+// then runs, so a turn written inside the window is still merged; it
+// records its pass before reading. While one hook pass holds the
+// transcript's context lock, another does nothing (the holder reads later).
+// An explicit run never waits; a record 10 minutes old, from the future or
+// unreadable makes nothing wait, and pruneSent drops stale records and
+// their locks.
 func TestContextFromHookIsDebounced(t *testing.T) {
 	cfg := claudeHome(t)
 	st := testStore(t)
@@ -608,33 +614,67 @@ func TestContextFromHookIsDebounced(t *testing.T) {
 	r := testRecord("20261001-100000-9", "claude", "/w", t0)
 	r.AgentSession, r.Draft = ctxConv, "hello"
 	st.logSentAt(r, t0)
-	one := claudeTurn{UUID: "h-1", Kind: "typed", Time: t0.Add(time.Second), Text: "hello", SessionID: ctxConv}
-	two := claudeTurn{UUID: "h-2", Kind: "queued", Time: t0.Add(time.Minute), Text: "and this", SessionID: ctxConv}
-	three := claudeTurn{UUID: "h-3", Kind: "queued", Time: t0.Add(2 * time.Minute), Text: "and that", SessionID: ctxConv}
-	four := claudeTurn{UUID: "h-4", Kind: "queued", Time: t0.Add(3 * time.Minute), Text: "and more", SessionID: ctxConv}
+	turn := func(i int, text string) claudeTurn {
+		return claudeTurn{UUID: fmt.Sprintf("h-%d", i), Kind: "queued", Time: t0.Add(time.Duration(i) * time.Minute), Text: text, SessionID: ctxConv}
+	}
+	one := claudeTurn{UUID: "h-0", Kind: "typed", Time: t0.Add(time.Second), Text: "hello", SessionID: ctxConv}
+	turns := []claudeTurn{one}
 	p := writeTurns(t, cfg, "-w", ctxConv, one)
+	more := func(text string) {
+		turns = append(turns, turn(len(turns), text))
+		writeTurns(t, cfg, "-w", ctxConv, turns...)
+	}
 	state := st.contextStatePath(p)
 	if exists(state) {
 		t.Fatal("a record before any pass")
 	}
-	pass := func(args ...string) string {
+	var slept []time.Duration
+	contextSleep = func(d time.Duration) {
+		slept = append(slept, d)
+		// The window passes.
+		os.WriteFile(state, []byte(time.Now().Add(-contextDebounce-time.Second).UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+	}
+	t.Cleanup(func() { contextSleep = time.Sleep })
+	pass := func(wantSleeps int, args ...string) string {
 		t.Helper()
+		slept = nil
 		code, out, errOut := runCLI(append([]string{"context", "--transcript", p}, args...)...)
-		if code != 0 {
-			t.Fatalf("%q: exit %d, %q", args, code, errOut)
+		if code != 0 || len(slept) != wantSleeps {
+			t.Fatalf("%q: exit %d, %q, waited %v", args, code, errOut, slept)
 		}
 		return out
 	}
-	if out := pass("--from-hook"); out != "1 logs updated, 0 messages added, 1 matched\n" || !exists(state) {
+	if out := pass(0, "--from-hook"); out != "1 logs updated, 0 messages added, 1 matched\n" || !exists(state) {
 		t.Fatalf("first hook pass: %q, record %v", out, exists(state))
 	}
-	writeTurns(t, cfg, "-w", ctxConv, one, two)
-	if out := pass("--from-hook"); out != "0 logs updated, 0 messages added, 0 matched\n" {
-		t.Fatalf("a hook pass inside 10 minutes ran: %q", out)
+	more("and this")
+	if out := pass(1, "--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("a hook pass inside 10 minutes: %q", out)
 	}
-	if out := pass(); out != "1 logs updated, 1 messages added, 0 matched\n" {
-		t.Fatalf("an explicit pass skipped: %q", out)
+	if d := slept[0]; d <= 0 || d > contextDebounce {
+		t.Fatalf("waited %v", d)
 	}
+	// The hook pass recorded itself, so the explicit pass below starts
+	// inside the window and must not wait.
+	if !st.contextDebounced(p, time.Now()) {
+		t.Fatal("the hook pass left no fresh record")
+	}
+	more("and that")
+	if out := pass(0); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("an explicit pass: %q", out)
+	}
+	// Another hook pass holds the context lock: this one leaves the turn to
+	// it and returns at once.
+	f, err := os.OpenFile(st.contextLockPath(p), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
+	more("held")
+	if out := pass(0, "--from-hook"); out != "0 logs updated, 0 messages added, 0 matched\n" {
+		t.Fatalf("a hook pass while another holds the lock: %q", out)
+	}
+	f.Close()
 	for name, at := range map[string]time.Time{
 		"10 minutes old":  time.Now().Add(-contextDebounce),
 		"from the future": time.Now().Add(time.Hour),
@@ -645,25 +685,27 @@ func TestContextFromHookIsDebounced(t *testing.T) {
 		}
 	}
 	os.WriteFile(state, []byte("not a time\n"), 0o600)
-	writeTurns(t, cfg, "-w", ctxConv, one, two, three)
-	if out := pass("--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
-		t.Fatalf("an unreadable record skipped: %q", out)
+	if out := pass(0, "--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("an unreadable record: %q", out)
 	}
 	os.WriteFile(state, []byte(time.Now().Add(-11*time.Minute).UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
-	writeTurns(t, cfg, "-w", ctxConv, one, two, three, four)
-	if out := pass("--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
-		t.Fatalf("a hook pass after 11 minutes skipped: %q", out)
+	more("and more")
+	if out := pass(0, "--from-hook"); out != "1 logs updated, 1 messages added, 0 matched\n" {
+		t.Fatalf("a hook pass after 11 minutes: %q", out)
 	}
 	if code, _, _ := runCLI("context", "--from-hook"); code != 2 {
 		t.Fatalf("--from-hook with no transcript: exit %d", code)
 	}
 	stale := st.contextStatePath("/x/projects/-w/" + ctxOther + ".jsonl")
+	staleLock := st.contextLockPath("/x/projects/-w/" + ctxOther + ".jsonl")
 	os.WriteFile(stale, []byte("x\n"), 0o600)
+	os.WriteFile(staleLock, nil, 0o600)
 	old := time.Now().Add(-contextDebounce - time.Minute)
 	os.Chtimes(stale, old, old)
 	st.pruneSent()
-	if exists(stale) || !exists(state) {
-		t.Fatalf("after pruning: stale record kept %v, fresh record kept %v", exists(stale), exists(state))
+	if exists(stale) || exists(staleLock) || !exists(state) || !exists(st.contextLockPath(p)) {
+		t.Fatalf("after pruning: stale record kept %v, its lock %v, fresh record kept %v, its lock %v",
+			exists(stale), exists(staleLock), exists(state), exists(st.contextLockPath(p)))
 	}
 }
 

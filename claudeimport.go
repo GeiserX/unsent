@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -576,7 +577,7 @@ type contextOptions struct {
 	transcript string
 	history    bool
 	json       bool
-	fromHook   bool // the Stop hook started the pass (contextDebounced)
+	fromHook   bool // the Stop hook started the pass (contextWait)
 }
 
 func parseContextOptions(args []string, allowed ...string) (contextOptions, error) {
@@ -667,7 +668,7 @@ func cmdContext(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		files = []transcriptFile{{o.transcript, strings.TrimSuffix(filepath.Base(o.transcript), ".jsonl")}}
-		if o.fromHook && st.contextDebounced(o.transcript, time.Now()) {
+		if o.fromHook && !st.contextWait(o.transcript) {
 			return printContextResult(o, contextResult{}, stdout, stderr)
 		}
 	default:
@@ -711,16 +712,66 @@ func cmdContext(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
 		return 1
 	}
-	if o.transcript != "" {
+	if o.transcript != "" && !o.fromHook {
 		st.markContextPass(o.transcript, time.Now())
 	}
 	return printContextResult(o, res, stdout, stderr)
 }
 
-// contextDebounce is how long after a pass over a transcript a pass the
-// Stop hook starts on it is skipped: a busy conversation ends a turn every
-// few seconds, and each pass reads the whole transcript.
+// contextDebounce is the least time between two passes the Stop hook starts
+// on one transcript: a busy conversation ends a turn every few seconds, and
+// each pass reads the whole transcript.
 const contextDebounce = 10 * time.Minute
+
+// contextSleep waits between hook passes (contextWait); a test swaps it.
+var contextSleep = time.Sleep
+
+// contextLockPath is the lock the hook passes over transcript coalesce on:
+// sent/.context-<its name without .jsonl>.lock.
+func (s *store) contextLockPath(transcript string) string {
+	return strings.TrimSuffix(s.contextStatePath(transcript), ".state") + ".lock"
+}
+
+// contextWait spaces the passes the Stop hook starts on transcript
+// contextDebounce apart without dropping a turn. The first takes the
+// transcript's context lock, waits until contextDebounce has passed since
+// the last pass, records its own pass and lets the lock go, and only then
+// reads the transcript. A hook pass that finds the lock held returns false
+// and does nothing: the holder has not read the transcript yet, so it takes
+// this turn in. One that comes after the holder let go finds the pass
+// recorded and waits its turn in the same way, so the newest turns are
+// always read by a pass at most contextDebounce later. With no lock to take
+// it runs at once.
+func (s *store) contextWait(transcript string) bool {
+	p := s.contextLockPath(transcript)
+	if os.MkdirAll(filepath.Dir(p), 0o700) != nil {
+		return true
+	}
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return true
+	}
+	defer f.Close()
+	if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		return false
+	}
+	for now := time.Now(); s.contextDebounced(transcript, now); now = time.Now() {
+		last, _ := s.lastContextPass(transcript)
+		contextSleep(last.Add(contextDebounce).Sub(now))
+	}
+	s.markContextPass(transcript, time.Now())
+	return true
+}
+
+// lastContextPass is the time markContextPass recorded for transcript.
+func (s *store) lastContextPass(transcript string) (time.Time, bool) {
+	b, err := os.ReadFile(s.contextStatePath(transcript))
+	if err != nil {
+		return time.Time{}, false
+	}
+	last, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(b)))
+	return last, err == nil
+}
 
 // contextStatePath is the file that records the last pass over transcript:
 // sent/.context-<its name without .jsonl>.state.
@@ -730,18 +781,11 @@ func (s *store) contextStatePath(transcript string) string {
 
 // contextDebounced reports whether a pass over transcript ran less than
 // contextDebounce before now. A state file that does not parse, or a time
-// after now (a clock step back), never skips.
+// after now (a clock step back), never counts.
 func (s *store) contextDebounced(transcript string, now time.Time) bool {
-	b, err := os.ReadFile(s.contextStatePath(transcript))
-	if err != nil {
-		return false
-	}
-	last, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(b)))
-	if err != nil {
-		return false
-	}
+	last, ok := s.lastContextPass(transcript)
 	age := now.Sub(last)
-	return age >= 0 && age < contextDebounce
+	return ok && age >= 0 && age < contextDebounce
 }
 
 // markContextPass records a pass over transcript at now.
