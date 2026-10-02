@@ -212,9 +212,10 @@ func TestContextRefreshesReplyTo(t *testing.T) {
 	}
 }
 
-// context add --reply sets reply_to with the gloss; without it reply_to is
-// left as it is; the same gloss again, with or without --reply once the
-// flag is set, writes nothing.
+// context add --reply sets reply_to with the gloss, even when the gloss is
+// the one the line already holds; without it reply_to is left as it is; the
+// same gloss again, with or without --reply once the flag is set, writes
+// nothing.
 func TestContextAddReply(t *testing.T) {
 	claudeHome(t)
 	st := testStore(t)
@@ -242,6 +243,13 @@ func TestContextAddReply(t *testing.T) {
 	}
 	if ms := readMessages(t, path); !ms[0].ReplyTo || ms[0].Gloss != "chose one, again" {
 		t.Fatalf("after a gloss without --reply %+v", ms[0])
+	}
+	// The same gloss with --reply on a line not yet marked sets the flag.
+	if code, _, errOut := runCLI("context", "add", ctxConv, "2", "--gloss", "a note", "--reply"); code != 0 {
+		t.Fatalf("same gloss with --reply: exit %d, %q", code, errOut)
+	}
+	if ms := readMessages(t, path); !ms[1].ReplyTo || ms[1].Gloss != "a note" {
+		t.Fatalf("after the same gloss with --reply %+v", ms[1])
 	}
 	stamp := t0.Add(-time.Hour)
 	os.Chtimes(path, stamp, stamp)
