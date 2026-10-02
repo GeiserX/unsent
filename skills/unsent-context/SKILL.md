@@ -25,10 +25,10 @@ Exit status 2 with "on send is delete for claude" means the user keeps no sent m
 
 ```sh
 unsent log --json            # every conversation, newest first
-unsent log <id> --json       # one conversation and its messages
+unsent log <agent_session> --json   # one conversation and its messages
 ```
 
-Use `id` from the list, not `n`: list numbers move when another session sends. Only Claude Code conversations (`"agent": "claude"`) have context.
+Name a conversation by its `agent_session` (Claude Code's own session id), not by `n` or `id`: list numbers move when another session sends, and one run's `id` can name several conversations (after `/clear`), which makes the command exit 2. Fall back to `id` only when `agent_session` is empty. Only Claude Code conversations (`"agent": "claude"`) have context.
 
 ## 3. Write the glosses
 
@@ -44,7 +44,7 @@ Messages with `reply_to` false are bare directives. They get no gloss. Skip entr
 ## 4. Save each gloss
 
 ```sh
-unsent context add <id> <uuid> --gloss "Asked whether to keep the v1 flag or drop it; chose to drop it."
+unsent context add <agent_session> <uuid> --gloss "Asked whether to keep the v1 flag or drop it; chose to drop it."
 ```
 
 `<uuid>` is the message's `uuid` from the `--json` output you just read. Use it whenever the message has one: a context pass can add an earlier message while you work, which moves every `n` after it. Only for a message with no `uuid`, pass its `n` instead, and read the conversation again right before, since numbers also shift when old messages are dropped. For text with quotes, pass `--gloss -` and the line on standard input.
