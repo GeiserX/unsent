@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -351,7 +352,7 @@ func classify(r *ctRecord) (ctNode, *ctCandidate) {
 		if a.Type != "queued_command" || a.CommandMode != "prompt" || r.IsMeta || a.IsMeta || r.IsSidechain {
 			return n, nil
 		}
-		text := a.Prompt.text()
+		text := stripPastedContent(a.Prompt.text())
 		if a.Origin != nil {
 			if a.Origin.Kind != "human" {
 				return n, nil
@@ -374,7 +375,7 @@ func classify(r *ctRecord) (ctNode, *ctCandidate) {
 			(r.Origin != nil && r.Origin.Kind != "human") {
 			return n, nil
 		}
-		text := c.text()
+		text := stripPastedContent(c.text())
 		// A slash command record is a turn on every version, marked or
 		// not: 2.1.287 writes a custom command with neither origin nor
 		// promptSource.
@@ -587,12 +588,27 @@ func endsInQuestion(s string) bool {
 	return strings.HasSuffix(strings.TrimRight(s, " \t\r\n"), "?")
 }
 
-// normaliseSent is the form two copies of one message are compared in: tabs
-// as four spaces, every run of whitespace as one space, trimmed. What
-// unsent read off the screen and what the transcript holds differ in
-// exactly those ways.
+// pastedContentRE is the tag Claude Code wraps a pasted part of a message
+// in since 2.1.277 (seen through 2.1.287), `<pasted_content id="1">` and a
+// bare `<pasted_content>`, with its close. The box shows the paste without
+// it, so the live sent log does too.
+var pastedContentRE = regexp.MustCompile(`</?pasted_content(?:\s[^>]*)?>`)
+
+// stripPastedContent is s with the paste tags taken out and the paste left
+// in place: what the user sent.
+func stripPastedContent(s string) string {
+	if !strings.Contains(s, "pasted_content") {
+		return s
+	}
+	return pastedContentRE.ReplaceAllString(s, "")
+}
+
+// normaliseSent is the form two copies of one message are compared in: paste
+// tags taken out, tabs as four spaces, every run of whitespace as one space,
+// trimmed. What unsent read off the screen and what the transcript holds
+// differ in exactly those ways.
 func normaliseSent(s string) string {
-	return strings.Join(strings.Fields(strings.ReplaceAll(s, "\t", "    ")), " ")
+	return strings.Join(strings.Fields(strings.ReplaceAll(stripPastedContent(s), "\t", "    ")), " ")
 }
 
 // claudeSlug is the projects folder name Claude Code uses for a cwd: every

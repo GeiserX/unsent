@@ -48,7 +48,7 @@ unsent import claude --history       # and for conversations only history.jsonl 
 unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to drop it"
 ```
 
-`unsent context` matches each logged message to its turn in the transcript by its text, with spaces collapsed, and fills in `uuid`, `kind`, `asked` and `reply_to`. Turns that are not in the log, usually answers and absorbed prompts, are added with `source` `transcript`. A gloss already written is kept. It prints one line, such as `3 logs updated, 12 messages added, 87 matched`. `--json` prints the same counts as an object, with `skipped` added: turns older than 365 days or with no uuid, and transcripts it could not read.
+`unsent context` matches each logged message to its turn in the transcript by its text, with spaces collapsed, and fills in `uuid`, `kind`, `asked` and `reply_to`. A paste counts as the text it holds, whether the transcript wraps it in `<pasted_content>` tags or the log still shows it as `[Pasted text #1]` with the paste beside it. A message and a turn more than an hour apart are never matched, and when several messages share a text, such as `yes`, each turn takes the one nearest to it in time. Turns that are not in the log, usually answers and absorbed prompts, are added with `source` `transcript`. A gloss already written is kept. It prints one line, such as `3 logs updated, 12 messages added, 87 matched`. `--json` prints the same counts as an object, with `skipped` added: turns older than 365 days or with no uuid, and transcripts it could not read.
 
 ```json
 {

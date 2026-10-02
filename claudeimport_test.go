@@ -157,6 +157,90 @@ func TestContextMatchesLiveMessages(t *testing.T) {
 	}
 }
 
+// Turns pair with logged messages nearest in time first, across the whole
+// log, and never more than contextMatchWindow apart: an old turn with the
+// same short text as a live message, read first, does not take it from the
+// turn sent with it, and is added; a turn hours from the only message with
+// its text is added, not matched.
+func TestContextPairsNearestFirst(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-6", "claude", "/w", t0)
+	r.AgentSession = ctxConv
+	for i, text := range []string{"yes", "later", "ok"} {
+		r.Draft = text
+		if err := st.logSentAt(r, t0.Add(time.Duration(i)*10*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTurns(t, cfg, "-w", ctxConv,
+		claudeTurn{UUID: "old-yes", Kind: "typed", Time: t0.Add(-72 * time.Hour), Text: "yes", Asked: "Last week?", ReplyTo: true, SessionID: ctxConv},
+		claudeTurn{UUID: "new-yes", Kind: "typed", Time: t0.Add(time.Second), Text: "yes", Asked: "Now?", ReplyTo: true, SessionID: ctxConv},
+		claudeTurn{UUID: "far-later", Kind: "typed", Time: t0.Add(3 * time.Hour), Text: "later", SessionID: ctxConv},
+		// Both inside the window: the nearer one takes the message.
+		claudeTurn{UUID: "early-ok", Kind: "typed", Time: t0.Add(-10 * time.Minute), Text: "ok", SessionID: ctxConv},
+		claudeTurn{UUID: "live-ok", Kind: "typed", Time: t0.Add(20*time.Minute + 2*time.Second), Text: "ok", SessionID: ctxConv},
+	)
+	code, out, errOut := runCLI("context", "--config-dir", cfg)
+	if code != 0 || out != "1 logs updated, 3 messages added, 2 matched\n" {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
+	}
+	var got []string
+	for _, m := range readMessages(t, st.claudeLogPath(ctxConv)) {
+		got = append(got, m.UUID+"|"+m.Source+"|"+m.Text+"|"+m.Asked)
+	}
+	want := []string{
+		"old-yes|transcript|yes|Last week?",
+		"early-ok|transcript|ok|",
+		"new-yes||yes|Now?",
+		"||later|",
+		"live-ok||ok|",
+		"far-later|transcript|later|",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("messages\n%q\nwant\n%q", got, want)
+	}
+}
+
+// A logged message is one message with its turn when the transcript wraps
+// a paste in <pasted_content> tags, and when the log still shows a paste as
+// a placeholder with the paste beside it, in any order: matched, never
+// added a second time.
+func TestContextMatchesPastes(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-7", "claude", "/w", t0)
+	r.AgentSession = ctxConv
+	for i, c := range []struct {
+		draft  string
+		pastes []string
+	}{
+		{"look at\nline one\nline two", nil},
+		{"check [Pasted text #1 +2 lines] now", []string{"a\nb\nc"}},
+		{"x [Pasted text #2 +1 line] y [Pasted text #1 +1 line]", []string{"p one\nq", "p two\nr"}},
+	} {
+		r.Draft, r.Pastes = c.draft, c.pastes
+		if err := st.logSentAt(r, t0.Add(time.Duration(i)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTurns(t, cfg, "-w", ctxConv,
+		claudeTurn{UUID: "p-1", Kind: "typed", Time: t0, Text: "look at\n<pasted_content id=\"1\">line one\nline two</pasted_content>", SessionID: ctxConv},
+		claudeTurn{UUID: "p-2", Kind: "typed", Time: t0.Add(time.Minute), Text: "check a\nb\nc now", SessionID: ctxConv},
+		claudeTurn{UUID: "p-3", Kind: "typed", Time: t0.Add(2 * time.Minute), Text: "x p two\nr y p one\nq", SessionID: ctxConv},
+	)
+	code, out, errOut := runCLI("context", "--config-dir", cfg)
+	if code != 0 || out != "1 logs updated, 0 messages added, 3 matched\n" {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
+	}
+	ms := readMessages(t, st.claudeLogPath(ctxConv))
+	if len(ms) != 3 || ms[0].UUID != "p-1" || ms[1].UUID != "p-2" || ms[2].UUID != "p-3" || len(ms[1].Pastes) != 1 {
+		t.Fatalf("messages %+v", ms)
+	}
+}
+
 // A conversation with no sent log gets none from unsent context, and a
 // transcript named on the command line is read even outside the config
 // folders.

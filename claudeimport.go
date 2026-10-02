@@ -134,16 +134,25 @@ func joinSentLog(head []byte, lines []*sentLine) []byte {
 // there, as a send would, to check the lock keeps it.
 var mergeHook func(path string)
 
+// contextMatchWindow is how far apart in time a logged message and a turn
+// with the same text may be and still be one message. A turn is recorded
+// when the agent takes it, a queued or absorbed one up to about a minute
+// after it was sent; a conversation resumed over months repeats short
+// texts ("yes", a slash command) days apart, and those must not pair up.
+const contextMatchWindow = time.Hour
+
 // mergeSent merges messages from a transcript or history into the sent log
 // at path, under its lock. A message with a uuid the log already holds is
-// skipped; one whose normalised text equals a message of the log that has
-// no uuid gives that message its uuid, kind, asked and reply_to (the
-// nearest in time among equals); the rest are added. Messages from history
-// carry no uuid and are only written into a log this makes. When the log
-// is missing, head is its header, or with head nil nothing is done. The
-// lines end sorted by time and the file's time is its last message's, so a
-// backfill does not reset retention. A pass that changes nothing writes
-// nothing.
+// skipped. The rest are paired with the messages of the log that have no
+// uuid and the same text (sameSent) within contextMatchWindow, the
+// nearest pairs first across the whole log, so an old turn never takes the
+// live message of a later one; a paired message gets the turn's uuid, kind,
+// asked and reply_to, and the turns left over are added. Messages from
+// history carry no uuid and are only written into a log this makes. When
+// the log is missing, head is its header, or with head nil nothing is
+// done. The lines end sorted by time and the file's time is its last
+// message's, so a backfill does not reset retention. A pass that changes
+// nothing writes nothing.
 func mergeSent(path string, head *sentHeader, msgs []sentMessage) (contextResult, error) {
 	var res contextResult
 	unlock, err := lockSent(path)
@@ -174,22 +183,29 @@ func mergeSent(path string, head *sentHeader, msgs []sentMessage) (contextResult
 			have[l.msg.UUID] = true
 		}
 	}
+	var turns, plain []sentMessage
 	for _, m := range msgs {
-		if m.UUID == "" && !created {
-			continue
-		}
-		if m.UUID != "" && have[m.UUID] {
-			continue
-		}
-		if m.UUID != "" {
-			have[m.UUID] = true
-			if l := nearestMatch(lines, m); l != nil {
-				l.msg.UUID, l.msg.Kind, l.msg.Asked, l.msg.ReplyTo = m.UUID, m.Kind, m.Asked, m.ReplyTo
-				l.dirty = true
-				res.Matched++
-				continue
+		switch {
+		case m.UUID == "":
+			if created {
+				plain = append(plain, m)
 			}
+		case !have[m.UUID]:
+			have[m.UUID] = true
+			turns = append(turns, m)
 		}
+	}
+	paired := pairTurns(lines, turns)
+	for i, m := range turns {
+		if l := paired[i]; l != nil {
+			l.msg.UUID, l.msg.Kind, l.msg.Asked, l.msg.ReplyTo = m.UUID, m.Kind, m.Asked, m.ReplyTo
+			l.dirty = true
+			res.Matched++
+			continue
+		}
+		plain = append(plain, m)
+	}
+	for _, m := range plain {
 		lines = append(lines, &sentLine{kind: sentLineMessage, msg: m, at: m.Time, dirty: true})
 		res.Added++
 	}
@@ -218,23 +234,106 @@ func mergeSent(path string, head *sentHeader, msgs []sentMessage) (contextResult
 	return res, nil
 }
 
-// nearestMatch is the message of lines with no uuid whose normalised text
-// equals m's, nearest to m in time; nil when there is none.
-func nearestMatch(lines []*sentLine, m sentMessage) *sentLine {
-	want := normaliseSent(m.Text)
-	var best *sentLine
-	var gap time.Duration
-	for _, l := range lines {
-		if l.kind != sentLineMessage || l.msg.UUID != "" || normaliseSent(l.msg.Text) != want {
+// pairTurns pairs turns with the messages of lines that have no uuid: a
+// pair is a message and a turn of the same text (sameSent) at most
+// contextMatchWindow apart, and pairs are taken nearest in time first, each
+// message and each turn once. paired[i] is turn i's message, nil for none.
+func pairTurns(lines []*sentLine, turns []sentMessage) []*sentLine {
+	paired := make([]*sentLine, len(turns))
+	type pair struct {
+		turn, line int
+		gap        time.Duration
+	}
+	var pairs []pair
+	byText := map[string][]int{} // messages without a paste placeholder
+	var withPastes []int
+	for j, l := range lines {
+		if l.kind != sentLineMessage || l.msg.UUID != "" {
 			continue
 		}
-		d := l.msg.Time.Sub(m.Time).Abs()
-		if best == nil || d < gap {
-			best, gap = l, d
+		if len(l.msg.Pastes) > 0 && pastedTextRE.MatchString(l.msg.Text) {
+			withPastes = append(withPastes, j)
+			continue
+		}
+		k := normaliseSent(l.msg.Text)
+		byText[k] = append(byText[k], j)
+	}
+	for i, m := range turns {
+		want := normaliseSent(m.Text)
+		try := func(j int) {
+			if d := lines[j].msg.Time.Sub(m.Time).Abs(); d <= contextMatchWindow {
+				pairs = append(pairs, pair{i, j, d})
+			}
+		}
+		for _, j := range byText[want] {
+			try(j)
+		}
+		for _, j := range withPastes {
+			if sameSent(lines[j].msg, want) {
+				try(j)
+			}
 		}
 	}
-	return best
+	sort.SliceStable(pairs, func(a, b int) bool { return pairs[a].gap < pairs[b].gap })
+	used := map[int]bool{}
+	for _, p := range pairs {
+		if paired[p.turn] == nil && !used[p.line] {
+			paired[p.turn] = lines[p.line]
+			used[p.line] = true
+		}
+	}
+	return paired
 }
+
+// sameSent reports whether the logged message m and a turn whose
+// normalised text is want are one message. m's text can still show a
+// paste as a placeholder, with the paste in m.Pastes, while the transcript
+// holds it in place: then each placeholder, in order, is filled with a
+// paste of m.Pastes, each once, and the result compared. The numbers on
+// the placeholders do not say which paste is which, so every assignment
+// is tried, up to sameSentTries.
+func sameSent(m sentMessage, want string) bool {
+	if normaliseSent(m.Text) == want {
+		return true
+	}
+	holes := pastedTextRE.FindAllStringIndex(m.Text, -1)
+	if len(holes) == 0 || len(holes) > len(m.Pastes) {
+		return false
+	}
+	used := make([]bool, len(m.Pastes))
+	tries := 0
+	var fill func(k int, b *strings.Builder) bool
+	fill = func(k int, b *strings.Builder) bool {
+		from := 0
+		if k > 0 {
+			from = holes[k-1][1]
+		}
+		if k == len(holes) {
+			tries++
+			return normaliseSent(b.String()+m.Text[from:]) == want
+		}
+		for i, p := range m.Pastes {
+			if used[i] || tries >= sameSentTries {
+				continue
+			}
+			var next strings.Builder
+			next.WriteString(b.String())
+			next.WriteString(m.Text[from:holes[k][0]])
+			next.WriteString(p)
+			used[i] = true
+			ok := fill(k+1, &next)
+			used[i] = false
+			if ok {
+				return true
+			}
+		}
+		return false
+	}
+	return fill(0, &strings.Builder{})
+}
+
+// sameSentTries caps the paste assignments sameSent tries for one message.
+const sameSentTries = 120
 
 // turnMessage is a turn as a sent log message.
 func turnMessage(t claudeTurn) sentMessage {
@@ -393,8 +492,9 @@ type claudeHistoryEntry struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-// pastedTextRE is the placeholder history.jsonl keeps for a paste.
-var pastedTextRE = regexp.MustCompile(`\[Pasted text #(\d+)(?: \+\d+ lines)?\]`)
+// pastedTextRE is the placeholder Claude Code shows for a paste, in the box
+// and in history.jsonl.
+var pastedTextRE = regexp.MustCompile(`\[Pasted text #(\d+)(?: \+\d+ lines?)?\]`)
 
 // text is the entry's display with each placeholder whose paste the entry
 // holds put back.

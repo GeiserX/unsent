@@ -512,6 +512,20 @@ func TestClaudeTranscriptLongLines(t *testing.T) {
 	}
 }
 
+// A paste Claude Code wrapped in <pasted_content> tags reads back as it
+// was sent, typed or absorbed mid-turn.
+func TestClaudeTranscriptPastedContent(t *testing.T) {
+	human := map[string]any{"kind": "human"}
+	ctExpect(t, ctBuild(
+		ctTyped("u1", "", "look at\n<pasted_content id=\"1\">line one\nline two</pasted_content>\nplease"),
+		ctSays("a1", "u1", "m1", ctText("Looking.")),
+		ctQueued("q1", "a1", map[string]any{"commandMode": "prompt", "prompt": "and <pasted_content>this</pasted_content>", "origin": human}),
+	),
+		ctBrief{"u1", "typed", "look at\nline one\nline two\nplease", "", false},
+		ctBrief{"q1", "absorbed", "and this", "Looking.", false},
+	)
+}
+
 // A huge assistant text gives the same asked and reply_to as its tail: the
 // reader keeps only the end of each.
 func TestClaudeTranscriptHugeAssistantText(t *testing.T) {
@@ -631,6 +645,10 @@ func TestNormaliseSent(t *testing.T) {
 		"x\r\n\ty":           "x y",
 		"":                   "",
 		" \n\t ":             "",
+		// A paste as the transcript wraps it equals the paste inline.
+		"look at\n<pasted_content id=\"1\">a\n\tb</pasted_content> please": "look at a b please",
+		"<pasted_content>x</pasted_content>":                               "x",
+		"<pasted_contents>kept</pasted_contents>":                          "<pasted_contents>kept</pasted_contents>",
 	}
 	for in, want := range cases {
 		if got := normaliseSent(in); got != want {
