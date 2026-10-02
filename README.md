@@ -27,6 +27,8 @@ unsent: recovered a draft from 18:42 today, 23 lines. Run `unsent restore` to co
 - Puts a draft back into the box when you reopen its Claude Code, Codex or agy conversation. Nothing is sent for you.
 - Recovers long drafts that scroll inside the box, and big pastes shown as placeholders.
 - Keeps a log of the messages you sent, and a history of drafts you cleared or replaced.
+- Adds context to Claude Code messages: what the agent had just said or asked when you answered, read from its transcript.
+- Imports every message you ever sent to Claude Code into the sent log, once, with `unsent import claude`.
 - Saves your half-typed zsh command line too.
 - `list --json`, `show --json` and `log --json` for scripts and agents.
 - Works in any terminal app, tmux and SSH. Drafts stay on your machine; `unsent` makes no network connections.
@@ -50,6 +52,7 @@ The full documentation is at [geiserx.github.io/unsent](https://geiserx.github.i
 - [Configuration](https://geiserx.github.io/unsent/configuration/): every environment variable, and how to turn `unsent` off for a while
 - [Using unsent](https://geiserx.github.io/unsent/usage/): setup, recovering drafts, JSON output, the Claude Code hook, what differs in Codex, agy and pi
 - [Sent messages](https://geiserx.github.io/unsent/sent-messages/): the sent log and its JSON shape
+- [Context](https://geiserx.github.io/unsent/context/): what each sent message answered, the one-off import, and the Stop hook
 - [Your zsh command line](https://geiserx.github.io/unsent/zsh/): the half-typed command line, and what is never saved
 - [Supported agents](https://geiserx.github.io/unsent/supported-agents/): which agent versions were checked, and how
 - [How it works](https://geiserx.github.io/unsent/how-it-works/): the mechanism, the one promise, and where drafts live
