@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -434,19 +435,41 @@ func sentLockPath(path string) string {
 	return filepath.Join(filepath.Dir(path), ".lock-"+strings.TrimSuffix(filepath.Base(path), ".jsonl"))
 }
 
-// lockSent takes the lock of the sent log at path, waiting for it, and
-// returns what releases it. Every write to a sent log holds it: a send's
-// append, a trim, and `unsent context`, which replaces the file, so an
-// append made between its read and its write would land in the file it
-// replaced. The kernel drops the lock if the process dies.
+// sentLockWait is how long lockSent waits for a lock another process
+// holds. A send takes the lock on the wrap's main loop, which also saves the
+// box and acts on a window close, so a holder that is stopped (Ctrl+Z) or
+// stuck must not hold the loop up for longer; the send then goes to history
+// (sendOff). A test shortens it.
+var sentLockWait = 2 * time.Second
+
+// errSentBusy is lockSent giving up after sentLockWait.
+var errSentBusy = errors.New("the sent log is locked by another process")
+
+// lockSent takes the lock of the sent log at path, waiting for it up to
+// sentLockWait, and returns what releases it. Every write to a sent log
+// holds it: a send's append, a trim, and `unsent context`, which replaces
+// the file, so an append made between its read and its write would land in
+// the file it replaced. The kernel drops the lock if the process dies.
 func lockSent(path string) (func(), error) {
 	lp := sentLockPath(path)
+	deadline := time.Now().Add(sentLockWait)
 	for {
 		f, err := os.OpenFile(lp, os.O_CREATE|os.O_RDWR, 0o600)
 		if err != nil {
 			return nil, err
 		}
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		for {
+			err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+			if err != syscall.EWOULDBLOCK && err != syscall.EINTR {
+				break
+			}
+			if !time.Now().Before(deadline) {
+				f.Close()
+				return nil, fmt.Errorf("%s: %w", path, errSentBusy)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		if err != nil {
 			f.Close()
 			return nil, err
 		}

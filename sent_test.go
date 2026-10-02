@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -807,4 +808,44 @@ func TestSessionTruncatedMiddle(t *testing.T) {
 		}
 		s.expect(nil, c.history)
 	}
+}
+
+// A send whose sent log another process holds locked (a context pass
+// stopped with Ctrl+Z) gives up after sentLockWait instead of holding up the
+// wrap's loop, and the draft goes to history; once the lock is free the
+// next send is logged.
+func TestSendGivesUpOnAHeldLock(t *testing.T) {
+	old := sentLockWait
+	sentLockWait = 200 * time.Millisecond
+	t.Cleanup(func() { sentLockWait = old })
+	s := newSendSession(t, &claude)
+	path := s.store.sentPath(s.rec.ID)
+	os.MkdirAll(filepath.Dir(path), 0o700)
+	f, err := os.OpenFile(sentLockPath(path), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	s.rec.Draft = "sent while the log was held"
+	done := make(chan error, 1)
+	go func() { done <- s.sendOff() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		f.Close()
+		<-done
+		t.Fatal("the send waited for the lock")
+	}
+	s.expect(nil, []string{"sent while the log was held"})
+	f.Close()
+	s.rec.Draft = "sent after"
+	if err := s.sendOff(); err != nil {
+		t.Fatal(err)
+	}
+	s.expect([]string{"sent after"}, []string{"sent while the log was held"})
 }
