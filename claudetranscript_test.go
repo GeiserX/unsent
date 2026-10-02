@@ -203,25 +203,25 @@ func TestClaudeTranscriptBlocksAndImages(t *testing.T) {
 }
 
 // A slash command the human typed reads back as "/name args", on every
-// version and with no marks at all (2.1.287 writes /revive with neither
-// origin nor promptSource); a record led by <command-name> is the
+// version and with no marks at all (2.1.287 writes a custom command with
+// neither origin nor promptSource); a record led by <command-name> is the
 // harness's echo of a local command.
 func TestClaudeTranscriptSlashCommands(t *testing.T) {
 	ctExpect(t, ctBuild(
 		ctTyped("u1", "", "<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>the open PR</command-args>"),
-		ctWith(ctTyped("u2", "u1", "<command-message>revive</command-message>\n<command-name>/revive</command-name>"), "promptSource", nil),
+		ctWith(ctTyped("u2", "u1", "<command-message>digest</command-message>\n<command-name>/digest</command-name>"), "promptSource", nil),
 		ctPlain("u3", "u2", ctOld, "<command-message>notes</command-message>\n<command-name>/notes</command-name>\n<command-args></command-args>"),
 		ctPlain("u4", "u3", ctNew, "<command-message>plan</command-message>\n<command-name>/plan</command-name>"),
 		ctPlain("u5", "u4", ctNew, "<command-name>/model</command-name>\n            <command-message>model</command-message>\n            <command-args></command-args>"),
 		ctPlain("u6", "u5", ctOld, "<local-command-stdout>Set model to x</local-command-stdout>"),
 		ctWith(ctTyped("u7", "u6", "<command-message>skill</command-message>\n<command-name>skill</command-name>"), "isMeta", true),
-		ctPlain("u8", "u7", "2.1.287", "<command-message>revive</command-message>\n<command-name>/revive</command-name>\n<command-args>where we were</command-args>"),
+		ctPlain("u8", "u7", "2.1.287", "<command-message>digest</command-message>\n<command-name>/digest</command-name>\n<command-args>where we were</command-args>"),
 	),
 		ctBrief{"u1", "slash", "/review the open PR", "", false},
-		ctBrief{"u2", "slash", "/revive", "", false},
+		ctBrief{"u2", "slash", "/digest", "", false},
 		ctBrief{"u3", "slash", "/notes", "", false},
 		ctBrief{"u4", "slash", "/plan", "", false},
-		ctBrief{"u8", "slash", "/revive where we were", "", false},
+		ctBrief{"u8", "slash", "/digest where we were", "", false},
 	)
 }
 
@@ -509,6 +509,23 @@ func TestClaudeTranscriptLongLines(t *testing.T) {
 	))
 	if len(turns) != 2 || len(turns[1].Text) != 2<<20 || turns[1].Asked != "Reading?" {
 		t.Fatalf("got %d turns", len(turns))
+	}
+}
+
+// A huge assistant text gives the same asked and reply_to as its tail: the
+// reader keeps only the end of each.
+func TestClaudeTranscriptHugeAssistantText(t *testing.T) {
+	head := strings.Repeat("words and more words. ", 10<<20/22)
+	tail := "é" + strings.Repeat("b", 1500) + "\nWhich one?\n\n"
+	turns := ctRead(t, ctBuild(
+		ctTyped("u1", "", "go"),
+		ctSays("a1", "u1", "m1", ctText(head)),
+		ctSays("a2", "a1", "m1", ctText(tail)),
+		ctTyped("u2", "a2", "the first"),
+	))
+	want := lastRunes(strings.TrimSpace(head+"\n"+tail), claudeAskedMax)
+	if len(turns) != 2 || turns[1].Asked != want || !turns[1].ReplyTo {
+		t.Fatalf("asked %d bytes, reply_to %v", len(turns[1].Asked), turns[1].ReplyTo)
 	}
 }
 

@@ -250,11 +250,14 @@ func readClaudeTranscript(r io.Reader) ([]claudeTurn, error) {
 					if _, dup := nodes[rec.UUID]; !dup {
 						n, c := classify(&rec)
 						if n.msg != "" {
-							if t := texts[n.msg]; t != "" {
-								texts[n.msg] = t + "\n" + rec.Message.Content.text()
-							} else {
-								texts[n.msg] = rec.Message.Content.text()
+							t := rec.Message.Content.text()
+							if prev := texts[n.msg]; prev != "" {
+								t = prev + "\n" + t
 							}
+							// Only the tail is ever read (asked, and whether
+							// it ends in a question); a margin covers the
+							// trailing space trimmed before the cut.
+							texts[n.msg] = lastRunes(t, 2*claudeAskedMax)
 							lastText = n.msg
 						}
 						nodes[rec.UUID] = n
@@ -373,7 +376,7 @@ func classify(r *ctRecord) (ctNode, *ctCandidate) {
 		}
 		text := c.text()
 		// A slash command record is a turn on every version, marked or
-		// not: 2.1.287 writes /revive with neither origin nor
+		// not: 2.1.287 writes a custom command with neither origin nor
 		// promptSource.
 		if t := strings.TrimLeft(text, " \t\r\n"); strings.HasPrefix(t, "<command-message>") {
 			n.role = ctHuman
