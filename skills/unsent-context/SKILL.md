@@ -44,10 +44,10 @@ Messages with `reply_to` false are bare directives. They get no gloss. Skip entr
 ## 4. Save each gloss
 
 ```sh
-unsent context add <id> <n> --gloss "Asked whether to keep the v1 flag or drop it; chose to drop it."
+unsent context add <id> <uuid> --gloss "Asked whether to keep the v1 flag or drop it; chose to drop it."
 ```
 
-`<n>` is the message's `n` from the `--json` output you just read. Read a conversation and write its glosses in one go: numbers shift when old messages are dropped, so never reuse an `n` from an earlier read. For text with quotes, pass `--gloss -` and the line on standard input.
+`<uuid>` is the message's `uuid` from the `--json` output you just read. Use it whenever the message has one: a context pass can add an earlier message while you work, which moves every `n` after it. Only for a message with no `uuid`, pass its `n` instead, and read the conversation again right before, since numbers also shift when old messages are dropped. For text with quotes, pass `--gloss -` and the line on standard input.
 
 ## 5. Finish
 

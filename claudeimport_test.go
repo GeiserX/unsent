@@ -96,7 +96,7 @@ func TestContextMatchesLiveMessages(t *testing.T) {
 		}
 	}
 	path := st.claudeLogPath(ctxConv)
-	if err := setGloss(path, 1, "the parser bug from yesterday"); err != nil {
+	if err := setGloss(path, messageKey{n: 1}, "the parser bug from yesterday"); err != nil {
 		t.Fatal(err)
 	}
 	// A later build's field on the third message.
@@ -519,6 +519,40 @@ func TestContextAdd(t *testing.T) {
 		if code, _, _ := runCLI(args...); code != 2 {
 			t.Errorf("%q: exit %d, want 2", args, code)
 		}
+	}
+}
+
+// context add names a message by its uuid too, which a pass that adds an
+// earlier turn does not move, while the number does; a uuid the log does
+// not hold exits 2.
+func TestContextAddByUUID(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-a", "claude", "/w", t0)
+	r.AgentSession = ctxConv
+	for i, text := range []string{"one", "two"} {
+		r.Draft = text
+		st.logSentAt(r, t0.Add(time.Duration(i)*2*time.Minute))
+	}
+	writeTurns(t, cfg, "-w", ctxConv,
+		claudeTurn{UUID: "g-1", Kind: "typed", Time: t0, Text: "one", SessionID: ctxConv},
+		claudeTurn{UUID: "g-mid", Kind: "absorbed", Time: t0.Add(time.Minute), Text: "in between", SessionID: ctxConv},
+		claudeTurn{UUID: "g-2", Kind: "typed", Time: t0.Add(2 * time.Minute), Text: "two", Asked: "Which?", ReplyTo: true, SessionID: ctxConv},
+	)
+	if code, out, errOut := runCLI("context", "--config-dir", cfg); code != 0 || out != "1 logs updated, 1 messages added, 2 matched\n" {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
+	}
+	// "two" was message 2 before the pass and is 3 now.
+	if code, _, errOut := runCLI("context", "add", ctxConv, "g-2", "--gloss", "chose two"); code != 0 {
+		t.Fatalf("by uuid: exit %d, %q", code, errOut)
+	}
+	ms := readMessages(t, st.claudeLogPath(ctxConv))
+	if ms[2].Text != "two" || ms[2].Gloss != "chose two" || ms[1].Gloss != "" {
+		t.Fatalf("messages %+v", ms)
+	}
+	if code, _, errOut := runCLI("context", "add", ctxConv, "g-none", "--gloss", "x"); code != 2 || errOut != "unsent: that session has no message g-none\n" {
+		t.Fatalf("an unknown uuid: exit %d, %q", code, errOut)
 	}
 }
 

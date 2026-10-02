@@ -378,7 +378,7 @@ One list, so the plan has one source. `UNSENT_NOTICE=0` (2.4) joins `UNSENT_OFF`
 | `unsent init zsh` | Print the zsh command-line hooks that setup writes | Must |
 | `unsent hook claude` | Print a Claude Code hook config: `SessionStart` notes a resumed session's draft (2.4), `Stop` starts `unsent context` for the turn's transcript, detached, skipped within 10 minutes of the last pass over it | Should, v0.5.1; Stop added |
 | `unsent context` | Give each Claude Code conversation's sent log its context from the transcript (uuid, kind, the agent's text before each message) and add the answers and absorbed messages the screen missed; `--config-dir`, `--session`, `--transcript`, `--json` | Should |
-| `unsent context add <session> <n> --gloss TEXT` | Set a one-line gloss on one message | Should |
+| `unsent context add <session> <n\|uuid> --gloss TEXT` | Set a one-line gloss on one message | Should |
 | `unsent import claude` | The same over every transcript, making the missing logs; `--history` adds conversations only `history.jsonl` still has | Should |
 | `unsent version` | Version | Today |
 

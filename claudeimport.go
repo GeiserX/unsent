@@ -812,9 +812,11 @@ func cmdImport(args []string, stdout, stderr io.Writer) int {
 	return printContextResult(o, res, stdout, stderr)
 }
 
-// cmdContextAdd is `unsent context add <session> <n> --gloss TEXT`: it
-// sets message n's gloss, one line, TEXT - read from stdin, and keeps the
-// log's time.
+// cmdContextAdd is `unsent context add <session> <n|uuid> --gloss TEXT`:
+// it sets the gloss of one message, one line, TEXT - read from stdin, and
+// keeps the log's time. The message is named by its uuid, which stays put,
+// or by n, its place in the log as it is now, which a pass that adds an
+// earlier turn moves.
 func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var rest []string
 	gloss, set := "", false
@@ -826,12 +828,16 @@ func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 		}
 		rest = append(rest, args[i])
 	}
-	n, err := 0, error(nil)
+	var key messageKey
 	if len(rest) == 2 {
-		n, err = strconv.Atoi(rest[1])
+		if n, err := strconv.Atoi(rest[1]); err == nil {
+			key.n = n
+		} else {
+			key.uuid = rest[1]
+		}
 	}
-	if !set || len(rest) != 2 || err != nil || n < 1 {
-		fmt.Fprintln(stderr, "unsent: usage: unsent context add <session> <n> --gloss TEXT (TEXT - reads stdin)")
+	if !set || len(rest) != 2 || key.uuid == "" && key.n < 1 {
+		fmt.Fprintln(stderr, "unsent: usage: unsent context add <session> <n|uuid> --gloss TEXT (TEXT - reads stdin)")
 		return 2
 	}
 	if gloss == "-" {
@@ -852,9 +858,9 @@ func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 	if l == nil {
 		return 2
 	}
-	switch err := setGloss(l.path, n, gloss); {
+	switch err := setGloss(l.path, key, gloss); {
 	case errors.Is(err, errNoMessage):
-		fmt.Fprintf(stderr, "unsent: that session has no message %d\n", n)
+		fmt.Fprintf(stderr, "unsent: that session has no message %s\n", rest[1])
 		return 2
 	case err != nil:
 		fmt.Fprintf(stderr, "unsent: %v\n", err)
@@ -865,10 +871,16 @@ func cmdContextAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 
 var errNoMessage = errors.New("no such message")
 
-// setGloss sets the gloss of message n (from 1, as unsent log numbers
-// them) of the sent log at path, under its lock, and keeps the file's
-// time.
-func setGloss(path string, n int, gloss string) error {
+// messageKey names one message of a sent log: by uuid when set, else by n,
+// from 1, as unsent log numbers them.
+type messageKey struct {
+	n    int
+	uuid string
+}
+
+// setGloss sets the gloss of the message key names in the sent log at
+// path, under its lock, and keeps the file's time.
+func setGloss(path string, key messageKey, gloss string) error {
 	unlock, err := lockSent(path)
 	if err != nil {
 		return err
@@ -891,16 +903,18 @@ func setGloss(path string, n int, gloss string) error {
 		if l.kind != sentLineMessage {
 			continue
 		}
-		if k++; k == n {
-			if l.msg.Gloss == gloss {
-				return nil
-			}
-			l.msg.Gloss, l.dirty = gloss, true
-			if err := writeFileDurable(path, joinSentLog(head, lines)); err != nil {
-				return err
-			}
-			return os.Chtimes(path, fi.ModTime(), fi.ModTime())
+		k++
+		if key.uuid != "" && l.msg.UUID != key.uuid || key.uuid == "" && k != key.n {
+			continue
 		}
+		if l.msg.Gloss == gloss {
+			return nil
+		}
+		l.msg.Gloss, l.dirty = gloss, true
+		if err := writeFileDurable(path, joinSentLog(head, lines)); err != nil {
+			return err
+		}
+		return os.Chtimes(path, fi.ModTime(), fi.ModTime())
 	}
 	return errNoMessage
 }

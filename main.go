@@ -51,7 +51,7 @@ Usage:
                              what the agent had just said, and the answers and
                              messages typed while it worked, which the screen
                              never showed as sent
-  unsent context add <session> <n> --gloss TEXT
+  unsent context add <session> <n|uuid> --gloss TEXT
                              set a one-line note on message n of a sent log
                              (TEXT - reads stdin); unsent log shows it
   unsent import claude [--config-dir DIR]... [--history] [--json]

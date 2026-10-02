@@ -65,7 +65,7 @@ unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to dro
 
 `unsent import claude` is the one-off backfill. It does what `unsent context` does and also creates a log for every transcript that has none, so your past conversations show in `unsent log`. With `--history`, a session found only in Claude Code's `history.jsonl`, whose transcript is gone, gets a log too: its messages are `typed`, with `source` `history` and no `asked`, since that file keeps no reply. Turns older than the 365 days a log is kept are skipped. When `UNSENT_ON_SEND` or `UNSENT_ON_SEND_CLAUDE` is `delete`, it imports nothing, says so and exits with status 2.
 
-`unsent context add <session> <n> --gloss TEXT` sets the gloss of message `n`. `<session>` is what `unsent log <session>` takes: the number from the list, unsent's id or Claude Code's session id. `--gloss -` reads the text from standard input. It exits with status 2 when the session or the message is not there.
+`unsent context add <session> <n|uuid> --gloss TEXT` sets the gloss of one message, named by its `uuid` or by `n`. Prefer the `uuid`: it never changes, while `n` is the message's place in the log as it is now, and a pass that adds an earlier turn, such as one the Stop hook starts while you read, moves every message after it. `<session>` is what `unsent log <session>` takes: the number from the list, unsent's id or Claude Code's session id. `--gloss -` reads the text from standard input. It exits with status 2 when the session or the message is not there.
 
 `unsent import` and `unsent context` take the place of any program with that name, such as ImageMagick's `import`. To run such a program through `unsent`, use `unsent -- import`.
 
