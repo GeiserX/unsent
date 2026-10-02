@@ -313,6 +313,11 @@ func trim(pattern string, limit int) {
 // trimOldest keeps the limit most recently written files matching pattern.
 func trimOldest(pattern string, limit int) {
 	names, _ := filepath.Glob(pattern)
+	trimOldestOf(names, limit)
+}
+
+// trimOldestOf keeps the limit most recently written of the files names.
+func trimOldestOf(names []string, limit int) {
 	if len(names) <= limit {
 		return
 	}

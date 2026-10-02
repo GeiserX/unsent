@@ -581,7 +581,8 @@ func sentKind(line []byte) sentLineKind {
 }
 
 // pruneSent deletes sent logs not written for sentMaxAge, then the oldest
-// beyond sentLimit, then the lock files of logs that are gone, the context
+// beyond sentLimit for each agent (sentGroup), so importing one agent's
+// conversations never pushes out another agent's logs, then the lock files of logs that are gone, the context
 // pass records (contextStatePath) older than contextDebounce, which no
 // longer hold a pass back, and the context locks of records that are gone.
 func (s *store) pruneSent() {
@@ -592,7 +593,15 @@ func (s *store) pruneSent() {
 			os.Remove(n)
 		}
 	}
-	trimOldest(pattern, sentLimit)
+	names, _ = filepath.Glob(pattern)
+	groups := map[string][]string{}
+	for _, n := range names {
+		g := sentGroup(n)
+		groups[g] = append(groups[g], n)
+	}
+	for _, g := range groups {
+		trimOldestOf(g, sentLimit)
+	}
 	locks, _ := filepath.Glob(filepath.Join(s.dir, "sent", ".lock-*"))
 	for _, lp := range locks {
 		log := filepath.Join(filepath.Dir(lp), strings.TrimPrefix(filepath.Base(lp), ".lock-")+".jsonl")
@@ -632,6 +641,20 @@ func (s *store) pruneSent() {
 			f.Close()
 		}
 	}
+}
+
+// sentGroup is the agent whose conversation the sent log at path holds,
+// from its name <agent>-<session>, or "" for a log of one run of unsent.
+func sentGroup(path string) string {
+	a, _, ok := strings.Cut(strings.TrimSuffix(filepath.Base(path), ".jsonl"), "-")
+	if ok {
+		for _, p := range profiles {
+			if p.name == a {
+				return a
+			}
+		}
+	}
+	return ""
 }
 
 // readSent reads one sent log. A line cut short by a crash is skipped.

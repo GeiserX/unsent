@@ -662,6 +662,30 @@ func TestSentLogRetentionCap(t *testing.T) {
 	}
 }
 
+// The cap is per agent: an import that brings more than sentLimit Claude
+// Code conversations, all newer than every other log, drops only the oldest
+// Claude Code logs, never a run's log or another agent's.
+func TestSentLogCapIsPerAgent(t *testing.T) {
+	st := testStore(t)
+	dir := filepath.Join(st.dir, "sent")
+	run := ageLog(t, dir, "20260101-120000-123", 48*time.Hour)
+	codex := ageLog(t, dir, "codex-0b1c2d3e-0000-4000-8000-000000000001", 47*time.Hour)
+	oldest := ageLog(t, dir, "claude-00000000-0000-4000-8000-999999999999", 46*time.Hour)
+	for i := range sentLimit {
+		ageLog(t, dir, fmt.Sprintf("claude-10000000-0000-4000-8000-%012d", i), time.Duration(sentLimit-i)*time.Minute)
+	}
+	st.pruneSent()
+	if !exists(run) || !exists(codex) {
+		t.Fatalf("the Claude Code import pushed out other logs: run kept %v, codex kept %v", exists(run), exists(codex))
+	}
+	if exists(oldest) {
+		t.Fatal("the oldest Claude Code log beyond the cap was kept")
+	}
+	if names, _ := filepath.Glob(filepath.Join(dir, "claude-*.jsonl")); len(names) != sentLimit {
+		t.Fatalf("%d Claude Code logs kept, want %d", len(names), sentLimit)
+	}
+}
+
 // A live session prunes too, when it starts a new log: a user who never
 // runs unsent log still gets the limits.
 func TestSentLogPrunesOnANewLog(t *testing.T) {

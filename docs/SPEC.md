@@ -346,7 +346,7 @@ The shell prompt is in scope, not optional (decision 5). A command typed at the 
 - **Must. `unsent log`** lists sessions that have a sent log, newest first: agent, folder, start time, message count, and the first line of the last message. `--agent <name>` and `--here` filter it. **`unsent log <session>`** prints that session's messages in order, numbered, with times. `<session>` is the number from the list, unsent's session id, or the agent's own session id. `--copy N` puts message N on the clipboard, with the same rules as `unsent restore` (print when there is no clipboard, `clip.exe` on WSL).
 - **Must. Retention.** The sent log is a convenience copy of text the agent already holds, so unlike orphans it expires [design]:
   - a session log over 5 MB drops its oldest messages first and records how many at the top;
-  - logs not written for 365 days are deleted, and at most 2,000 session logs are kept, oldest deleted first; a log `unsent context` or `unsent import` writes takes its last message's time, so a backfill does not reset its age;
+  - logs not written for 365 days are deleted, and at most 2,000 session logs per agent are kept (logs of single runs count as one more group), oldest deleted first, so an import of one agent's conversations never deletes another agent's logs; a log `unsent context` or `unsent import` writes takes its last message's time, so a backfill does not reset its age;
   - `unsent forget --log <session>` deletes one at once. Here `<session>` is unsent's session id, which `unsent log` shows on every row, never the list number: a session that sends its first message in between shifts the numbers, and the deletion cannot be undone [design].
 - **Must. Off.** `UNSENT_ON_SEND=delete` keeps no text recognized as sent for any agent; the per-name variable does it for one. Turning it off does not delete existing logs; `unsent forget --log` does.
 
@@ -481,7 +481,7 @@ A claim that unsent works with an agent names a version and a date, and rests on
   - A key typed just before Enter, inside one tick, is in the logged text.
   - Under `delete`, nothing of the message remains in `sent/`, `history/` or `drafts/`.
   - A profile with no submit keys never writes a sent log.
-  - `UNSENT_ON_SEND_CLAUDE` wins over `UNSENT_ON_SEND`; files are `0600`; retention trims at 5 MB, 365 days (a log 364.5 days old stays, one 365.5 days old goes) and 2,000 logs; `unsent log <session> --copy N` copies message N.
+  - `UNSENT_ON_SEND_CLAUDE` wins over `UNSENT_ON_SEND`; files are `0600`; retention trims at 5 MB, 365 days (a log 364.5 days old stays, one 365.5 days old goes) and 2,000 logs per agent; `unsent log <session> --copy N` copies message N.
   - Mutation: a submit match that is always true must turn the Ctrl+C test red.
 - **Shell command lines** (2.12), on a real zsh with only the hooks sourced (`zsh -f`), driven through a pseudo-terminal; CI installs zsh where the runner lacks it:
   - a line typed then SIGHUP, and one typed then `kill -9`, both show in `unsent list` (the `kill -9` case up to the last redraw);
