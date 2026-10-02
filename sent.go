@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -260,7 +261,7 @@ const (
 	sentFormat = 1
 	// sentMaxBytes caps one session's log; the oldest messages go first.
 	sentMaxBytes = 5 << 20
-	sentMaxAge   = 90 * 24 * time.Hour
+	sentMaxAge   = 365 * 24 * time.Hour
 	sentLimit    = 2000
 )
 
@@ -281,11 +282,35 @@ type sentHeader struct {
 	Dropped int `json:"dropped,omitempty"`
 }
 
+// sentMessage is one message line. Fields are only added, so an older build
+// reads a newer line; none may be named time, resumed or session, the
+// fields sentKind tells the kinds of line apart by.
 type sentMessage struct {
 	Time time.Time `json:"time"`
 	Text string    `json:"text"`
 	// Pastes holds pastes the text still shows as a placeholder.
 	Pastes []string `json:"pastes,omitempty"`
+	// The context `unsent context` reads from the agent's transcript (see
+	// claudeimport.go); all empty for a message only the screen saw.
+	// UUID is the transcript record of the human turn, the key a second
+	// pass dedupes on.
+	UUID string `json:"uuid,omitempty"`
+	// Kind is how the turn was sent: "" (typed in the box, seen live),
+	// "typed", "queued", "absorbed" (typed while the agent worked and taken
+	// in mid-turn), "answer" (to the agent's question) or "slash".
+	Kind string `json:"kind,omitempty"`
+	// Asked is the agent's text just before the message, cut to 1000
+	// characters.
+	Asked string `json:"asked,omitempty"`
+	// ReplyTo says the message answers Asked: an answer, or text that
+	// ended in a question.
+	ReplyTo bool `json:"reply_to,omitempty"`
+	// Gloss is one line about the message, written later
+	// (`unsent context add`).
+	Gloss string `json:"gloss,omitempty"`
+	// Source is where the message came from: "" the screen, "transcript"
+	// or "history" (Claude Code's history.jsonl).
+	Source string `json:"source,omitempty"`
 }
 
 // sentResume is the line a run adds to a conversation's log it resumed,
@@ -339,6 +364,11 @@ func (s *store) logSentAt(r *record, when time.Time) error {
 		return err
 	}
 	path, conversation := s.sentPathOf(r), r.AgentSession != ""
+	unlock, err := lockSent(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	joined := r.joined
 	if joined.IsZero() {
 		joined = r.Started
@@ -398,8 +428,43 @@ func (s *store) logSentAt(r *record, when time.Time) error {
 	return nil
 }
 
+// sentLockPath is the lock file of the sent log at path:
+// sent/.lock-<name without .jsonl>.
+func sentLockPath(path string) string {
+	return filepath.Join(filepath.Dir(path), ".lock-"+strings.TrimSuffix(filepath.Base(path), ".jsonl"))
+}
+
+// lockSent takes the lock of the sent log at path, waiting for it, and
+// returns what releases it. Every write to a sent log holds it: a send's
+// append, a trim, and `unsent context`, which replaces the file, so an
+// append made between its read and its write would land in the file it
+// replaced. The kernel drops the lock if the process dies.
+func lockSent(path string) (func(), error) {
+	lp := sentLockPath(path)
+	for {
+		f, err := os.OpenFile(lp, os.O_CREATE|os.O_RDWR, 0o600)
+		if err != nil {
+			return nil, err
+		}
+		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+			f.Close()
+			return nil, err
+		}
+		// pruneSent removes the lock of a log that is gone while it holds
+		// it; a lock on the removed file guards nothing, so take the new
+		// one.
+		a, aerr := f.Stat()
+		b, berr := os.Stat(lp)
+		if aerr == nil && berr == nil && os.SameFile(a, b) {
+			return func() { f.Close() }, nil
+		}
+		f.Close()
+	}
+}
+
 // trimSent drops a sent log's oldest messages until it fits in
 // sentMaxBytes, keeping at least the newest, and counts them in the header.
+// The caller holds the log's lock (lockSent).
 // A resume line stays while a message of the run it marks is kept, and goes
 // once the next resume line comes before the first message kept; lines of
 // a kind this build does not know stay.
@@ -492,7 +557,7 @@ func sentKind(line []byte) sentLineKind {
 }
 
 // pruneSent deletes sent logs not written for sentMaxAge, then the oldest
-// beyond sentLimit.
+// beyond sentLimit, then the lock files of logs that are gone.
 func (s *store) pruneSent() {
 	pattern := filepath.Join(s.dir, "sent", "*.jsonl")
 	names, _ := filepath.Glob(pattern)
@@ -502,6 +567,25 @@ func (s *store) pruneSent() {
 		}
 	}
 	trimOldest(pattern, sentLimit)
+	locks, _ := filepath.Glob(filepath.Join(s.dir, "sent", ".lock-*"))
+	for _, lp := range locks {
+		log := filepath.Join(filepath.Dir(lp), strings.TrimPrefix(filepath.Base(lp), ".lock-")+".jsonl")
+		if _, err := os.Stat(log); err == nil {
+			continue
+		}
+		f, err := os.Open(lp)
+		if err != nil {
+			continue
+		}
+		// Only a lock nobody holds goes, and only while this holds it
+		// (see lockSent).
+		if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) == nil {
+			if _, err := os.Stat(log); os.IsNotExist(err) {
+				os.Remove(lp)
+			}
+		}
+		f.Close()
+	}
 }
 
 // readSent reads one sent log. A line cut short by a crash is skipped.

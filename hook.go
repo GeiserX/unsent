@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // `unsent hook claude` prints a Claude Code SessionStart hook for the user
@@ -16,14 +17,20 @@ import (
 // conversation that unsent kept a draft for it, and asks it to check with
 // the user. It never sends anything, never uses initialUserMessage, and
 // names the draft without carrying its text beyond the first line.
+//
+// The same command is a Stop hook: at the end of each turn it starts
+// `unsent context --transcript <the conversation's transcript>` on its own
+// and returns at once, so the sent log gets the turn's context and Claude
+// Code never waits for it.
 
 // hookInput is the part of Claude Code's hook input the note needs
 // (docs/research/claude.md section 10).
 type hookInput struct {
-	SessionID     string `json:"session_id"`
-	Cwd           string `json:"cwd"`
-	Source        string `json:"source"`
-	HookEventName string `json:"hook_event_name"`
+	SessionID      string `json:"session_id"`
+	TranscriptPath string `json:"transcript_path"`
+	Cwd            string `json:"cwd"`
+	Source         string `json:"source"`
+	HookEventName  string `json:"hook_event_name"`
 }
 
 // hookNote is the whole output of a hook that has a note: one field, the
@@ -39,6 +46,7 @@ type hookNote struct {
 type hookConfig struct {
 	Hooks struct {
 		SessionStart []hookMatcher `json:"SessionStart"`
+		Stop         []hookMatcher `json:"Stop"`
 	} `json:"hooks"`
 }
 
@@ -97,6 +105,7 @@ func printClaudeHook(stdout, stderr io.Writer) int {
 	}
 	var c hookConfig
 	c.Hooks.SessionStart = []hookMatcher{{Hooks: []hookCommand{{Type: "command", Command: shellQuote(exe) + " hook claude --run"}}}}
+	c.Hooks.Stop = []hookMatcher{{Hooks: []hookCommand{{Type: "command", Command: shellQuote(exe) + " hook claude --run"}}}}
 	if code := printJSON(stdout, stderr, c); code != 0 {
 		return code
 	}
@@ -108,8 +117,10 @@ func printClaudeHook(stdout, stderr io.Writer) int {
 
 // runClaudeHook prints the note for a resumed conversation that left a
 // draft, and nothing in every other case: another source, no draft, input
-// or a store it cannot read, any error. The hook must never block or slow
-// Claude Code, so it reads no terminal, runs no command and always exits 0.
+// or a store it cannot read, any error. For a Stop event it starts the
+// context pass (stopHook) and prints nothing. The hook must never block or
+// slow Claude Code, so it reads no terminal, waits for no command and
+// always exits 0.
 func runClaudeHook(stdin io.Reader, stdout io.Writer) {
 	defer func() { recover() }()
 	if f, ok := stdin.(*os.File); ok {
@@ -122,7 +133,14 @@ func runClaudeHook(stdin io.Reader, stdout io.Writer) {
 		return
 	}
 	var in hookInput
-	if json.Unmarshal(data, &in) != nil || in.HookEventName != "SessionStart" || in.Source != "resume" || in.SessionID == "" || in.Cwd == "" {
+	if json.Unmarshal(data, &in) != nil {
+		return
+	}
+	if in.HookEventName == "Stop" {
+		stopHook(in)
+		return
+	}
+	if in.HookEventName != "SessionStart" || in.Source != "resume" || in.SessionID == "" || in.Cwd == "" {
 		return
 	}
 	st := existingStore()
@@ -138,6 +156,58 @@ func runClaudeHook(stdin io.Reader, stdout io.Writer) {
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
 	enc.Encode(hookOutput(claudeNote(r)))
+}
+
+// stopHook starts `unsent context --transcript PATH` for the conversation
+// whose turn ended, detached, and returns without waiting for it. PATH is
+// the hook's transcript_path, or the one Claude Code would name for the
+// session in that folder, and must be a regular .jsonl file right in a
+// project folder of a projects folder. Nothing starts under on-send delete
+// or with no store.
+func stopHook(in hookInput) {
+	if onSend("claude") == "delete" || existingStore() == nil {
+		return
+	}
+	path := in.TranscriptPath
+	if path == "" {
+		if in.Cwd == "" || !sessionIDRE.MatchString(in.SessionID) {
+			return
+		}
+		path = filepath.Join(filepath.Dir(claudeSessions()), "projects", claudeSlug(in.Cwd), in.SessionID+".jsonl")
+	}
+	if !transcriptPath(path) {
+		return
+	}
+	exe, err := hookExe()
+	if err != nil {
+		return
+	}
+	hookSpawn([]string{exe, "context", "--transcript", filepath.Clean(path)})
+}
+
+// transcriptPath reports whether path names a Claude Code transcript:
+// absolute, <...>/projects/<slug>/<session>.jsonl, a regular file.
+func transcriptPath(path string) bool {
+	path = filepath.Clean(path)
+	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	if !filepath.IsAbs(path) || filepath.Ext(path) != ".jsonl" || !sessionIDRE.MatchString(id) ||
+		filepath.Base(filepath.Dir(filepath.Dir(path))) != "projects" {
+		return false
+	}
+	fi, err := os.Lstat(path)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// hookSpawn starts argv in a session of its own with no terminal and its
+// standard streams on /dev/null, and does not wait for it. A test swaps it
+// for one that records argv.
+var hookSpawn = func(argv []string) error {
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	return cmd.Process.Release()
 }
 
 // hookOutput is what the hook prints for a note: additionalContext and

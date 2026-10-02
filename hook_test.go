@@ -253,8 +253,114 @@ func TestHookClaudeConfigGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []hookMatcher{{Hooks: []hookCommand{{Type: "command", Command: "/usr/local/bin/unsent hook claude --run"}}}}
-	if !reflect.DeepEqual(c.Hooks.SessionStart, want) {
+	if !reflect.DeepEqual(c.Hooks.SessionStart, want) || !reflect.DeepEqual(c.Hooks.Stop, want) {
 		t.Fatalf("config %+v", c)
+	}
+}
+
+// stopJSON is a Stop hook's input as Claude Code sends it.
+func stopJSON(session, transcript, cwd string) string {
+	b, _ := json.Marshal(map[string]any{
+		"session_id": session, "transcript_path": transcript, "cwd": cwd,
+		"hook_event_name": "Stop", "stop_hook_active": false,
+	})
+	return string(b)
+}
+
+// spawned swaps hookSpawn for one that records each argv, and the binary's
+// path for a fixed one.
+func spawned(t *testing.T) *[][]string {
+	t.Helper()
+	var got [][]string
+	oldSpawn, oldExe := hookSpawn, hookExe
+	hookSpawn = func(argv []string) error {
+		got = append(got, argv)
+		return nil
+	}
+	hookExe = func() (string, error) { return "/usr/local/bin/unsent", nil }
+	t.Cleanup(func() { hookSpawn, hookExe = oldSpawn, oldExe })
+	return &got
+}
+
+// writeTranscript writes an empty transcript file at
+// <cfg>/projects/<slug>/<session>.jsonl and returns its path.
+func writeTranscript(t *testing.T, cfg, slug, session string) string {
+	t.Helper()
+	dir := filepath.Join(cfg, "projects", slug)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, session+".jsonl")
+	if err := os.WriteFile(p, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// A Stop event with the conversation's transcript starts unsent context
+// on it and prints nothing; a path that is not a transcript in a projects
+// folder starts nothing.
+func TestHookClaudeStopStartsTheContextPass(t *testing.T) {
+	seedHook(t)
+	cfg := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	work := realPath(t.TempDir())
+	good := writeTranscript(t, cfg, claudeSlug(work), hookConv)
+	got := spawned(t)
+	if out := runHook(t, stopJSON(hookConv, good, work)); out != "" {
+		t.Fatalf("the Stop hook printed %q", out)
+	}
+	want := [][]string{{"/usr/local/bin/unsent", "context", "--transcript", good}}
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("spawned %q, want %q", *got, want)
+	}
+	// No transcript_path: the one Claude Code names for the folder.
+	*got = nil
+	runHook(t, stopJSON(hookConv, "", work))
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("with no transcript_path spawned %q, want %q", *got, want)
+	}
+	outside := filepath.Join(t.TempDir(), hookConv+".jsonl")
+	os.WriteFile(outside, []byte("{}\n"), 0o600)
+	link := filepath.Join(cfg, "projects", "linked", hookConv+".jsonl")
+	os.MkdirAll(filepath.Dir(link), 0o700)
+	os.Symlink(outside, link)
+	notJSONL := writeTranscript(t, cfg, "x", "abc")
+	os.Rename(notJSONL, strings.TrimSuffix(notJSONL, ".jsonl")+".txt")
+	sub := filepath.Join(cfg, "projects", "x", hookConv, "subagents", "agent-1.jsonl")
+	os.MkdirAll(filepath.Dir(sub), 0o700)
+	os.WriteFile(sub, []byte("{}\n"), 0o600)
+	for name, path := range map[string]string{
+		"outside a projects folder": outside,
+		"a symlink":                 link,
+		"not .jsonl":                strings.TrimSuffix(notJSONL, ".jsonl") + ".txt",
+		"missing":                   filepath.Join(cfg, "projects", "x", "nope.jsonl"),
+		"relative":                  "projects/x/" + hookConv + ".jsonl",
+		"a subagent's, one deeper":  sub,
+		"a folder":                  filepath.Join(cfg, "projects", "x"),
+	} {
+		*got = nil
+		if out := runHook(t, stopJSON(hookConv, path, work)); out != "" || len(*got) != 0 {
+			t.Errorf("%s: printed %q, spawned %q", name, out, *got)
+		}
+	}
+	// Under on-send delete nothing starts.
+	*got = nil
+	t.Setenv("UNSENT_ON_SEND_CLAUDE", "delete")
+	runHook(t, stopJSON(hookConv, good, work))
+	if len(*got) != 0 {
+		t.Fatalf("under delete spawned %q", *got)
+	}
+}
+
+// The real spawn starts the command detached and returns before it ends.
+func TestHookSpawnDoesNotWait(t *testing.T) {
+	start := time.Now()
+	if err := hookSpawn([]string{"sh", "-c", "sleep 2"}); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 1500*time.Millisecond {
+		t.Fatalf("hookSpawn waited %v", d)
 	}
 }
 
