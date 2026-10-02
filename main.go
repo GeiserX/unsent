@@ -683,8 +683,7 @@ type sentMessageJSON struct {
 const answeringMax = 200
 
 // answeringLine is the line unsent log quotes above a reply: the last line
-// of asked with text, where the agent's question is, trimmed and cut to
-// answeringMax characters.
+// of asked with text, trimmed and cut to answeringMax characters.
 func answeringLine(asked string) string {
 	lines := strings.Split(asked, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {

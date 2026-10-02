@@ -543,8 +543,8 @@ func TestClaudeTranscriptHugeAssistantText(t *testing.T) {
 	}
 }
 
-// What was asked keeps its last 1000 runes, where the question is, and is
-// never cut inside one; reply_to reads the whole text's last paragraph.
+// What was asked keeps its last 1000 runes and is never cut inside one;
+// reply_to reads the whole text's last paragraph.
 func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
 	long := "the head goes éé" + strings.Repeat("a", 998) + "?"
 	turns := ctRead(t, ctBuild(

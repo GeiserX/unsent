@@ -51,7 +51,7 @@ type claudeTurn struct {
 }
 
 // claudeAskedMax is how many runes of the agent's text a turn keeps: the
-// last ones, since a question comes at the end.
+// last ones, since an agent asks near the end.
 const claudeAskedMax = 1000
 
 // claudeTypedSince is the first Claude Code version that marks typed
