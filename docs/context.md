@@ -59,6 +59,8 @@ unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to dro
 }
 ```
 
+`--session` exits with status 2 when no conversation by that name is found, and when the conversation has a transcript but no sent log yet; `unsent import claude` makes that log.
+
 `--config-dir DIR` adds a Claude Code config folder to read, and can be given more than once. Without it, `unsent` reads `$CLAUDE_CONFIG_DIR` when it is set, and `~/.claude`. Two config folders that share one `projects` folder through a symlink are read once.
 
 `unsent import claude` is the one-off backfill. It does what `unsent context` does and also creates a log for every transcript that has none, so your past conversations show in `unsent log`. With `--history`, a session found only in Claude Code's `history.jsonl`, whose transcript is gone, gets a log too: its messages are `typed`, with `source` `history` and no `asked`, since that file keeps no reply. Turns older than the 365 days a log is kept are skipped. When `UNSENT_ON_SEND` or `UNSENT_ON_SEND_CLAUDE` is `delete`, it imports nothing, says so and exits with status 2.

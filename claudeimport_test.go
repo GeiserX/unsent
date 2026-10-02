@@ -267,6 +267,36 @@ func TestContextOnlyExistingLogsAndAnExplicitTranscript(t *testing.T) {
 	}
 }
 
+// context --session exits 2 for a conversation it cannot find (a number
+// past the list, a typo, another agent's log) and for a Claude Code
+// conversation that has a transcript but no sent log yet, naming the
+// command that makes one; it writes nothing either way.
+func TestContextSessionNotFound(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	r := testRecord("20261001-100000-8", "codex", "/w", t0)
+	r.Draft = "a codex message"
+	st.logSentAt(r, t0)
+	writeTurns(t, cfg, "-w", ctxOther, claudeTurn{UUID: "n-1", Kind: "typed", Time: t0, Text: "no log", SessionID: ctxOther})
+	for _, c := range []struct{ session, want string }{
+		{"99", `unsent: no Claude Code conversation "99"; see unsent log` + "\n"},
+		{"0", `unsent: no Claude Code conversation "0"; see unsent log` + "\n"},
+		{"not-a-real-session", `unsent: no Claude Code conversation "not-a-real-session"; see unsent log` + "\n"},
+		{"x y", `unsent: no Claude Code conversation "x y"; see unsent log` + "\n"},
+		{"1", `unsent: no Claude Code conversation "1"; see unsent log` + "\n"},
+		{ctxOther, `unsent: no sent log for "` + ctxOther + `"; unsent import claude makes one` + "\n"},
+	} {
+		code, out, errOut := runCLI("context", "--config-dir", cfg, "--session", c.session)
+		if code != 2 || out != "" || errOut != c.want {
+			t.Errorf("--session %q: exit %d, %q, %q", c.session, code, out, errOut)
+		}
+	}
+	if exists(st.claudeLogPath(ctxOther)) {
+		t.Fatal("a log was made")
+	}
+}
+
 // A send that lands while unsent context rewrites the log is kept: both
 // take the log's lock, so the send waits for the rewrite and appends to
 // the new file. Without the lock it appends to the file the rewrite then

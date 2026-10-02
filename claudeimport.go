@@ -674,14 +674,21 @@ func cmdContext(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		all := claudeTranscripts(claudeConfigDirs(o.configDirs))
 		if o.session != "" {
 			only = o.session
-			if l := findSent(st.sentLogs(), o.session); len(l) == 1 && l[0].Agent == "claude" && l[0].AgentSession != "" {
-				only = l[0].AgentSession
-			}
-			if !sessionIDRE.MatchString(only) {
-				fmt.Fprintf(stderr, "unsent: no Claude Code conversation %q\n", o.session)
-				return 2
+			found := findSent(st.sentLogs(), o.session)
+			if len(found) == 1 && found[0].Agent == "claude" && found[0].AgentSession != "" {
+				only = found[0].AgentSession
 			}
 			files = all[only]
+			_, err := os.Stat(st.claudeLogPath(only))
+			hasLog := sessionIDRE.MatchString(only) && err == nil
+			switch {
+			case !sessionIDRE.MatchString(only), files == nil && !hasLog:
+				fmt.Fprintf(stderr, "unsent: no Claude Code conversation %q; see unsent log\n", o.session)
+				return 2
+			case !hasLog:
+				fmt.Fprintf(stderr, "unsent: no sent log for %q; unsent import claude makes one\n", o.session)
+				return 2
+			}
 			break
 		}
 		// Only the transcripts of conversations that have a log.
