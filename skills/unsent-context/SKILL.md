@@ -32,7 +32,7 @@ Name a conversation by its `agent_session` (Claude Code's own session id), not b
 
 ## 3. Sort replies from directives
 
-Read each message in `messages` with a non-empty `asked` and no `gloss`. unsent sets `reply_to` only when the agent's last paragraph holds a `?`, so many replies still have it false. Decide from `asked` and `text` alone:
+Read each message in `messages` with a non-empty `asked` and no `gloss`. unsent sets `reply_to` when the message answers one of the agent's menu questions or when the agent's last paragraph holds a `?` outside a code block, so many replies still have it false. Decide from `asked` and `text` alone:
 
 - **A reply**: the text answers, chooses, confirms or refuses something the agent said, or asks about it (`Delete which copies exactly?` after `...or keep them on disk?`).
 - **A directive**: a new instruction unrelated to what the agent said. It gets no gloss and nothing is saved.

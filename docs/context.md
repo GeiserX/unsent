@@ -11,7 +11,7 @@ Each message in a sent log can carry these fields. A message with none of them i
 | Field | What it holds |
 | --- | --- |
 | `asked` | the agent's text right before your message: every text block of its last reply, keeping the last 1,000 characters, since a question comes at the end. For an `answer`, the questions it answers. `""` when your message followed another of yours with no reply between them. |
-| `reply_to` | `true` when the message answers the agent: an answer to one of its questions, or the last paragraph of what the agent said (the text after its last blank line) holds a `?` anywhere. The [skill](#the-skill) marks the replies this misses. |
+| `reply_to` | `true` when the message answers the agent: an answer to one of its questions, or the last paragraph of what the agent said (the text after its last blank line) holds a `?` anywhere outside a code block. The [skill](#the-skill) marks the replies this misses. |
 | `kind` | how the message reached the agent, below. `""` for a message `unsent` read off the box live until a pass matches it to its turn; `source` `""` is what marks a message `unsent` saw in the box. |
 | `uuid` | the id of the turn in Claude Code's transcript. `unsent` uses it so a turn is never added twice. |
 | `gloss` | one line saying what was asked and what you chose, written later by the [skill](#the-skill) through `unsent context add` |

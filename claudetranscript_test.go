@@ -574,7 +574,8 @@ func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
 }
 
 // A message replies when the last paragraph of what the agent said, the
-// text after its last blank line, holds a question mark anywhere.
+// text after its last blank line, holds a question mark anywhere outside a
+// code fence.
 func TestAsksSomething(t *testing.T) {
 	for _, c := range []struct {
 		name, text string
@@ -591,6 +592,12 @@ func TestAsksSomething(t *testing.T) {
 		{"a list after the question", "Keep the flag?\n\n- tests pass\n- docs updated", false},
 		{"a line of spaces splits paragraphs", "Keep it?\n   \nDone.", false},
 		{"crlf", "Done.\r\n\r\nKeep it? Yes.\r\n", true},
+		{"only in a trailing fence", "Run:\n\n```\ncurl x?y\n```", false},
+		{"in a fence with a language", "Run this:\n```sh\nls *?.go\n```\n", false},
+		{"before a trailing fence", "Shall I run it?\n```\ncurl x?y\n```", true},
+		{"a blank line inside the trailing fence", "Run this?\n```\na\n\nb\n```", true},
+		{"after a fence", "```\nx?\n```\nDone.", false},
+		{"a fence in an earlier paragraph", "```\nx\n```\n\nKeep it?", true},
 	} {
 		if got := asksSomething(c.text); got != c.want {
 			t.Errorf("%s: asksSomething(%q) = %v, want %v", c.name, c.text, got, c.want)

@@ -583,17 +583,25 @@ func lastRunes(s string, n int) string {
 }
 
 // asksSomething reports whether the last paragraph of s, the text after
-// its last blank line, holds a question mark anywhere. An agent often puts
-// its question mid paragraph and ends on a default ("Delete them? My
-// default is to keep them."), and a question in an earlier paragraph is
-// usually answered by the paragraphs after it.
+// its last blank line, holds a question mark anywhere outside a code fence.
+// An agent often puts its question mid paragraph and ends on a default
+// ("Delete them? My default is to keep them."), and a question in an
+// earlier paragraph is usually answered by the paragraphs after it. A ? in
+// a fenced block is a URL query, a glob or a regex, not a question, and a
+// blank line inside a fence does not end the paragraph. The walk goes up
+// from the end, so a fence opened before a cut head still reads right.
 func asksSomething(s string) bool {
 	lines := strings.Split(strings.TrimRight(s, " \t\r\n"), "\n")
+	fenced := false
 	for i := len(lines) - 1; i >= 0; i-- {
-		if strings.TrimSpace(lines[i]) == "" {
-			break
-		}
-		if strings.Contains(lines[i], "?") {
+		l := strings.TrimSpace(lines[i])
+		switch {
+		case strings.HasPrefix(l, "```"):
+			fenced = !fenced
+		case fenced:
+		case l == "":
+			return false
+		case strings.Contains(l, "?"):
 			return true
 		}
 	}
