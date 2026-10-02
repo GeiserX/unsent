@@ -80,7 +80,7 @@ the second one, and keep the tests
   ↳ why: Asked whether to split the parser out; chose its own package, tests kept
 ```
 
-The `answering` line shows the last line of `asked` that has text, cut to 200 characters, and only when `reply_to` is true. The `why` line shows the gloss. `unsent log <n> --json` carries all six fields on each message, each left out when empty. [Sent messages](sent-messages.md) has the rest of the shape.
+The `answering` line shows the last line of `asked` that has text outside a code block, cut to 200 characters, and only when `reply_to` is true. The `why` line shows the gloss. `unsent log <n> --json` carries all six fields on each message, each left out when empty. [Sent messages](sent-messages.md) has the rest of the shape.
 
 ## The Stop hook
 

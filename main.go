@@ -683,11 +683,19 @@ type sentMessageJSON struct {
 const answeringMax = 200
 
 // answeringLine is the line unsent log quotes above a reply: the last line
-// of asked with text, trimmed and cut to answeringMax characters.
+// of asked with text outside a code block, trimmed and cut to answeringMax
+// characters. Fences are walked the way asksSomething walks them, so a
+// question above a trailing block is quoted, never the block's last line.
 func answeringLine(asked string) string {
 	lines := strings.Split(asked, "\n")
+	fenced := false
 	for i := len(lines) - 1; i >= 0; i-- {
-		if l := strings.TrimSpace(lines[i]); l != "" {
+		l := strings.TrimSpace(lines[i])
+		switch {
+		case strings.HasPrefix(l, "```"):
+			fenced = !fenced
+		case fenced:
+		case l != "":
 			return cutRunes(l, answeringMax)
 		}
 	}

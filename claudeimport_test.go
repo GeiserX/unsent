@@ -762,6 +762,9 @@ func TestAnsweringLine(t *testing.T) {
 		{"  only line  ", "only line"},
 		{"\n\n", ""},
 		{"head\n" + long, strings.Repeat("é", answeringMax)},
+		{"Shall I run it?\n```\ncurl x?y\n```", "Shall I run it?"},
+		{"Run this?\n```sh\na\n\nb\n```\n", "Run this?"},
+		{"```\nonly a block\n```", ""},
 	} {
 		if got := answeringLine(c.asked); got != c.want {
 			t.Errorf("answeringLine(%q) = %q, want %q", c.asked, got, c.want)
