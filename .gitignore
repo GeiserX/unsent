@@ -9,5 +9,10 @@ coverage*.out
 *.db
 .beads-credential-key
 .beads/proxieddb/
-.beads/
+.beads/issues.jsonl
+.beads/interactions.jsonl
+.beads/embeddeddolt/
+.beads/dolt/
+.beads/backup/
+.beads/.remote-visibility
 /site/
