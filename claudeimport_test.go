@@ -439,6 +439,50 @@ func TestImportClaudeCreatesLogs(t *testing.T) {
 	}
 }
 
+// A forked conversation's transcript repeats the turns before the fork
+// under its own session id. Each conversation's log gets them, whichever
+// file sorts first, and a pass over the fork's transcript alone then finds
+// nothing new.
+func TestImportClaudeForkedConversation(t *testing.T) {
+	cfg := claudeHome(t)
+	st := testStore(t)
+	t0 := ctxBase()
+	// The fork sorts first, so a dedupe across files gave it every shared
+	// turn and left the conversation it came from with no log.
+	fork, parent := ctxConv, ctxOther
+	writeTurns(t, cfg, "-work-a", parent,
+		claudeTurn{UUID: "p-1", Kind: "typed", Time: t0, Text: "before the fork", Cwd: "/work/a", SessionID: parent},
+		claudeTurn{UUID: "p-2", Kind: "typed", Time: t0.Add(2 * time.Minute), Text: "after, in the first", Cwd: "/work/a", SessionID: parent},
+	)
+	forkPath := writeTurns(t, cfg, "-work-a", fork,
+		claudeTurn{UUID: "p-1", Kind: "typed", Time: t0, Text: "before the fork", Cwd: "/work/a", SessionID: fork},
+		claudeTurn{UUID: "f-1", Kind: "typed", Time: t0.Add(time.Minute), Text: "after, in the fork", Cwd: "/work/a", SessionID: fork},
+	)
+	if code, out, errOut := runCLI("import", "claude", "--config-dir", cfg); code != 0 {
+		t.Fatalf("exit %d, %q, %q", code, out, errOut)
+	}
+	texts := func(id string) []string {
+		var out []string
+		for _, m := range readMessages(t, st.claudeLogPath(id)) {
+			out = append(out, m.Text)
+		}
+		return out
+	}
+	if got := texts(parent); !slices.Equal(got, []string{"before the fork", "after, in the first"}) {
+		t.Fatalf("the first conversation's log: %q", got)
+	}
+	if got := texts(fork); !slices.Equal(got, []string{"before the fork", "after, in the fork"}) {
+		t.Fatalf("the fork's log: %q", got)
+	}
+	before, _ := os.ReadFile(st.claudeLogPath(fork))
+	if code, out, _ := runCLI("context", "--transcript", forkPath); code != 0 || !strings.HasPrefix(out, "0 logs updated") {
+		t.Fatalf("a pass over the fork: exit %d, %q", code, out)
+	}
+	if after, _ := os.ReadFile(st.claudeLogPath(fork)); !bytes.Equal(before, after) {
+		t.Fatal("a pass over the fork's transcript changed its log")
+	}
+}
+
 // Under on-send delete for Claude Code, import and context keep nothing.
 func TestImportClaudeRefusesUnderDelete(t *testing.T) {
 	cfg := claudeHome(t)

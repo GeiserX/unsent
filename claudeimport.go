@@ -382,8 +382,11 @@ func claudeTranscripts(dirs []string) map[string][]transcriptFile {
 
 // groupTurns reads files and sorts their turns by conversation: the turn's
 // own session id, else the one the file's name says. A turn is taken once
-// by uuid, the first read; one with no uuid, or older than cutoff, is
-// skipped and counted.
+// per conversation by uuid, the first read; one with no uuid, or older than
+// cutoff, is skipped and counted. A forked or continued conversation's
+// transcript repeats the earlier turns under its own session id, so they go
+// to both conversations' logs, whichever file is read first, as a pass over
+// that one transcript would put them.
 func groupTurns(files []transcriptFile, read turnReader, cutoff time.Time) (map[string][]claudeTurn, []string, int) {
 	groups := map[string][]claudeTurn{}
 	var order []string
@@ -406,14 +409,15 @@ func groupTurns(files []transcriptFile, read turnReader, cutoff time.Time) (map[
 			case t.UUID == "" || t.Time.Before(cutoff):
 				skipped++
 				continue
-			case seen[t.UUID]:
-				continue
 			}
-			seen[t.UUID] = true
 			id := t.SessionID
 			if !sessionIDRE.MatchString(id) {
 				id = f.session
 			}
+			if seen[id+"/"+t.UUID] {
+				continue
+			}
+			seen[id+"/"+t.UUID] = true
 			if _, ok := groups[id]; !ok {
 				order = append(order, id)
 			}

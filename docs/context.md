@@ -97,6 +97,7 @@ A sent log is kept for 365 days after its last message. A log that `unsent conte
 ## What it does not do
 
 - Compactions are not recorded. A compaction summary repeats your earlier messages, so it is never read as a turn. A `/compact` you type never gets context either: the transcript keeps it only as a bare `/compact` record, without what you typed after it, and that record is not read as a turn.
+- A forked or continued conversation (`--fork-session`) starts its transcript with a copy of the turns before the fork, so its log holds them too, as `transcript` messages, and so does the log of the conversation it came from.
 - Only Claude Code's transcripts are read. Messages sent to Codex, pi and agy have no context yet.
 - A message sent while on send was `delete` is never imported later. The setting means keep nothing, and it holds for the transcript too.
 - A conversation that is not in the transcript or in `history.jsonl` cannot be backfilled.
