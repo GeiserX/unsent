@@ -629,6 +629,18 @@ func seedSentJSON(t *testing.T) *store {
 	if err := os.WriteFile(path, []byte(string(line)+"\n"+rest), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// The resumed run's message has the context unsent context gives it,
+	// and a gloss; the log's time stays now, so the seed never ages out.
+	if _, err := mergeSent(path, nil, []sentMessage{{
+		Time: at(41), Text: "carry on", UUID: "seed-uuid-3", Kind: "typed",
+		Asked: "\nShall I go on with the parser?\nOr stop here?", ReplyTo: true, Source: "transcript",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := setGloss(path, 3, "finish the refactor before the release"); err != nil {
+		t.Fatal(err)
+	}
+	os.Chtimes(path, time.Now(), time.Now())
 	run := testRecord("20260928-173000-77", "claude", "/work", at(30))
 	run.Draft = "é" + strings.Repeat("x", firstLineMax+5) + "\nrest"
 	if err := st.logSentAt(run, at(31)); err != nil {

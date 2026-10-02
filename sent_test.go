@@ -629,15 +629,17 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// Logs not written for 90 days go, however few there are.
+// Logs not written for 365 days go, however few there are. The ages are
+// written out, not taken from sentMaxAge, so a cap of 364 days fails.
 func TestSentLogRetentionAge(t *testing.T) {
 	st := testStore(t)
 	dir := filepath.Join(st.dir, "sent")
-	old := ageLog(t, dir, "old", sentMaxAge+24*time.Hour)
-	young := ageLog(t, dir, "young", sentMaxAge-24*time.Hour)
+	day := 24 * time.Hour
+	old := ageLog(t, dir, "old", 365*day+12*time.Hour)
+	young := ageLog(t, dir, "young", 364*day+12*time.Hour)
 	st.pruneSent()
 	if exists(old) || !exists(young) {
-		t.Fatalf("after pruning: 91 days old kept %v, 89 days old kept %v", exists(old), exists(young))
+		t.Fatalf("after pruning: 365.5 days old kept %v, 364.5 days old kept %v", exists(old), exists(young))
 	}
 }
 
