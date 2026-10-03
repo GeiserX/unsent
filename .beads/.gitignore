@@ -3,6 +3,11 @@ dolt/
 embeddeddolt/
 proxieddb/
 
+# Bead text lives in the Dolt tracker only, never in git
+issues.jsonl
+interactions.jsonl
+events.jsonl
+
 # Runtime files
 bd.sock
 bd.sock.startlock
