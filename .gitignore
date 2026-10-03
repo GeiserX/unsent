@@ -11,6 +11,7 @@ coverage*.out
 .beads/proxieddb/
 .beads/issues.jsonl
 .beads/interactions.jsonl
+.beads/events.jsonl
 .beads/embeddeddolt/
 .beads/dolt/
 .beads/backup/
