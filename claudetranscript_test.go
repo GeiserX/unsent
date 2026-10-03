@@ -543,9 +543,8 @@ func TestClaudeTranscriptHugeAssistantText(t *testing.T) {
 	}
 }
 
-// What was asked keeps its last 1000 runes, where the question is, and is
-// never cut inside one; reply_to reads the whole text's last non-empty
-// line.
+// What was asked keeps its last 1000 runes and is never cut inside one;
+// reply_to reads the whole text's last paragraph.
 func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
 	long := "the head goes éé" + strings.Repeat("a", 998) + "?"
 	turns := ctRead(t, ctBuild(
@@ -556,7 +555,7 @@ func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
 		ctTyped("u2", "a2", "two"),
 		ctSays("a3", "u2", "m3", ctText("Is it? No.")),
 		ctTyped("u3", "a3", "three"),
-		ctSays("a4", "u3", "m4", ctText("Why?\nBecause.")),
+		ctSays("a4", "u3", "m4", ctText("Why?\n\nBecause.")),
 		ctTyped("u4", "a4", "four"),
 	))
 	if got := turns[1].Asked; got != "é"+strings.Repeat("a", 998)+"?" {
@@ -566,11 +565,43 @@ func TestClaudeTranscriptAskedCutAndReplyTo(t *testing.T) {
 	for _, tr := range turns {
 		reply = append(reply, tr.ReplyTo)
 	}
-	if want := []bool{false, true, true, false, false}; !reflect.DeepEqual(reply, want) {
+	if want := []bool{false, true, true, true, false}; !reflect.DeepEqual(reply, want) {
 		t.Fatalf("reply_to %v, want %v", reply, want)
 	}
 	if turns[2].Asked != "Is it?" {
 		t.Fatalf("asked %q", turns[2].Asked)
+	}
+}
+
+// A message replies when the last paragraph of what the agent said, the
+// text after its last blank line, holds a question mark anywhere outside a
+// code fence.
+func TestAsksSomething(t *testing.T) {
+	for _, c := range []struct {
+		name, text string
+		want       bool
+	}{
+		{"at the end", "I read the code.\n\nShall I fix the parser?", true},
+		{"mid last paragraph", "Done.\n\nShall I delete the copies, or keep them on disk? My default is to keep them.", true},
+		{"only in an earlier paragraph", "Which file?\n\nI picked main.go and fixed it.", false},
+		{"none", "Fixed it.\n\nAll tests pass.", false},
+		{"empty", "", false},
+		{"blank only", " \n\t\n", false},
+		{"trailing whitespace", "Done.\n\nShip it?  \n \n\t", true},
+		{"a list in the last paragraph", "Summary:\n\n- keep the flag?\n- drop the tests", true},
+		{"a list after the question", "Keep the flag?\n\n- tests pass\n- docs updated", false},
+		{"a line of spaces splits paragraphs", "Keep it?\n   \nDone.", false},
+		{"crlf", "Done.\r\n\r\nKeep it? Yes.\r\n", true},
+		{"only in a trailing fence", "Run:\n\n```\ncurl x?y\n```", false},
+		{"in a fence with a language", "Run this:\n```sh\nls *?.go\n```\n", false},
+		{"before a trailing fence", "Shall I run it?\n```\ncurl x?y\n```", true},
+		{"a blank line inside the trailing fence", "Run this?\n```\na\n\nb\n```", true},
+		{"after a fence", "```\nx?\n```\nDone.", false},
+		{"a fence in an earlier paragraph", "```\nx\n```\n\nKeep it?", true},
+	} {
+		if got := asksSomething(c.text); got != c.want {
+			t.Errorf("%s: asksSomething(%q) = %v, want %v", c.name, c.text, got, c.want)
+		}
 	}
 }
 

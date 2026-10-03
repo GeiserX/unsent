@@ -51,9 +51,11 @@ Usage:
                              what the agent had just said, and the answers and
                              messages typed while it worked, which the screen
                              never showed as sent
-  unsent context add <session> <n|uuid> --gloss TEXT
+  unsent context add <session> <n|uuid> --gloss TEXT [--reply]
                              set a one-line note on message n of a sent log
-                             (TEXT - reads stdin); unsent log shows it
+                             (TEXT - reads stdin); unsent log shows it;
+                             --reply also marks the message a reply to what
+                             the agent asked
   unsent import claude [--config-dir DIR]... [--history] [--json]
                              the same over every Claude Code transcript, making
                              the sent logs that are missing (the last 365 days);
@@ -681,12 +683,19 @@ type sentMessageJSON struct {
 const answeringMax = 200
 
 // answeringLine is the line unsent log quotes above a reply: the last line
-// of asked with text, where the agent's question is, trimmed and cut to
-// answeringMax characters.
+// of asked with text outside a code block, trimmed and cut to answeringMax
+// characters. Fences are walked the way asksSomething walks them, so a
+// question above a trailing block is quoted, never the block's last line.
 func answeringLine(asked string) string {
 	lines := strings.Split(asked, "\n")
+	fenced := false
 	for i := len(lines) - 1; i >= 0; i-- {
-		if l := strings.TrimSpace(lines[i]); l != "" {
+		l := strings.TrimSpace(lines[i])
+		switch {
+		case strings.HasPrefix(l, "```"):
+			fenced = !fenced
+		case fenced:
+		case l != "":
 			return cutRunes(l, answeringMax)
 		}
 	}

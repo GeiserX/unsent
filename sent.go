@@ -302,10 +302,11 @@ type sentMessage struct {
 	// in mid-turn), "answer" (to the agent's question) or "slash".
 	Kind string `json:"kind,omitempty"`
 	// Asked is the agent's text just before the message, its last 1000
-	// characters (a question comes at the end).
+	// characters (an agent asks near the end).
 	Asked string `json:"asked,omitempty"`
-	// ReplyTo says the message answers Asked: an answer, or text that
-	// ended in a question.
+	// ReplyTo says the message answers Asked: an answer, agent text whose
+	// last paragraph holds a ? outside a code block, or set by unsent
+	// context add --reply.
 	ReplyTo bool `json:"reply_to,omitempty"`
 	// Gloss is one line about the message, written later
 	// (`unsent context add`).

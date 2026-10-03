@@ -10,8 +10,8 @@ Each message in a sent log can carry these fields. A message with none of them i
 
 | Field | What it holds |
 | --- | --- |
-| `asked` | the agent's text right before your message: every text block of its last reply, keeping the last 1,000 characters, since a question comes at the end. For an `answer`, the questions it answers. `""` when your message followed another of yours with no reply between them. |
-| `reply_to` | `true` when the message answers the agent: an answer to one of its questions, or `asked` ends with a line that ends in `?` |
+| `asked` | the agent's text right before your message: every text block of its last reply, keeping the last 1,000 characters, since an agent asks near the end. For an `answer`, the questions it answers. `""` when your message followed another of yours with no reply between them. |
+| `reply_to` | `true` when the message answers the agent: an answer to one of its questions, or the last paragraph of what the agent said (the text after its last blank line) holds a `?` anywhere outside a code block. The [skill](#the-skill) marks the replies this misses. |
 | `kind` | how the message reached the agent, below. `""` for a message `unsent` read off the box live until a pass matches it to its turn; `source` `""` is what marks a message `unsent` saw in the box. |
 | `uuid` | the id of the turn in Claude Code's transcript. `unsent` uses it so a turn is never added twice. |
 | `gloss` | one line saying what was asked and what you chose, written later by the [skill](#the-skill) through `unsent context add` |
@@ -45,10 +45,10 @@ unsent context --session <session>   # one conversation: a number from unsent lo
 unsent context --transcript <path>   # one transcript file
 unsent import claude                 # also create logs for conversations unsent never saw
 unsent import claude --history       # and for conversations only history.jsonl remembers
-unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to drop it"
+unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to drop it" --reply
 ```
 
-`unsent context` matches each logged message to its turn in the transcript by its text, with spaces collapsed, and fills in `uuid`, `kind`, `asked` and `reply_to`. A paste counts as the text it holds, whether the transcript wraps it in `<pasted_content>` tags or the log still shows it as `[Pasted text #1]` with the paste beside it. A message and a turn more than an hour apart are never matched, and when several messages share a text, such as `yes`, each turn takes the one nearest to it in time. Turns that are not in the log, usually answers and absorbed prompts, are added with `source` `transcript`. A gloss already written is kept. It prints one line, such as `3 logs updated, 12 messages added, 87 matched`. `--json` prints the same counts as an object, with `skipped` added: turns older than 365 days or with no uuid, and transcripts it could not read.
+`unsent context` matches each logged message to its turn in the transcript by its text, with spaces collapsed, and fills in `uuid`, `kind`, `asked` and `reply_to`. A paste counts as the text it holds, whether the transcript wraps it in `<pasted_content>` tags or the log still shows it as `[Pasted text #1]` with the paste beside it. A message and a turn more than an hour apart are never matched, and when several messages share a text, such as `yes`, each turn takes the one nearest to it in time. Turns that are not in the log, usually answers and absorbed prompts, are added with `source` `transcript`. A message the log already holds by `uuid` gets `reply_to` true when its turn now reads as a reply, such as after an update that reads more turns as replies, and counts as matched; nothing else of it changes, and `reply_to` never goes back to false. A gloss already written is kept. It prints one line, such as `3 logs updated, 12 messages added, 87 matched`. `--json` prints the same counts as an object, with `skipped` added: turns older than 365 days or with no uuid, and transcripts it could not read.
 
 ```json
 {
@@ -65,7 +65,7 @@ unsent context add 1 4 --gloss "Asked whether to keep the old flag; chose to dro
 
 `unsent import claude` is the one-off backfill. It does what `unsent context` does and also creates a log for every transcript that has none, so your past conversations show in `unsent log`. With `--history`, a session found only in Claude Code's `history.jsonl`, whose transcript is gone, gets a log too: its messages are `typed`, with `source` `history` and no `asked`, since that file keeps no reply. Turns older than the 365 days a log is kept are skipped. When `UNSENT_ON_SEND` or `UNSENT_ON_SEND_CLAUDE` is `delete`, it imports nothing, says so and exits with status 2.
 
-`unsent context add <session> <n|uuid> --gloss TEXT` sets the gloss of one message, named by its `uuid` or by `n`. Prefer the `uuid`: it never changes, while `n` is the message's place in the log as it is now, and a pass that adds an earlier turn, such as one the Stop hook starts while you read, moves every message after it. `<session>` is what `unsent log <session>` takes: the number from the list, unsent's id or Claude Code's session id. `--gloss -` reads the text from standard input. It exits with status 2 when the session or the message is not there.
+`unsent context add <session> <n|uuid> --gloss TEXT [--reply]` sets the gloss of one message, named by its `uuid` or by `n`. `--reply` also sets its `reply_to` to true, for a reply the `?` rule missed; without it `reply_to` stays as it is. Prefer the `uuid`: it never changes, while `n` is the message's place in the log as it is now, and a pass that adds an earlier turn, such as one the Stop hook starts while you read, moves every message after it. `<session>` is what `unsent log <session>` takes: the number from the list, unsent's id or Claude Code's session id. `--gloss -` reads the text from standard input. Setting the gloss a message already has changes nothing. It exits with status 2 when the session or the message is not there.
 
 `unsent import` and `unsent context` take the place of any program with that name, such as ImageMagick's `import`. To run such a program through `unsent`, use `unsent -- import`.
 
@@ -80,7 +80,7 @@ the second one, and keep the tests
   ↳ why: Asked whether to split the parser out; chose its own package, tests kept
 ```
 
-The `answering` line shows the last line of `asked` that has text, where the question is, cut to 200 characters, and only when `reply_to` is true. The `why` line shows the gloss. `unsent log <n> --json` carries all six fields on each message, each left out when empty. [Sent messages](sent-messages.md) has the rest of the shape.
+The `answering` line shows the last line of `asked` that has text outside a code block, cut to 200 characters, and only when `reply_to` is true. The `why` line shows the gloss. `unsent log <n> --json` carries all six fields on each message, each left out when empty. [Sent messages](sent-messages.md) has the rest of the shape.
 
 ## The Stop hook
 
@@ -108,7 +108,7 @@ A sent log is kept for 365 days after its last message. A log that `unsent conte
 
 ## The skill
 
-The repo ships a skill, [skills/unsent-context](https://github.com/GeiserX/unsent/tree/main/skills/unsent-context), that runs the pass for you: it runs `unsent context`, then writes a gloss for each answer that has none, from `asked` and the message alone. Copy or symlink the folder into `~/.claude/skills` (or the skills folder of your agent) and ask for it, or run it on a schedule.
+The repo ships a skill, [skills/unsent-context](https://github.com/GeiserX/unsent/tree/main/skills/unsent-context), that runs the pass for you: it runs `unsent context`, then reads each message that has `asked` and no gloss. From `asked` and the message alone it decides whether the message replies to what the agent said or is a new directive, and writes a gloss for each reply. A reply the `?` rule missed is saved with `--reply`, which is how such a message gets its `answering` line. Copy or symlink the folder into `~/.claude/skills` (or the skills folder of your agent) and ask for it, or run it on a schedule.
 
 ```sh
 ln -s "$PWD/skills/unsent-context" ~/.claude/skills/unsent-context   # from a checkout of unsent
