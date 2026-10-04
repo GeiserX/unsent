@@ -17,6 +17,7 @@ A tag with a suffix, such as `v0.3.0-rc1`, is a prerelease.
 [`release.yml`](../.github/workflows/release.yml) runs on every `v*.*.*` tag. It runs goreleaser v2 with [`.goreleaser.yaml`](../.goreleaser.yaml), which:
 
 - builds `unsent` for macOS and Linux, amd64 and arm64, with `CGO_ENABLED=0` and the tag stamped into `unsent version`;
+- signs the macOS binaries with the maintainer's Developer ID and notarizes them with Apple (see "Signing and notarization" below);
 - packs each build into `unsent_<version>_<os>_<arch>.tar.gz` with `LICENSE` and `README.md`, and writes `checksums.txt`;
 - creates the GitHub release with those files and a changelog from GitHub;
 - writes the Homebrew formula and pushes it to the tap (next section).
@@ -44,7 +45,31 @@ With the secret missing or empty, goreleaser skips the tap step and the release 
 goreleaser release --snapshot --clean && test -s dist/homebrew/Formula/unsent.rb
 ```
 
+## Signing and notarization
+
+The `notarize` block in `.goreleaser.yaml` signs the two darwin binaries with a Developer ID Application certificate, with the hardened runtime, and sends them to Apple's notary service, all from the Linux runner. It waits for Apple's verdict, so a rejected binary fails the release before anything is published. A bare binary cannot carry a stapled ticket; Gatekeeper looks the ticket up online.
+
+It needs five repository secrets:
+
+| Secret | Value |
+| --- | --- |
+| `MACOS_SIGN_P12` | the Developer ID Application certificate and key as a `.p12`, base64 |
+| `MACOS_SIGN_PASSWORD` | the `.p12` password |
+| `MACOS_NOTARY_ISSUER_ID` | the App Store Connect API issuer id |
+| `MACOS_NOTARY_KEY_ID` | the API key id |
+| `MACOS_NOTARY_KEY` | the API key's `.p8` file, base64 |
+
+Pull requests and snapshots have none of them and build unsigned. A tag build stops before goreleaser when any of them is empty, so a release never ships unsigned by mistake.
+
+To check a published binary on a Mac:
+
+```sh
+codesign -dv --verbose=2 unsent    # Authority=Developer ID Application, flags=0x10000(runtime)
+codesign --verify --strict --check-notarization -R='notarized' unsent
+```
+
 ## After the release
 
 - Check the release run and the release page for 4 tarballs and `checksums.txt`.
+- Run the two `codesign` checks above on the darwin binaries.
 - If the tap was pushed, run `brew install GeiserX/unsent/unsent && unsent version` on a clean Mac.
