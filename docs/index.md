@@ -20,6 +20,10 @@ hide:
 
 **unsent** saves the message you have typed into a coding agent and not sent yet, and gives it back after a closed window, a reboot, a crash or one Ctrl+C too many. Claude Code, Codex, pi and agy save your conversations, not the message still in the box. `unsent` runs the agent in your terminal as before, reads its input box every 0.4 seconds and keeps the text on disk; it saves your half-typed zsh command line too. Start with [Getting started](getting-started.md), then [Using unsent](usage.md). [Supported agents](supported-agents.md) says which version of each agent was last checked, and how.
 
+<p align="center">
+  <img src="images/demo.gif" alt="A prompt typed into Claude Code through unsent, a crash before Enter, then unsent list, show and restore bring the prompt back" width="100%">
+</p>
+
 <div class="grid cards" markdown>
 
 -   :material-download: **[Getting started](getting-started.md)**
