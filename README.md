@@ -13,6 +13,10 @@
 
 **AutoRecover for your AI agent prompts.**
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="A prompt typed into Claude Code through unsent, a crash before Enter, then unsent list, show and restore bring the prompt back" width="900">
+</p>
+
 `unsent` saves text you have typed and not sent yet, in two places: the input box of a coding agent that runs in your terminal, and the command line at your shell prompt. Today that means Claude Code, Codex, pi, agy and zsh. Those agents save your *conversations*, not the message you haven't sent yet, so a closed window, a reboot, a crash or one Ctrl+C too many loses the prompt.
 
 The next time you start the agent in that folder, `unsent` tells you what it kept:

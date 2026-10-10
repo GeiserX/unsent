@@ -119,13 +119,16 @@ extra_css:
 # Files under docs/ that are not pages. MkDocs publishes every Markdown file in
 # docs/ whether or not it is in the nav, so anything that is not a page must be
 # listed here. SPEC.md and RELEASING.md match the capital-letter glob, and the
-# agent measurements live in research/; pages link them by GitHub URL.
+# agent measurements live in research/; pages link them by GitHub URL. The
+# demo's tape and its setup script are not pages either.
 exclude_docs: |
   [A-Z]*.md
   design/
   research/
   notes/
   requirements-docs.txt
+  images/demo.tape
+  images/demo-setup.sh
 
 # The nav title equals the page's H1. Three tabs, none with one page.
 nav:
