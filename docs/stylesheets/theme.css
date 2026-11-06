@@ -3,7 +3,7 @@
  * banner.svg sets the wordmark in #10233f on a #e9eef4 plate and draws a
  * floppy disk with a #1f4e8c body and a #e25b45 line on its label. The header
  * uses the wordmark colour, the text on it the plate colour, and the accent is
- * the label's red. mkdocs.yml sets primary and accent to custom, so nothing is
+ * the label's red. zensical.toml sets primary and accent to custom, so nothing is
  * painted until these variables exist.
  */
 :root {
@@ -42,9 +42,15 @@
    Only the first topic is styled; Material puts the page title in a second
    .md-header__topic and swaps them on scroll. */
 .md-header__topic:first-child .md-ellipsis {
-  color: #e9eef4;
   font-weight: 800;
   letter-spacing: -0.01em;
+}
+
+/* The plate colour only on the dark scheme: Zensical's modern header takes the
+   page background, so on the light scheme it is white and the plate colour
+   would vanish. There the name keeps the default text colour. */
+[data-md-color-scheme="slate"] .md-header__topic:first-child .md-ellipsis {
+  color: #e9eef4;
 }
 
 /* Keep the mark and the name close, so they read as one unit. */
