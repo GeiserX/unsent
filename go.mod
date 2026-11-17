@@ -2,6 +2,8 @@ module github.com/GeiserX/unsent
 
 go 1.26.0
 
+toolchain go1.27.4
+
 require (
 	github.com/charmbracelet/colorprofile v0.4.2 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260303162955-0b88c25f3fff // indirect
